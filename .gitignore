@@ -1,0 +1,33 @@
+# macOS
+.DS_Store
+
+# Xcode / build output
+build/
+DerivedData/
+*.xcarchive
+*.ipa
+*.dSYM.zip
+*.dSYM
+xcuserdata/
+*.xcuserstate
+*.moved-aside
+
+# The Xcode project is generated from project.yml with XcodeGen
+Endurancr.xcodeproj/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Website tooling
+website/.wrangler/
+node_modules/
+
+# Local tooling and personal files
+.claude/
+screenshots/
+*.mobileprovision
+*.p12
+*.cer
+.env

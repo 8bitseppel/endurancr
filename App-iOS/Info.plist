@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>endurancr</string>
+    <key>CFBundleDisplayName</key>
+    <string>endurancr</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundlePackageType</key>
+    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>CFBundleShortVersionString</key>
+    <string>$(MARKETING_VERSION)</string>
+    <key>CFBundleVersion</key>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
+    <!-- endurancr makes no network connections and uses no encryption beyond
+         what the OS provides, which is exempt. Declaring this here skips the export-compliance prompt
+         on every TestFlight/App Store upload. -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    <key>UILaunchScreen</key>
+    <dict/>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+    <!-- iPad (TARGETED_DEVICE_FAMILY 1,2) must support all orientations for
+         multitasking, otherwise App Store upload validation rejects the build. -->
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>NSHealthShareUsageDescription</key>
+    <string>endurancr reads your runs, routes, heart rate, resting heart rate, VO2 max, steps, running speed and power from Apple Health to track your progress and adapt your training plan. This data stays on your device and is never sent anywhere.</string>
+    <key>NSHealthUpdateUsageDescription</key>
+    <string>endurancr saves the runs it records (workout, distance, energy and GPS route) to Apple Health so they live alongside your other workouts. Nothing leaves your device.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>endurancr uses your location only while you record a run, including with the screen locked, to measure distance and pace and map your route. Your route stays on your device and in Apple Health.</string>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>location</string>
+    </array>
+    <key>NSSupportsLiveActivities</key>
+    <true/>
+</dict>
+</plist>
