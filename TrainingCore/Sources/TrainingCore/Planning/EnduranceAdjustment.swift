@@ -24,10 +24,11 @@ public enum EnduranceAdjustment {
         return (min(maxPoints, points) * (1 - credit) * 10).rounded() / 10
     }
 
-    /// The long run that earns every point back: 30 km for a marathon, 85% of the
-    /// distance for shorter goals (about 18 km for a half marathon).
+    /// The long run that earns every point back: 25 km for a marathon (the plan's
+    /// peak long run, about Jack Tupper Daniels' 2.5 hour cap at easy pace), 85% of
+    /// the distance for shorter goals (about 18 km for a half marathon).
     public static func fullCreditMeters(goalMeters: Double) -> Double {
-        min(30_000, goalMeters * 0.85)
+        min(25_000, goalMeters * 0.85)
     }
 
     /// Share of the points earned back by the longest recent run, from 0 (at or

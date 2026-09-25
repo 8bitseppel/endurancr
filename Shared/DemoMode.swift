@@ -4,14 +4,15 @@ import SwiftUI
 import TrainingCore
 
 /// Sample data for Simulator screenshots, switched on with the `-demo` launch
-/// argument in Debug builds only. It seeds a marathon plan six weeks in, answers
-/// HealthKit queries with runs that follow that plan, and skips the Health
-/// permission sheet. Release builds compile it out, so it can't reach TestFlight.
+/// argument in Debug builds only. It seeds a 4:30 marathon plan from a 12.2 km
+/// run at 5:36/km, six weeks in, answers HealthKit queries with runs that follow
+/// that plan, and skips the Health permission sheet. Release builds compile it out, so it can't reach TestFlight.
 ///
 /// `-demoScreen <name>` opens a specific screen: `welcome` (no goal yet), `goal`
 /// (the goal form, filled in), `run` (live run), `summary` (post-run summary),
 /// `progress` or `plan` (iPhone tabs). `-demoScroll YES` slowly scrolls the
-/// screen down and back up, for recording.
+/// screen down and back up, for recording. `-demoRecentRun <meters>,<seconds>`
+/// makes Health hold only that one run, from yesterday, to try a plan from it.
 enum DemoMode {
     static var isOn: Bool {
         #if DEBUG
@@ -38,20 +39,21 @@ enum DemoMode {
         // Monday six weeks ago, so week 1 is a full week.
         let thisMonday = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: today))!
         let start = calendar.date(byAdding: .day, value: -42, to: thisMonday)!
-        let race = calendar.date(byAdding: .day, value: 160, to: today)!
+        // 31 weeks in all, race on the last Sunday.
+        let race = calendar.date(byAdding: .day, value: 216, to: start)!
         let goal = Goal(
             name: "Hamburg Marathon",
             race: .marathon,
             raceDate: race,
-            targetTimeSeconds: 3 * 3600 + 45 * 60,
+            targetTimeSeconds: 4 * 3600 + 30 * 60,
             daysPerWeek: 5,
             restWeekdays: [2]
         )
-        // A 10K in 49:30 about two months ago.
+        // A 12.2 km run at 5:36/km the day before the plan started.
         let fitness = FitnessSnapshot(
-            distanceMeters: 10_000,
-            timeSeconds: 49 * 60 + 30,
-            date: calendar.date(byAdding: .day, value: -60, to: today)!
+            distanceMeters: 12_200,
+            timeSeconds: 68 * 60 + 19,
+            date: calendar.date(byAdding: .day, value: -1, to: start)!
         )
         return PlanInputs(goal: goal, fitness: fitness, startDate: start)
     }
@@ -86,6 +88,7 @@ enum DemoMode {
     /// A few easy runs are skipped; long runs never are, since the app would
     /// move a missed one into this week.
     static var runs: [CompletedRun] {
+        if let recent = recentRun { return [recent] }
         guard let plan else { return [] }
         let today = Calendar.current.startOfDay(for: .now)
         return plan.allWorkouts.enumerated().compactMap { index, workout in
@@ -100,6 +103,15 @@ enum DemoMode {
                 averageHeartRate: 138 + Double(index % 5) * 3
             )
         }
+    }
+
+    /// The single run set with `-demoRecentRun`, if any.
+    static var recentRun: CompletedRun? {
+        guard isOn, let parts = UserDefaults.standard.string(forKey: "demoRecentRun")?
+            .split(separator: ",").compactMap({ Double($0) }), parts.count == 2 else { return nil }
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Calendar.current.startOfDay(for: .now))!
+        return CompletedRun(date: yesterday.addingTimeInterval(8 * 3600),
+                            distanceMeters: parts[0], durationSeconds: parts[1])
     }
 
     /// Replaces whatever plan is stored with the demo plan.

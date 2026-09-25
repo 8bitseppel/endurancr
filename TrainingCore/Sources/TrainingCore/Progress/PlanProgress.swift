@@ -129,7 +129,8 @@ public struct PlanProgress: Sendable, Equatable {
         let requiredVDOT = plan.goal.targetTimeSeconds.map {
             calculator.vdot(distanceMeters: plan.goal.race.meters, timeSeconds: $0)
         }
-        let isReady = requiredVDOT.map { plan.raceVDOT >= $0 } ?? false
+        // Ready only once the endurance is earned too, not just the pace.
+        let isReady = plan.enduranceHoldback == 0 && (requiredVDOT.map { plan.raceVDOT >= $0 } ?? false)
 
         return PlanProgress(
             asOf: asOf,

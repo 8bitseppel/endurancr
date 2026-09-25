@@ -391,6 +391,29 @@ h.suite("Weekly volume redistribution") {
 
 // MARK: Endurance adjustment
 
+h.suite("Good to go needs proven endurance") {
+    let engine = AdaptationEngine()
+    // 12.2 km at 5:36/km: pace-wise already a 4:30 marathon, endurance unproven.
+    let run = FitnessSnapshot(distanceMeters: 12_200, timeSeconds: 12.2 * 336, date: date(2026, 9, 24))
+    let goal = Goal(race: .marathon, raceDate: date(2027, 4, 25), targetTimeSeconds: 4.5 * 3600)
+    let plan = try VDOTPlanGenerator().makePlan(goal: goal, fitness: run, startDate: date(2026, 9, 25), calendar: cal)
+    h.check(!plan.isMaintenance, "a short run doesn't make a marathon plan maintenance")
+    let longest = plan.allWorkouts.filter { $0.type == .longRun }.map(\.distanceMeters).max() ?? 0
+    h.check(longest >= EnduranceAdjustment.fullCreditMeters(goalMeters: goal.race.meters),
+            "the build's long runs reach the full-credit distance (got \(Int(longest)))")
+    let progress = PlanProgress.make(plan: plan, completedRuns: [], asOf: date(2026, 10, 1), calendar: cal)
+    h.check(!progress.isReadyForGoal, "not good to go while endurance is still held back")
+    // A marathon result that meets the target is still good to go.
+    let marathon = FitnessSnapshot(distanceMeters: 42_195, timeSeconds: 4.4 * 3600, date: date(2026, 9, 1))
+    let hold = try VDOTPlanGenerator().makePlan(goal: goal, fitness: marathon, startDate: date(2026, 9, 25), calendar: cal)
+    h.check(hold.isMaintenance, "a marathon faster than the target keeps the maintenance plan")
+    // The fitness run the day before the plan starts doesn't fill week 1.
+    let before = CompletedRun(date: date(2026, 9, 24).addingTimeInterval(8 * 3600), distanceMeters: 12_200, durationSeconds: 4_099)
+    let week1 = engine.redistributedWithinWeek(plan: plan, completedRuns: [before], asOf: date(2026, 9, 25), calendar: cal).weeks[0]
+    h.check(week1.workouts.filter(\.type.isRunning).count == plan.weeks[0].workouts.filter(\.type.isRunning).count,
+            "a run before the plan starts doesn't cancel week 1 runs")
+}
+
 h.suite("Endurance adjustment") {
     let engine = AdaptationEngine()
     let calc = VDOTCalculator()
@@ -406,12 +429,12 @@ h.suite("Endurance adjustment") {
     let rawRacePace = calc.predictedTimeSeconds(distanceMeters: goal.race.meters, vdot: plan.vdot) / 42.195
     h.check(race.targetPaceSecPerKm!.lowerBound > rawRacePace, "race-day pace uses the held-back VDOT")
 
-    // Long runs earn it back: 23 km halfway, 30 km fully.
+    // Long runs earn it back: 19 km about halfway, 25 km fully.
     let asOf = date(2026, 3, 1)
-    let half = engine.creditingEndurance(plan: plan, completedRuns: [CompletedRun(date: date(2026, 2, 22), distanceMeters: 23_250, durationSeconds: 7_800)], asOf: asOf, calendar: cal)
-    h.check(half.enduranceHoldback > 0 && half.enduranceHoldback < plan.enduranceHoldback, "a 23 km long run earns part back")
-    let done = engine.creditingEndurance(plan: plan, completedRuns: [CompletedRun(date: date(2026, 2, 22), distanceMeters: 30_000, durationSeconds: 10_800)], asOf: asOf, calendar: cal)
-    h.check(done.enduranceHoldback == 0 && done.raceVDOT == plan.vdot, "a 30 km long run earns it all back")
+    let half = engine.creditingEndurance(plan: plan, completedRuns: [CompletedRun(date: date(2026, 2, 22), distanceMeters: 19_400, durationSeconds: 7_800)], asOf: asOf, calendar: cal)
+    h.check(half.enduranceHoldback > 0 && half.enduranceHoldback < plan.enduranceHoldback, "a 19 km long run earns part back")
+    let done = engine.creditingEndurance(plan: plan, completedRuns: [CompletedRun(date: date(2026, 2, 22), distanceMeters: 25_000, durationSeconds: 9_600)], asOf: asOf, calendar: cal)
+    h.check(done.enduranceHoldback == 0 && done.raceVDOT == plan.vdot, "a 25 km long run earns it all back")
     let repaced = engine.repaced(plan: done, withVDOT: done.vdot, asOf: asOf, calendar: cal)
     h.check(abs(repaced.paceZones.marathonSecPerKm - full.marathonSecPerKm) < 0.01, "with the endurance shown, marathon pace is the race's")
     let old = engine.creditingEndurance(plan: plan, completedRuns: [CompletedRun(date: date(2025, 11, 1), distanceMeters: 30_000, durationSeconds: 10_800)], asOf: asOf, calendar: cal)

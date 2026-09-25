@@ -289,8 +289,11 @@ public struct AdaptationEngine: Sendable {
 
         let start = calendar.startOfDay(for: week.startDate)
         let end = calendar.date(byAdding: .day, value: 7, to: start) ?? start
+        // Runs before the plan's first run (e.g. the effort that set the fitness)
+        // don't count toward the first week.
+        let planStart = plan.allWorkouts.filter(\.type.isRunning).map { calendar.startOfDay(for: $0.date) }.min() ?? start
         let completedThisWeek = completedRuns
-            .filter { $0.date >= start && $0.date < end && $0.date <= asOf }
+            .filter { $0.date >= max(start, planStart) && $0.date < end && $0.date <= asOf }
             .reduce(0.0) { $0 + $1.distanceMeters }
 
         // A planned day is still "to do" only if it's today or later and no run was
@@ -356,7 +359,7 @@ public struct AdaptationEngine: Sendable {
                 week.workouts[i].distanceMeters = 0
                 week.workouts[i].targetPaceSecPerKm = nil
                 week.workouts[i].structure = nil
-                week.workouts[i].notes = "Week volume already met - rest"
+                week.workouts[i].notes = "Rest, the week's distance is already done"
             } else if abs(newDistance - original) >= 100 {
                 week.workouts[i].distanceMeters = newDistance
                 week.workouts[i].notes = "Adjusted to keep the week on target"

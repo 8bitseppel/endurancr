@@ -54,10 +54,13 @@ public struct VDOTPlanGenerator: PlanGenerator {
         // VDOT that time requires, they're "good to go": build a maintenance plan
         // that holds fitness (steady volume, one quality session, a weekly long run)
         // rather than a progressive build toward a fitness they already have.
+        // Endurance still to earn (a short race for a long goal) always gets the full
+        // build instead: holding 56 km weeks would never bring the long runs a
+        // marathon needs.
         let requiredVDOT = goal.targetTimeSeconds.map {
             calculator.vdot(distanceMeters: goal.race.meters, timeSeconds: $0)
         }
-        let isMaintenance = requiredVDOT.map { raceVDOT >= $0 } ?? false
+        let isMaintenance = holdback == 0 && (requiredVDOT.map { raceVDOT >= $0 } ?? false)
 
         // Anchor every week to Monday so the plan reads as Monday–Sunday calendar
         // weeks (the ISO "Kalenderwoche" the athlete sees on any calendar), instead

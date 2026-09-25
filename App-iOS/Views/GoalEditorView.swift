@@ -378,6 +378,7 @@ struct GoalEditorView: View {
                 Text(date.formatted(date: .abbreviated, time: .omitted))
                     .foregroundStyle(editingDate == field ? Color.accentColor : .secondary)
             }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -588,6 +589,7 @@ private struct AddDraftVacationView: View {
                 Text(date.formatted(date: .abbreviated, time: .omitted))
                     .foregroundStyle(editingDate == field ? Color.accentColor : .secondary)
             }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

@@ -103,7 +103,7 @@ struct CalendarView: View {
 
     private func weekHeader(_ week: TrainingWeek) -> some View {
         HStack {
-            Text("Week \(week.index + 1) · \(week.phase.rawValue.capitalized)")
+            Text("Week \(week.index + 1) · \(week.phase.displayName)")
             Spacer()
             Text(Format.distance(week.plannedVolumeMeters))
                 .foregroundStyle(.secondary)

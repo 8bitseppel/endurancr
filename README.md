@@ -52,7 +52,8 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   run never grows past the week's long run.
 - Honest marathon pace: when your fitness comes from a much shorter race, marathon
   pace and the finish prediction start up to 3 VDOT lower, and long runs earn it
-  back (fully at 30 km for a marathon). Easy and interval paces keep your speed.
+  back (fully at 25 km for a marathon). Until they do, you get a full build, never
+  a "good to go" plan. Easy and interval paces keep your speed.
 - Swap days by dragging them in the plan; the watch shows the same adjusted days.
 - Live run screens on Apple Watch and iPhone, with a Live Activity and controls on
   the Lock Screen.
@@ -105,7 +106,8 @@ To run it on your own devices, set your own team in `project.yml`
 
 `./scripts/screenshots.sh` takes the screenshots in `docs/screenshots/` on the iPhone and
 Apple Watch Simulators, using sample data that only exists in Debug builds
-(`Shared/DemoMode.swift`). Long screens are recorded while they scroll and saved as
+(`Shared/DemoMode.swift`): a 4:30 marathon plan from a 12.2 km run at 5:36/km, six
+weeks in. Long screens are recorded while they scroll and saved as
 GIFs (needs ffmpeg). `./scripts/release.sh` raises the build number and archives a
 build for TestFlight.
 

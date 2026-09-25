@@ -171,7 +171,7 @@ struct ProgressDashboardView: View {
                         Text("Week \(n) of \(progress.totalWeeks)")
                             .font(.caption).foregroundStyle(.secondary)
                         if let phase = progress.currentWeekPhase {
-                            Text(phase.rawValue.capitalized)
+                            Text(phase.displayName)
                                 .font(.caption2).foregroundStyle(.secondary)
                         }
                     }
@@ -361,6 +361,10 @@ struct ProgressDashboardView: View {
                     Label("You can already run this", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                         .font(.subheadline)
+                } else if let gap = progress.vdotToGoal, gap <= 0 {
+                    Label("On pace, long runs still to prove the endurance", systemImage: "arrow.up.forward")
+                        .foregroundStyle(.secondary)
+                        .font(.subheadline)
                 } else if let gap = progress.vdotToGoal {
                     Label("About \(String(format: "%.1f", gap)) VDOT to go", systemImage: "arrow.up.forward")
                         .foregroundStyle(.secondary)
@@ -398,14 +402,29 @@ struct ProgressDashboardView: View {
                     x: .value("Week", week.index + 1),
                     y: .value("km", week.plannedVolumeMeters / 1_000)
                 )
-                .foregroundStyle(by: .value("Phase", week.phase.rawValue))
+                .foregroundStyle(by: .value("Phase", week.phase.displayName))
             }
+            // Fixed colours: the default palette puts race week in orange.
+            .chartForegroundStyleScale(domain: phaseDomain(plan), range: phaseDomain(plan).map { phaseColor[$0] ?? .blue })
             .frame(height: 200)
         } header: {
             Text("Weekly volume")
         } footer: {
             Text("Each week's total km sets the run lengths. It starts around half your peak and rises ≤8% per week, with an easier cutback every 4th week and two taper weeks before race day. Peak volume scales with race distance (about \(peakVolumeText(plan)) here). Inside a week, the long run is the single longest run, a set share of the week's total, capped at \(Format.distance(VDOTPlanGenerator.longRunCap(for: plan.goal.race))) for a \(plan.goal.race.displayName), and the remaining km are split evenly across your other running days as easy/quality sessions.")
         }
+    }
+
+    private let phaseColor: [String: Color] = [
+        TrainingPhase.base.displayName: .teal, TrainingPhase.build.displayName: .blue,
+        TrainingPhase.peak.displayName: .indigo, TrainingPhase.taper.displayName: .green,
+        TrainingPhase.raceWeek.displayName: .purple, TrainingPhase.maintenance.displayName: .blue,
+    ]
+
+    /// The phases this plan has, in order, so the legend lists only those.
+    private func phaseDomain(_ plan: TrainingPlan) -> [String] {
+        var seen: [String] = []
+        for week in plan.weeks where !seen.contains(week.phase.displayName) { seen.append(week.phase.displayName) }
+        return seen
     }
 
     private func peakVolumeText(_ plan: TrainingPlan) -> String {
