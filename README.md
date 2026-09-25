@@ -38,7 +38,7 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   <img src="docs/screenshots/iphone-7-plan.png" width="180" alt="Plan">
 </p>
 <p align="center">
-  <img src="docs/screenshots/watch-1-today.gif" width="156" alt="Watch home">
+  <img src="docs/screenshots/watch-1-today.png" width="156" alt="Watch home">
   <img src="docs/screenshots/watch-2-run.gif" width="156" alt="Watch during a run">
   <img src="docs/screenshots/watch-3-summary.gif" width="156" alt="Watch after a run">
 </p>

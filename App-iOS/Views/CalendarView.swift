@@ -49,21 +49,22 @@ struct CalendarView: View {
                                 card(workout, zones: plan.paceZones)
                             }
                         } header: {
-                            weekHeader(week)
+                            weekHeader(week).id("week-\(week.index)")
                         }
-                        .id(week.index)
                     }
                 }
                 .padding(.horizontal)
                 .padding(.bottom)
             }
             .refreshable { await coordinator.refreshAdaptation() }
-            .onAppear {
-                // Open on the current week, not week 1.
+            .task {
+                // Open on the current week, not week 1. Wait one layout pass so the
+                // lazy stack can resolve the target.
                 guard !didScrollToToday,
                       let current = plan.weeks.last(where: { $0.startDate <= .now }) else { return }
                 didScrollToToday = true
-                proxy.scrollTo(current.index, anchor: .top)
+                try? await Task.sleep(for: .milliseconds(50))
+                proxy.scrollTo("week-\(current.index)", anchor: .top)
             }
         }
     }
