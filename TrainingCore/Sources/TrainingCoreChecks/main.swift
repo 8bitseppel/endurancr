@@ -370,6 +370,20 @@ h.suite("Weekly volume redistribution") {
     h.check(find(thu.id, in: w2).type == .rest, "Thu easy collapses to rest when volume is already met")
     h.check(find(sat.id, in: w2).type == .threshold, "quality still protected on overshoot")
 
+    // A missed Monday with the long run still ahead: easy runs grow, but never past
+    // the long run (the user saw a 16.4 km easy run in a week with a 14.8 km long run).
+    let lMon = PlannedWorkout(date: date(2026, 3, 2), type: .easy, distanceMeters: 8_000, targetPaceSecPerKm: easyPace)
+    let lTue = PlannedWorkout(date: date(2026, 3, 3), type: .easy, distanceMeters: 10_000, targetPaceSecPerKm: easyPace)
+    let lThu = PlannedWorkout(date: date(2026, 3, 5), type: .easy, distanceMeters: 9_000, targetPaceSecPerKm: easyPace)
+    let lSat = PlannedWorkout(date: date(2026, 3, 7), type: .longRun, distanceMeters: 12_000, targetPaceSecPerKm: easyPace)
+    let lateLong = TrainingPlan(goal: goal, vdot: 45, paceZones: zones, weeks: [
+        TrainingWeek(index: 0, startDate: date(2026, 3, 2), phase: .build, workouts: [lMon, lTue, lThu, lSat])
+    ])
+    let w3 = engine.redistributedWithinWeek(plan: lateLong, completedRuns: [], asOf: date(2026, 3, 3), calendar: cal).weeks[0].workouts
+    h.check(find(lTue.id, in: w3).distanceMeters > 10_000 && find(lThu.id, in: w3).distanceMeters > 9_000, "easy runs still absorb the missed day")
+    h.check(w3.filter { $0.type == .easy }.allSatisfy { $0.distanceMeters <= 12_000 }, "no easy run grows past the long run")
+    h.check(find(lSat.id, in: w3).distanceMeters == 12_000, "long run keeps its distance")
+
     // A week that isn't the current week is never touched.
     let far = engine.redistributedWithinWeek(plan: base, completedRuns: [short], asOf: date(2026, 5, 1), calendar: cal)
     h.check(far.weeks[0].workouts == base.weeks[0].workouts, "non-current week left unchanged")

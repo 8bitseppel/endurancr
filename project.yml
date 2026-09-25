@@ -16,7 +16,7 @@ packages:
 settings:
   base:
     MARKETING_VERSION: "1.0.0"
-    CURRENT_PROJECT_VERSION: "7"
+    CURRENT_PROJECT_VERSION: "8"
     SWIFT_VERSION: "6.0"
     # Signing baked in so `xcodegen generate` never wipes it (previously had to be
     # re-entered in Xcode after every regen). Automatic signing lets Xcode manage

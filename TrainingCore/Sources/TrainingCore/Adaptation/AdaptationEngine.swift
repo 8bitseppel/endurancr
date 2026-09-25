@@ -237,7 +237,8 @@ public struct AdaptationEngine: Sendable {
     /// remaining EASY runs. Long runs and quality sessions are protected — their
     /// prescribed distance is never changed — so the training stimulus survives; only
     /// easy days flex. Each easy run grows by at most `maxEasyGrowth`× its original so
-    /// no recovery day balloons, and an easy run the week no longer needs (volume
+    /// no recovery day balloons, and never beyond the week's long run, so the long
+    /// run stays the longest run of the week. An easy run the week no longer needs (volume
     /// already banked) collapses to a rest day.
     ///
     /// Example: a 42 km week with a Saturday 17 km long run. The athlete can only run
@@ -292,9 +293,16 @@ public struct AdaptationEngine: Sendable {
         let easyBudget = max(0, weeklyTarget - completedThisWeek - protectedRemaining)
 
         // Water-fill the budget across the easy runs, proportional to their original
-        // size, capping each at maxEasyGrowth× so no single recovery day overloads.
-        let caps = Dictionary(uniqueKeysWithValues:
-            easyIdx.map { ($0, week.workouts[$0].distanceMeters * maxEasyGrowth) })
+        // size, capping each at maxEasyGrowth× so no single recovery day overloads,
+        // and never past the week's long run: an easy run longer than the long run
+        // turns the week upside down. Leftover shortfall is simply not made up.
+        let longRun = week.workouts.filter { $0.type == .longRun }.map(\.distanceMeters).max()
+        let caps = Dictionary(uniqueKeysWithValues: easyIdx.map { i in
+            let original = week.workouts[i].distanceMeters
+            var cap = original * maxEasyGrowth
+            if let longRun { cap = min(cap, max(original, longRun)) }
+            return (i, cap)
+        })
         var alloc = Dictionary(uniqueKeysWithValues: easyIdx.map { ($0, 0.0) })
         var active = Set(easyIdx)
         var budget = easyBudget
