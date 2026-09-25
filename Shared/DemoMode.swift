@@ -160,20 +160,25 @@ private struct DemoAutoScroll: ViewModifier {
     static func run(scroll: (CGFloat) -> Void, bounds: () -> (CGFloat, CGFloat)) async {
         try? await Task.sleep(for: .seconds(3.5))
         let (top, bottom) = bounds()
-        await glide(from: top, to: bottom, seconds: 4, scroll: scroll)
+        await glide(from: top, to: bottom, seconds: 5, scroll: scroll)
         try? await Task.sleep(for: .seconds(1.5))
-        await glide(from: bottom, to: top, seconds: 2.5, scroll: scroll)
+        await glide(from: bottom, to: top, seconds: 3, scroll: scroll)
     }
 
-    /// Steps the offset every frame with an ease in and out.
+    /// Moves the offset about every frame with an ease in and out. The position
+    /// comes from the clock, not a step count, so a late frame doesn't stutter.
     @MainActor
     private static func glide(from start: CGFloat, to end: CGFloat, seconds: Double, scroll: (CGFloat) -> Void) async {
-        let steps = Int(seconds * 60)
-        for step in 0...steps {
-            let t = Double(step) / Double(steps)
+        let clock = ContinuousClock()
+        let began = clock.now
+        var t = 0.0
+        while t < 1 {
+            let elapsed = began.duration(to: clock.now)
+            let done = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+            t = min(1, done / seconds)
             let eased = t < 0.5 ? 2 * t * t : 1 - pow(-2 * t + 2, 2) / 2
             scroll(start + (end - start) * eased)
-            try? await Task.sleep(for: .milliseconds(16))
+            try? await Task.sleep(for: .milliseconds(8))
         }
     }
 }

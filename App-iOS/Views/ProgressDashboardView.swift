@@ -275,7 +275,7 @@ struct ProgressDashboardView: View {
     // MARK: Adherence
 
     @ViewBuilder private func adherenceSection(_ progress: PlanProgress) -> some View {
-        Section("Plan adherence") {
+        Section {
             if progress.plannedToDateMeters <= 0 {
                 // Nothing is due yet — showing "100%" here would be misleading. Say so
                 // plainly and point at the first run instead of an empty adherence ring.
@@ -294,30 +294,42 @@ struct ProgressDashboardView: View {
                     Image(systemName: "hourglass").foregroundStyle(.secondary)
                 }
             } else {
-                HStack(spacing: 20) {
-                    gauge(fraction: progress.adherenceFraction, tint: .accentColor)
-                    VStack(alignment: .leading, spacing: 4) {
-                        LabeledContent("Workouts done", value: "\(progress.workoutsCompleted)/\(progress.workoutsScheduledToDate)")
-                        LabeledContent("Distance", value: "\(Format.distance(progress.completedDistanceMeters)) / \(Format.distance(progress.plannedToDateMeters))")
-                        LabeledContent("Plan complete", value: percent(progress.overallCompletionFraction))
-                    }
+                // Two different questions, kept apart so neither number reads as the
+                // other: how far through the plan you are, and how much of what was
+                // due so far you actually ran.
+                bar("Through the plan",
+                    detail: progress.currentWeekNumber.map { "Week \($0) of \(progress.totalWeeks)" } ?? "",
+                    fraction: progress.overallCompletionFraction)
+                bar("Runs done so far",
+                    detail: "\(progress.workoutsCompleted) of \(progress.workoutsScheduledToDate) due until today",
+                    fraction: progress.adherenceFraction)
+                LabeledContent("Distance so far",
+                               value: "\(Format.distance(progress.completedDistanceMeters)) of \(Format.distance(progress.plannedToDateMeters))")
                     .font(.subheadline)
-                }
-                .padding(.vertical, 4)
+            }
+        } header: {
+            Text("Sticking to the plan")
+        } footer: {
+            if progress.plannedToDateMeters > 0 {
+                Text("Runs done so far only counts runs that were already due, not the ones still ahead.")
             }
         }
     }
 
-    private func gauge(fraction: Double, tint: Color) -> some View {
-        ZStack {
-            Circle().stroke(tint.opacity(0.15), lineWidth: 10)
-            Circle()
-                .trim(from: 0, to: max(0.001, fraction))
-                .stroke(tint, style: StrokeStyle(lineWidth: 10, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            Text(percent(fraction)).font(.subheadline.weight(.semibold)).monospacedDigit()
+    private func bar(_ title: String, detail: String, fraction: Double) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title).fontWeight(.semibold)
+                Spacer()
+                Text(percent(fraction)).foregroundStyle(.secondary).monospacedDigit()
+            }
+            ProgressView(value: min(max(fraction, 0), 1))
+                .tint(.accentColor)
+            if !detail.isEmpty {
+                Text(detail).font(.footnote).foregroundStyle(.secondary)
+            }
         }
-        .frame(width: 72, height: 72)
+        .padding(.vertical, 2)
     }
 
     // MARK: Fitness

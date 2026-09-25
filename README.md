@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="website/logo.svg" width="160" height="160" alt="endurancr app icon">
+  <img src="website/logo.svg" width="240" height="240" alt="endurancr app icon">
 </p>
 
 <h1 align="center">endurancr</h1>

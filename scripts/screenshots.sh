@@ -72,7 +72,7 @@ shot() {
   echo "    $OUT/$4.png"
 }
 
-# rec <device> <bundle id> <screen> <file name> <gif width>
+# rec <device> <bundle id> <screen> <file name> <gif width> <gif fps>
 # Takes the screenshot, then records the screen scrolling down and back up.
 rec() {
   shot "$1" "$2" "$3" "$4"
@@ -81,11 +81,11 @@ rec() {
   sleep 2.5
   xcrun simctl io "$1" recordVideo --codec=h264 --force "$BUILD/$4.mov" >/dev/null 2>&1 &
   recorder=$!
-  sleep 12
+  sleep 14
   kill -INT "$recorder"
   wait "$recorder" || true
   ffmpeg -loglevel error -y -i "$BUILD/$4.mov" -vf \
-    "fps=12,scale=$5:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" \
+    "fps=$6,scale=$5:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle" \
     "$OUT/$4.gif"
   echo "    $OUT/$4.gif"
 }
@@ -93,16 +93,16 @@ rec() {
 # The order follows a first week with the app: set a goal, run, check in.
 echo "==> iPhone"
 shot "$PHONE" app.endurancr welcome iphone-1-welcome
-rec  "$PHONE" app.endurancr goal iphone-2-goal 400
+rec  "$PHONE" app.endurancr goal iphone-2-goal 360 20
 shot "$PHONE" app.endurancr - iphone-3-today
 shot "$PHONE" app.endurancr run iphone-4-run
 shot "$PHONE" app.endurancr summary iphone-5-summary
-rec  "$PHONE" app.endurancr progress iphone-6-progress 400
+rec  "$PHONE" app.endurancr progress iphone-6-progress 360 20
 shot "$PHONE" app.endurancr plan iphone-7-plan
 
 echo "==> Apple Watch"
-rec "$WATCH" app.endurancr.watchkitapp - watch-1-today 312
-rec "$WATCH" app.endurancr.watchkitapp run watch-2-run 312
-rec "$WATCH" app.endurancr.watchkitapp summary watch-3-summary 312
+rec "$WATCH" app.endurancr.watchkitapp - watch-1-today 312 25
+rec "$WATCH" app.endurancr.watchkitapp run watch-2-run 312 25
+rec "$WATCH" app.endurancr.watchkitapp summary watch-3-summary 312 25
 
 echo "==> Done"
