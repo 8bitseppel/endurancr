@@ -31,16 +31,14 @@ struct WatchTodayView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 10) {
-                    header
-                    startButton
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 4)
+            // Everything that matters, Start included, on one screen. Only very large
+            // text sizes fall back to scrolling.
+            ViewThatFits(in: .vertical) {
+                home(compact: false)
+                home(compact: true)
+                ScrollView { home(compact: false) }
             }
             .containerBackground(Color.accentColor.opacity(0.45).gradient, for: .navigation)
-            .demoAutoScroll()
             .task(id: storedPlans.first?.updatedAt) { await loadWeekProgress() }
             .navigationDestination(isPresented: $showLiveRun) {
                 LiveRunView(workout: workout, plannedWorkout: runWorkout, zones: runZones)
@@ -96,31 +94,43 @@ struct WatchTodayView: View {
         )
     }
 
+    /// `compact` is the tighter layout for the smallest watches.
+    private func home(compact: Bool) -> some View {
+        VStack(spacing: 4) {
+            header(compact: compact)
+            Spacer(minLength: 0)
+            startButton
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 4)
+    }
+
     @ViewBuilder
-    private var header: some View {
+    private func header(compact: Bool) -> some View {
         switch state {
         case .workout(let planned):
-            VStack(alignment: .leading, spacing: 2) {
-                Text("TODAY")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.tint)
-                Text(Format.workoutTitle(planned.type)).font(.headline)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(Format.workoutTitle(planned.type))
+                    .font(.headline).foregroundStyle(.tint)
+                    .lineLimit(1).minimumScaleFactor(0.8)
                 Text(Format.distance(planned.distanceMeters))
-                    .font(.system(.title, design: .rounded).weight(.semibold))
+                    .font(.system(compact ? .title3 : .title2, design: .rounded).weight(.semibold))
                     .monospacedDigit()
                     .lineLimit(1).minimumScaleFactor(0.6)
                 Text(Format.paceRange(planned.targetPaceSecPerKm))
                     .font(.footnote).monospacedDigit()
                     .foregroundStyle(.secondary)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Today, \(Format.workoutTitle(planned.type)), \(Format.distance(planned.distanceMeters))")
             .frame(maxWidth: .infinity, alignment: .leading)
-            weekRing
+            weekRing(compact: compact)
         case .rest:
             message("Rest day", "Recover well.", systemImage: "moon.zzz.fill")
-            weekRing
+            weekRing(compact: compact)
         case .noSessionToday:
             message("Nothing scheduled", "Start a free run anytime.", systemImage: "calendar")
-            weekRing
+            weekRing(compact: compact)
         case .noGoal:
             message("No goal yet", "Set a goal on your iPhone, or just start a free run.",
                     systemImage: "flag.fill")
@@ -128,22 +138,23 @@ struct WatchTodayView: View {
     }
 
     private func message(_ title: String, _ detail: String, systemImage: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Image(systemName: systemImage)
-                .font(.title3)
+        VStack(alignment: .leading, spacing: 2) {
+            Label(title, systemImage: systemImage)
+                .font(.headline)
+                .labelStyle(.titleAndIcon)
                 .foregroundStyle(.tint)
-            Text(title).font(.headline)
             Text(detail).font(.footnote).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// This week's completed volume against the plan, as a small ring plus numbers.
     @ViewBuilder
-    private var weekRing: some View {
+    private func weekRing(compact: Bool) -> some View {
         if let weekProgress, weekProgress.currentWeekPlannedMeters > 0 {
             let fraction = min(1, weekProgress.currentWeekCompletedMeters / weekProgress.currentWeekPlannedMeters)
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Gauge(value: fraction) {
                     EmptyView()
                 } currentValueLabel: {
@@ -153,12 +164,14 @@ struct WatchTodayView: View {
                 }
                 .gaugeStyle(.accessoryCircularCapacity)
                 .tint(.accentColor)
-                .scaleEffect(0.8)
-                .frame(width: 40, height: 40)
+                .scaleEffect(0.7)
+                .frame(width: 34, height: 34)
 
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(weekProgress.currentWeekNumber.map { "Week \($0)" } ?? "This week")
-                        .font(.footnote.weight(.semibold))
+                    if !compact {
+                        Text(weekProgress.currentWeekNumber.map { "Week \($0)" } ?? "This week")
+                            .font(.footnote.weight(.semibold))
+                    }
                     Text("\(Format.distance(weekProgress.currentWeekCompletedMeters)) of \(Format.distance(weekProgress.currentWeekPlannedMeters))")
                         .font(.caption2).monospacedDigit()
                         .foregroundStyle(.secondary)
@@ -211,7 +224,6 @@ struct WatchTodayView: View {
         .buttonStyle(.glassProminent)
         .tint(.accentColor)
         .controlSize(.large)
-        .padding(.top, 4)
     }
 
     private enum TodayState {
