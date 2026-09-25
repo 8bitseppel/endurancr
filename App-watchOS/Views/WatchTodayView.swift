@@ -197,7 +197,7 @@ struct WatchTodayView: View {
             // step-aware targets; leave nil for a free run.
             if case .workout(let planned) = state, let plan = currentPlan {
                 runWorkout = planned
-                runZones = VDOTCalculator().paceZones(forVDOT: plan.vdot)
+                runZones = plan.paceZones
             } else {
                 runWorkout = nil
                 runZones = nil

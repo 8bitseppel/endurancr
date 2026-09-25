@@ -48,7 +48,12 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
 - A goal (for example a marathon on a given date) or a target VDOT, and a plan that
   builds towards it week by week.
 - The plan adapts after every run: missed sessions, harder or easier efforts, and
-  weekly distance are redistributed while the key sessions stay protected.
+  weekly distance are redistributed while the key sessions stay protected. An easy
+  run never grows past the week's long run.
+- Honest marathon pace: when your fitness comes from a much shorter race, marathon
+  pace and the finish prediction start up to 3 VDOT lower, and long runs earn it
+  back (fully at 30 km for a marathon). Easy and interval paces keep your speed.
+- Swap days by dragging them in the plan; the watch shows the same adjusted days.
 - Live run screens on Apple Watch and iPhone, with a Live Activity and controls on
   the Lock Screen.
 - The plan syncs directly between iPhone and Apple Watch with WatchConnectivity.

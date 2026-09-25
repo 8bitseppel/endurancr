@@ -129,7 +129,7 @@ public struct PlanProgress: Sendable, Equatable {
         let requiredVDOT = plan.goal.targetTimeSeconds.map {
             calculator.vdot(distanceMeters: plan.goal.race.meters, timeSeconds: $0)
         }
-        let isReady = requiredVDOT.map { plan.vdot >= $0 } ?? false
+        let isReady = requiredVDOT.map { plan.raceVDOT >= $0 } ?? false
 
         return PlanProgress(
             asOf: asOf,
@@ -146,7 +146,7 @@ public struct PlanProgress: Sendable, Equatable {
             currentWeekPlannedMeters: currentWeek?.plannedVolumeMeters ?? 0,
             currentWeekCompletedMeters: currentWeekCompleted,
             nextWorkout: next,
-            vdot: plan.vdot,
+            vdot: plan.raceVDOT,
             requiredVDOT: requiredVDOT,
             isReadyForGoal: isReady
         )

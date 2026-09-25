@@ -42,7 +42,13 @@ public struct VDOTPlanGenerator: PlanGenerator {
         }
 
         let vdot = calculator.vdot(distanceMeters: fitness.distanceMeters, timeSeconds: fitness.timeSeconds)
-        let zones = calculator.paceZones(forVDOT: vdot)
+        // A short race shows speed, not the endurance for a much longer goal, so
+        // marathon pace and the race prediction start a little lower.
+        let holdback = EnduranceAdjustment.basePoints(
+            fitnessDistanceMeters: fitness.distanceMeters, goalMeters: goal.race.meters
+        )
+        let raceVDOT = vdot - holdback
+        let zones = calculator.paceZones(forVDOT: vdot, raceVDOT: raceVDOT)
 
         // If the athlete set a target time and their current VDOT already meets the
         // VDOT that time requires, they're "good to go": build a maintenance plan
@@ -51,7 +57,7 @@ public struct VDOTPlanGenerator: PlanGenerator {
         let requiredVDOT = goal.targetTimeSeconds.map {
             calculator.vdot(distanceMeters: goal.race.meters, timeSeconds: $0)
         }
-        let isMaintenance = requiredVDOT.map { vdot >= $0 } ?? false
+        let isMaintenance = requiredVDOT.map { raceVDOT >= $0 } ?? false
 
         // Anchor every week to Monday so the plan reads as Monday–Sunday calendar
         // weeks (the ISO "Kalenderwoche" the athlete sees on any calendar), instead
@@ -81,7 +87,7 @@ public struct VDOTPlanGenerator: PlanGenerator {
             if phase == .raceWeek {
                 workouts = raceWeekWorkouts(
                     weekStart: weekStart, raceOffset: raceOffsetInWeek,
-                    goal: goal, vdot: vdot, zones: zones, calendar: calendar
+                    goal: goal, vdot: raceVDOT, zones: zones, calendar: calendar
                 )
             } else {
                 let volume = isMaintenance
@@ -99,7 +105,8 @@ public struct VDOTPlanGenerator: PlanGenerator {
             weeks.append(TrainingWeek(index: i, startDate: weekStart, phase: phase, workouts: workouts))
         }
 
-        return TrainingPlan(goal: goal, vdot: vdot, paceZones: zones, weeks: weeks, isMaintenance: isMaintenance)
+        return TrainingPlan(goal: goal, vdot: vdot, paceZones: zones, weeks: weeks,
+                            isMaintenance: isMaintenance, enduranceHoldback: holdback)
     }
 
     // MARK: Periodization

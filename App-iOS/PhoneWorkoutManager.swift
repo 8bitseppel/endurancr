@@ -107,14 +107,14 @@ final class PhoneWorkoutManager: NSObject, @unchecked Sendable {
     func start(
         goalName: String = "", workoutTitle: String = "Run",
         targetPace: ClosedRange<Double>? = nil,
-        plannedWorkout: PlannedWorkout? = nil, vdot: Double? = nil
+        plannedWorkout: PlannedWorkout? = nil, zones: PaceZones? = nil
     ) {
         guard !isRunning else { return }
         self.goalName = goalName
         self.workoutTitle = workoutTitle
         self.targetPace = targetPace
         self.plannedWorkout = plannedWorkout
-        self.zones = vdot.map { VDOTCalculator().paceZones(forVDOT: $0) }
+        self.zones = zones
 
         let config = HKWorkoutConfiguration()
         config.activityType = .running

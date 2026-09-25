@@ -131,7 +131,7 @@ struct ProgressDashboardView: View {
                         workoutTitle: Format.workoutTitle(today.type),
                         targetPace: today.targetPaceSecPerKm,
                         plannedWorkout: today,
-                        vdot: coordinator.currentPlan?.vdot
+                        zones: coordinator.currentPlan?.paceZones
                     )
                     showLiveRun = true
                 } label: {
@@ -347,6 +347,10 @@ struct ProgressDashboardView: View {
                 }
             }
             LabeledContent("VDOT", value: String(format: "%.1f", plan.vdot))
+            if plan.enduranceHoldback > 0 {
+                LabeledContent("For the \(plan.goal.race.displayName.lowercased())",
+                               value: String(format: "%.1f", plan.raceVDOT))
+            }
             LabeledContent("Projected \(plan.goal.race.displayName)", value: projectedTime(plan))
             if let target = plan.goal.targetTimeSeconds {
                 LabeledContent("Target", value: Format.duration(target))
@@ -366,8 +370,17 @@ struct ProgressDashboardView: View {
         } header: {
             Text("Fitness")
         } footer: {
-            Text("Your recent effort is converted to a VDOT (Jack Tupper Daniels' single number for aerobic fitness) using the Daniels and Gilbert formula. Every training pace below and your projected finish time are derived from it. Strong recorded runs nudge the VDOT up a little at a time.")
+            Text(fitnessFooter(plan))
         }
+    }
+
+    private func fitnessFooter(_ plan: TrainingPlan) -> String {
+        var text = "Your recent effort is converted to a VDOT (Jack Tupper Daniels' single number for aerobic fitness) using the Daniels and Gilbert formula. Every training pace below and your projected finish time are derived from it. Strong recorded runs nudge the VDOT up a little at a time."
+        if plan.enduranceHoldbackBase > 0 {
+            let full = Format.distance(EnduranceAdjustment.fullCreditMeters(goalMeters: plan.goal.race.meters))
+            text += " Your effort was much shorter than a \(plan.goal.race.displayName.lowercased()), and it shows speed, not the endurance to go that far. So marathon pace and the projection use \(String(format: "%.1f", plan.enduranceHoldback)) VDOT less for now. Long runs earn it back, fully once you've run \(full)."
+        }
+        return text
     }
 
     /// Average pace (sec/km) of the recent effort that seeded the VDOT.
@@ -411,7 +424,7 @@ struct ProgressDashboardView: View {
         } header: {
             Text("Paces (min/km)")
         } footer: {
-            Text("All five paces come from your VDOT (\(String(format: "%.1f", plan.vdot))). Easy builds aerobic base and is most of your volume; marathon is goal-race effort; threshold (\"comfortably hard\") lifts your lactate ceiling; interval develops top-end aerobic power; repetition sharpens speed and economy.")
+            Text("All five paces come from your VDOT (\(String(format: "%.1f", plan.vdot))\(plan.enduranceHoldback > 0 ? "; marathon pace from \(String(format: "%.1f", plan.raceVDOT)) until your long runs show the endurance" : "")). Easy builds aerobic base and is most of your volume; marathon is goal-race effort; threshold (\"comfortably hard\") lifts your lactate ceiling; interval develops top-end aerobic power; repetition sharpens speed and economy.")
         }
     }
 
@@ -448,7 +461,7 @@ struct ProgressDashboardView: View {
     }
 
     private func projectedTime(_ plan: TrainingPlan) -> String {
-        let seconds = calculator.predictedTimeSeconds(distanceMeters: plan.goal.race.meters, vdot: plan.vdot)
+        let seconds = calculator.predictedTimeSeconds(distanceMeters: plan.goal.race.meters, vdot: plan.raceVDOT)
         return Format.duration(seconds)
     }
 

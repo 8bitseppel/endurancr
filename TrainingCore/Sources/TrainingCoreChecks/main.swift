@@ -389,6 +389,39 @@ h.suite("Weekly volume redistribution") {
     h.check(far.weeks[0].workouts == base.weeks[0].workouts, "non-current week left unchanged")
 }
 
+// MARK: Endurance adjustment
+
+h.suite("Endurance adjustment") {
+    let engine = AdaptationEngine()
+    let calc = VDOTCalculator()
+    // An all-out 11.8 km relay leg in 50 minutes, training for a marathon.
+    let leg = FitnessSnapshot(distanceMeters: 11_800, timeSeconds: 50 * 60, date: date(2026, 1, 1))
+    let goal = Goal(race: .marathon, raceDate: date(2026, 6, 1))
+    let plan = try VDOTPlanGenerator().makePlan(goal: goal, fitness: leg, startDate: date(2026, 1, 5), calendar: cal)
+    let full = calc.paceZones(forVDOT: plan.vdot)
+    h.check(plan.enduranceHoldback > 2 && plan.enduranceHoldback <= EnduranceAdjustment.maxPoints, "marathon from 11.8 km holds back 2 to 3 VDOT")
+    h.check(plan.paceZones.marathonSecPerKm > full.marathonSecPerKm, "marathon pace is slower than the raw race suggests")
+    h.check(plan.paceZones.easySecPerKm == full.easySecPerKm && plan.paceZones.intervalSecPerKm == full.intervalSecPerKm, "easy and interval paces keep the race's speed")
+    let race = try require(plan.allWorkouts.first { $0.type == .raceDay }, "race day")
+    let rawRacePace = calc.predictedTimeSeconds(distanceMeters: goal.race.meters, vdot: plan.vdot) / 42.195
+    h.check(race.targetPaceSecPerKm!.lowerBound > rawRacePace, "race-day pace uses the held-back VDOT")
+
+    // Long runs earn it back: 23 km halfway, 30 km fully.
+    let asOf = date(2026, 3, 1)
+    let half = engine.creditingEndurance(plan: plan, completedRuns: [CompletedRun(date: date(2026, 2, 22), distanceMeters: 23_250, durationSeconds: 7_800)], asOf: asOf, calendar: cal)
+    h.check(half.enduranceHoldback > 0 && half.enduranceHoldback < plan.enduranceHoldback, "a 23 km long run earns part back")
+    let done = engine.creditingEndurance(plan: plan, completedRuns: [CompletedRun(date: date(2026, 2, 22), distanceMeters: 30_000, durationSeconds: 10_800)], asOf: asOf, calendar: cal)
+    h.check(done.enduranceHoldback == 0 && done.raceVDOT == plan.vdot, "a 30 km long run earns it all back")
+    let repaced = engine.repaced(plan: done, withVDOT: done.vdot, asOf: asOf, calendar: cal)
+    h.check(abs(repaced.paceZones.marathonSecPerKm - full.marathonSecPerKm) < 0.01, "with the endurance shown, marathon pace is the race's")
+    let old = engine.creditingEndurance(plan: plan, completedRuns: [CompletedRun(date: date(2025, 11, 1), distanceMeters: 30_000, durationSeconds: 10_800)], asOf: asOf, calendar: cal)
+    h.check(old.enduranceHoldback == plan.enduranceHoldback, "a long run from months ago doesn't count")
+
+    // Speed goals and long fitness races hold nothing back.
+    h.check(EnduranceAdjustment.basePoints(fitnessDistanceMeters: 5_000, goalMeters: 10_000) == 0, "10 km goal: nothing held back")
+    h.check(EnduranceAdjustment.basePoints(fitnessDistanceMeters: 30_000, goalMeters: 42_195) == 0, "a 30 km race already shows the endurance")
+}
+
 // MARK: Fatigue analyzer
 
 h.suite("Fatigue analyzer") {

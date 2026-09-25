@@ -95,13 +95,14 @@ public struct VDOTCalculator: Sendable {
         return 60_000.0 / velocity                            // sec per km
     }
 
-    /// Full set of training paces for a VDOT value.
-    public func paceZones(forVDOT vdot: Double) -> PaceZones {
+    /// Full set of training paces for a VDOT value. `raceVDOT`, when given, sets
+    /// marathon pace only (see `EnduranceAdjustment`); the other zones use `vdot`.
+    public func paceZones(forVDOT vdot: Double, raceVDOT: Double? = nil) -> PaceZones {
         let intervalVelocity = Self.velocity(forVO2: Intensity.interval * vdot)
         let repetitionSecPerKm = 60_000.0 / (intervalVelocity * Intensity.repetitionVelocityBoost)
         return PaceZones(
             easySecPerKm: secPerKm(atFraction: Intensity.easy, vdot: vdot),
-            marathonSecPerKm: secPerKm(atFraction: Intensity.marathon, vdot: vdot),
+            marathonSecPerKm: secPerKm(atFraction: Intensity.marathon, vdot: raceVDOT ?? vdot),
             thresholdSecPerKm: secPerKm(atFraction: Intensity.threshold, vdot: vdot),
             intervalSecPerKm: secPerKm(atFraction: Intensity.interval, vdot: vdot),
             repetitionSecPerKm: repetitionSecPerKm

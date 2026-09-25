@@ -130,17 +130,30 @@ public struct TrainingPlan: Sendable, Equatable, Codable {
     /// True when the athlete's current fitness already meets the goal's target, so
     /// the plan holds fitness (steady volume) rather than building toward it.
     public var isMaintenance: Bool
+    /// VDOT points held back from marathon pace and the race prediction because the
+    /// fitness race was much shorter than the goal (`EnduranceAdjustment`).
+    /// `enduranceHoldbackBase` is the amount at plan start; `enduranceHoldback` is
+    /// what is still held back after long runs earned some back.
+    public var enduranceHoldbackBase: Double
+    public var enduranceHoldback: Double
 
-    public init(goal: Goal, vdot: Double, paceZones: PaceZones, weeks: [TrainingWeek], isMaintenance: Bool = false) {
+    public init(goal: Goal, vdot: Double, paceZones: PaceZones, weeks: [TrainingWeek],
+                isMaintenance: Bool = false, enduranceHoldback: Double = 0) {
         self.goal = goal
         self.vdot = vdot
         self.paceZones = paceZones
         self.weeks = weeks
         self.isMaintenance = isMaintenance
+        self.enduranceHoldbackBase = enduranceHoldback
+        self.enduranceHoldback = enduranceHoldback
     }
 
+    /// The VDOT that sets marathon pace and predicts the goal race: fitness minus
+    /// the endurance still to prove. Easy, threshold and interval paces use `vdot`.
+    public var raceVDOT: Double { vdot - enduranceHoldback }
+
     private enum CodingKeys: String, CodingKey {
-        case goal, vdot, paceZones, weeks, isMaintenance
+        case goal, vdot, paceZones, weeks, isMaintenance, enduranceHoldbackBase, enduranceHoldback
     }
 
     public init(from decoder: Decoder) throws {
@@ -150,6 +163,8 @@ public struct TrainingPlan: Sendable, Equatable, Codable {
         paceZones = try c.decode(PaceZones.self, forKey: .paceZones)
         weeks = try c.decode([TrainingWeek].self, forKey: .weeks)
         isMaintenance = try c.decodeIfPresent(Bool.self, forKey: .isMaintenance) ?? false
+        enduranceHoldbackBase = try c.decodeIfPresent(Double.self, forKey: .enduranceHoldbackBase) ?? 0
+        enduranceHoldback = try c.decodeIfPresent(Double.self, forKey: .enduranceHoldback) ?? 0
     }
 
     public var allWorkouts: [PlannedWorkout] { weeks.flatMap(\.workouts) }

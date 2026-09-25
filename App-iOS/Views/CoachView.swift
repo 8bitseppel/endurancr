@@ -128,7 +128,7 @@ struct CoachView: View {
                 workoutTitle: Format.workoutTitle(workout.type),
                 targetPace: workout.targetPaceSecPerKm,
                 plannedWorkout: workout.type == .rest ? nil : workout,
-                vdot: plan.vdot
+                zones: plan.paceZones
             )
             showLiveRun = true
         } label: {

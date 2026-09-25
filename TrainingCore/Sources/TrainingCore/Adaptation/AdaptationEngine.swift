@@ -1,7 +1,8 @@
 import Foundation
 
 /// Adjusts a plan from recorded runs. Deterministic, rule-based:
-///  1. Re-rate VDOT from recent strong runs (damped, so paces don't whipsaw).
+///  1. Re-rate VDOT from recent strong runs (damped, so paces don't whipsaw),
+///     and earn back held-back marathon endurance from long runs.
 ///  2. Re-pace all *future* workouts from the updated VDOT.
 ///  3. Reschedule a missed long run onto the next upcoming rest day.
 ///  4. Ease the next quality session to easy when fatigue signals fire.
@@ -49,6 +50,29 @@ public struct AdaptationEngine: Sendable {
         return min(target, current + maxIncrease)
     }
 
+    // MARK: Endurance credit
+
+    /// Earns back endurance points held back at plan start (`EnduranceAdjustment`)
+    /// from the longest run in the last `lookbackDays`. Never holds back more than
+    /// at plan start, and never less than zero.
+    public func creditingEndurance(
+        plan: TrainingPlan,
+        completedRuns: [CompletedRun],
+        asOf: Date,
+        lookbackDays: Int = 56,
+        calendar: Calendar = .current
+    ) -> TrainingPlan {
+        guard plan.enduranceHoldbackBase > 0 else { return plan }
+        let cutoff = calendar.date(byAdding: .day, value: -lookbackDays, to: asOf) ?? asOf
+        let longest = completedRuns
+            .filter { $0.date >= cutoff && $0.date <= asOf }
+            .map(\.distanceMeters).max() ?? 0
+        let credit = EnduranceAdjustment.credit(longestRunMeters: longest, goalMeters: plan.goal.race.meters)
+        var updated = plan
+        updated.enduranceHoldback = (plan.enduranceHoldbackBase * (1 - credit) * 10).rounded() / 10
+        return updated
+    }
+
     // MARK: Re-pacing
 
     /// Returns the plan with future workouts (date ≥ `asOf`) re-paced from `vdot`.
@@ -58,7 +82,7 @@ public struct AdaptationEngine: Sendable {
         asOf: Date,
         calendar: Calendar = .current
     ) -> TrainingPlan {
-        let zones = calculator.paceZones(forVDOT: vdot)
+        let zones = calculator.paceZones(forVDOT: vdot, raceVDOT: vdot - plan.enduranceHoldback)
         let asOfDay = calendar.startOfDay(for: asOf)
         var updated = plan
         updated.vdot = vdot
@@ -90,7 +114,7 @@ public struct AdaptationEngine: Sendable {
         case .raceDay:
             let goalKm = plan.goal.race.meters / 1_000
             let seconds = plan.goal.targetTimeSeconds
-                ?? calculator.predictedTimeSeconds(distanceMeters: plan.goal.race.meters, vdot: vdot)
+                ?? calculator.predictedTimeSeconds(distanceMeters: plan.goal.race.meters, vdot: vdot - plan.enduranceHoldback)
             return seconds / goalKm
         }
     }
@@ -361,7 +385,8 @@ public struct AdaptationEngine: Sendable {
         calendar: Calendar = .current
     ) -> TrainingPlan {
         let newVDOT = reRatedVDOT(current: plan.vdot, completedRuns: completedRuns, asOf: asOf, calendar: calendar)
-        let repacedPlan = repaced(plan: plan, withVDOT: newVDOT, asOf: asOf, calendar: calendar)
+        let credited = creditingEndurance(plan: plan, completedRuns: completedRuns, asOf: asOf, calendar: calendar)
+        let repacedPlan = repaced(plan: credited, withVDOT: newVDOT, asOf: asOf, calendar: calendar)
         let rescheduled = rescheduleMissedLongRun(plan: repacedPlan, completedRuns: completedRuns, asOf: asOf, calendar: calendar)
         let assessment = assessFatigue(
             restingHeartRates: restingHeartRates,

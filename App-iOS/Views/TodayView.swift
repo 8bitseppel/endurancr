@@ -55,7 +55,7 @@ struct TodayView: View {
                             workoutTitle: today.map { Format.workoutTitle($0.type) } ?? "Run",
                             targetPace: today?.targetPaceSecPerKm,
                             plannedWorkout: today?.type == .rest ? nil : today,
-                            vdot: coordinator.currentPlan?.vdot
+                            zones: coordinator.currentPlan?.paceZones
                         )
                         showLiveRun = true
                     } label: {

@@ -247,7 +247,8 @@ final class PlanCoordinator {
         let now = Date.now
         let cal = Calendar.current
         let newVDOT = adaptation.reRatedVDOT(current: base.vdot, completedRuns: runs, asOf: now, calendar: cal)
-        let repaced = adaptation.repaced(plan: base, withVDOT: newVDOT, asOf: now, calendar: cal)
+        let credited = adaptation.creditingEndurance(plan: base, completedRuns: runs, asOf: now, calendar: cal)
+        let repaced = adaptation.repaced(plan: credited, withVDOT: newVDOT, asOf: now, calendar: cal)
         let rescheduled = adaptation.rescheduleMissedLongRun(plan: repaced, completedRuns: runs, asOf: now, calendar: cal)
         let assessment = adaptation.assessFatigue(restingHeartRates: resting, completedRuns: runs, asOf: now, calendar: cal)
         let eased = adaptation.easedForFatigue(plan: rescheduled, assessment: assessment, asOf: now, calendar: cal)
