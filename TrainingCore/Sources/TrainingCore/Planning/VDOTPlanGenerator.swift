@@ -237,12 +237,58 @@ public struct VDOTPlanGenerator: PlanGenerator {
         // only if dropping those neighbours still leaves enough days to honour
         // daysPerWeek. Then spread the chosen days evenly so rest falls between
         // efforts and any unavoidable adjacency lands on the lighter easy days.
-        let need = k - 1
         let others = allowed.filter { $0 != longOffset }
         let isolated = others.filter { abs($0 - longOffset) > 1 }
-        let pool = isolated.count >= need ? isolated : others
-        let runDays = (evenlySpaced(pool, count: need) + [longOffset]).sorted()
-        return (runDays, longOffset)
+        func spread(_ need: Int) -> [Int] {
+            let pool = isolated.count >= need ? isolated : others
+            return (evenlySpaced(pool, count: need) + [longOffset]).sorted()
+        }
+        let runDays = spread(k - 1)
+        guard backToBackCount(runDays) > 0 else { return (runDays, longOffset) }
+
+        // The even spread still put two runs on consecutive days. Look for the set
+        // with the fewest back-to-back pairs, then the widest gaps.
+        let best = bestSpacing(others: others, longOffset: longOffset, need: k - 1)
+        // A partial first week (training starts on a Thursday, say) has no reason to
+        // cram runs onto consecutive days: drop runs until each one has a rest day
+        // between it and the next. Full weeks keep the running days the athlete asked
+        // for, since five or six runs in seven days can't all be spaced out.
+        if earliestOffset > 0, backToBackCount(best) > 0 {
+            for fewer in stride(from: k - 2, through: 0, by: -1) {
+                let candidate = bestSpacing(others: others, longOffset: longOffset, need: fewer)
+                if backToBackCount(candidate) == 0 { return (candidate, longOffset) }
+            }
+        }
+        return (best, longOffset)
+    }
+
+    /// Number of consecutive-day pairs in a sorted list of day offsets.
+    static func backToBackCount(_ days: [Int]) -> Int {
+        zip(days, days.dropFirst()).filter { $1 - $0 == 1 }.count
+    }
+
+    /// Of every way to pick `need` days from `others` alongside the long run, the one
+    /// with the fewest back-to-back pairs, then the largest smallest gap. Ties keep
+    /// the earliest set, so the layout is deterministic.
+    static func bestSpacing(others: [Int], longOffset: Int, need: Int) -> [Int] {
+        func combinations(_ items: ArraySlice<Int>, _ n: Int) -> [[Int]] {
+            guard n > 0 else { return [[]] }
+            guard let first = items.first else { return [] }
+            let rest = items.dropFirst()
+            return combinations(rest, n - 1).map { [first] + $0 } + combinations(rest, n)
+        }
+        func score(_ days: [Int]) -> (Int, Int) {
+            let minGap = zip(days, days.dropFirst()).map { $1 - $0 }.min() ?? 7
+            return (backToBackCount(days), -minGap)
+        }
+        var best: [Int] = [longOffset]
+        var bestScore = (Int.max, Int.max)
+        for pick in combinations(others[...], min(need, others.count)) {
+            let days = (pick + [longOffset]).sorted()
+            let s = score(days)
+            if s < bestScore { best = days; bestScore = s }
+        }
+        return best
     }
 
     /// Picks `count` items spread as evenly as possible across a sorted array.

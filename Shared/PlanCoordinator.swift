@@ -49,11 +49,7 @@ final class PlanCoordinator {
 
     /// Rebuilds the un-adapted plan from the stored inputs, or `nil` if there are none.
     private func regeneratedBasePlan() -> TrainingPlan? {
-        guard let inputs else { return nil }
-        return try? generator.makePlan(
-            goal: inputs.goal, fitness: inputs.fitness,
-            startDate: inputs.startDate, calendar: .current
-        )
+        try? inputs?.makePlan(calendar: .current)
     }
 
     private var storedEntity: StoredPlan? {
@@ -109,8 +105,9 @@ final class PlanCoordinator {
             return
         }
         let start = startDate ?? existing.startDate
-        let plan = try generator.makePlan(goal: goal, fitness: fitness, startDate: start, calendar: .current)
-        let newInputs = PlanInputs(goal: goal, fitness: fitness, startDate: start)
+        // Days the athlete moved stay moved when only the goal or rules change.
+        let newInputs = PlanInputs(goal: goal, fitness: fitness, startDate: start, daySwaps: existing.daySwaps)
+        let plan = try newInputs.makePlan(calendar: .current)
         inputs = newInputs
         persistInputs()
         currentPlan = plan
@@ -142,10 +139,7 @@ final class PlanCoordinator {
     func importData(_ data: Data) throws {
         let restored = try PlanBackupCodec.decode(data).inputs
         // Build once up front so invalid inputs throw before we replace anything.
-        let plan = try generator.makePlan(
-            goal: restored.goal, fitness: restored.fitness,
-            startDate: restored.startDate, calendar: .current
-        )
+        let plan = try restored.makePlan(calendar: .current)
         try context.delete(model: StoredPlan.self)
         context.insert(StoredPlan(inputs: restored))
         try context.save()
@@ -265,6 +259,46 @@ final class PlanCoordinator {
         fatigue = assessment
 
         currentPlan = redistributed
+    }
+
+    // MARK: Moving days
+
+    /// Whether a day can still be moved: today or later, not race day, and not inside
+    /// a vacation (a run moved there would just be blanked again).
+    func canMove(_ workout: PlannedWorkout) -> Bool {
+        let cal = Calendar.current
+        guard workout.type != .raceDay,
+              cal.startOfDay(for: workout.date) >= cal.startOfDay(for: .now) else { return false }
+        let away = currentPlan?.effectiveUnavailablePeriods(calendar: cal) ?? []
+        return !away.contains { $0.contains(workout.date, calendar: cal) }
+    }
+
+    /// Swaps the sessions on two days (a run with a rest day, or two runs) and
+    /// persists the swap so it survives regeneration and syncs to the watch.
+    func swapDays(_ a: Date, _ b: Date) {
+        let cal = Calendar.current
+        guard var inputs, !cal.isDate(a, inSameDayAs: b),
+              let first = workout(on: a), let second = workout(on: b),
+              canMove(first), canMove(second) else { return }
+        let swap = DaySwap(cal.startOfDay(for: a), cal.startOfDay(for: b))
+        inputs.daySwaps.append(swap)
+        self.inputs = inputs
+        persistInputs()
+        // Apply straight to the adapted plan so the list updates without a reload.
+        currentPlan = currentPlan?.applyingSwaps([swap], calendar: cal)
+    }
+
+    /// True when the athlete has moved at least one day.
+    var hasMovedDays: Bool { !(inputs?.daySwaps.isEmpty ?? true) }
+
+    /// Puts every moved day back where the plan had it.
+    func resetMovedDays() async {
+        guard var inputs, !inputs.daySwaps.isEmpty else { return }
+        inputs.daySwaps = []
+        self.inputs = inputs
+        persistInputs()
+        currentPlan = regeneratedBasePlan()
+        await refreshAdaptation()
     }
 
     /// Adds a vacation / unavailable period to the goal and persists it.

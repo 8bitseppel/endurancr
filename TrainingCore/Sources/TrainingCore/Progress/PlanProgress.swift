@@ -16,12 +16,12 @@ public struct PlanProgress: Sendable, Equatable {
 
     /// Distance actually run (sum of recorded runs within the plan window, up to `asOf`).
     public var completedDistanceMeters: Double
-    /// Planned running distance for workouts dated on or before `asOf`.
+    /// Planned running distance for the runs due so far (see `workoutsScheduledToDate`).
     public var plannedToDateMeters: Double
     /// Planned running distance across the whole plan.
     public var totalPlannedMeters: Double
 
-    /// Running workouts scheduled on or before `asOf`.
+    /// Running workouts due so far: every one before today, plus today's once it's done.
     public var workoutsScheduledToDate: Int
     /// Of those, how many a recorded run fulfilled.
     public var workoutsCompleted: Int
@@ -55,6 +55,13 @@ public struct PlanProgress: Sendable, Equatable {
         return min(1, max(0, completedDistanceMeters / plannedToDateMeters))
     }
 
+    /// Share of the runs due so far that a recorded run fulfilled, clamped to [0, 1].
+    /// 1 when nothing is due yet.
+    public var runsDoneFraction: Double {
+        guard workoutsScheduledToDate > 0 else { return 1 }
+        return min(1, Double(workoutsCompleted) / Double(workoutsScheduledToDate))
+    }
+
     /// Fraction of the plan's total planned distance completed, clamped to [0, 1].
     public var overallCompletionFraction: Double {
         guard totalPlannedMeters > 0 else { return 0 }
@@ -76,16 +83,24 @@ public struct PlanProgress: Sendable, Equatable {
         let daysUntil = max(0, calendar.dateComponents([.day], from: asOfDay,
             to: calendar.startOfDay(for: plan.goal.raceDate)).day ?? 0)
 
-        // Plan span, for filtering runs to this plan.
-        let planStart = plan.weeks.first.map { calendar.startOfDay(for: $0.startDate) } ?? asOfDay
+        // Plan span, for filtering runs to this plan. Week 0 starts on a Monday, but
+        // training may begin later that week; runs from the days before the first
+        // scheduled run belong to no plan and must not count as progress.
+        let firstRunDay = workouts.filter(\.type.isRunning).map { calendar.startOfDay(for: $0.date) }.min()
+        let planStart = firstRunDay
+            ?? plan.weeks.first.map { calendar.startOfDay(for: $0.startDate) } ?? asOfDay
         let runsInPlan = completedRuns.filter {
             let day = calendar.startOfDay(for: $0.date)
             return day >= planStart && day <= asOfDay
         }
         let completedDistance = runsInPlan.reduce(0) { $0 + $1.distanceMeters }
 
+        // A run is due once its day has passed. Today's run only counts once it's
+        // done, so the morning of a run day doesn't read as a missed session.
         let runningToDate = workouts.filter {
-            $0.type.isRunning && calendar.startOfDay(for: $0.date) <= asOfDay
+            guard $0.type.isRunning else { return false }
+            let day = calendar.startOfDay(for: $0.date)
+            return day < asOfDay || (day == asOfDay && engine.isCompleted($0, by: completedRuns, calendar: calendar))
         }
         let plannedToDate = runningToDate.reduce(0) { $0 + $1.distanceMeters }
         let totalPlanned = workouts.filter(\.type.isRunning).reduce(0) { $0 + $1.distanceMeters }
@@ -101,7 +116,7 @@ public struct PlanProgress: Sendable, Equatable {
             let start = calendar.startOfDay(for: week.startDate)
             let end = calendar.date(byAdding: .day, value: 7, to: start) ?? start
             return completedRuns
-                .filter { $0.date >= start && $0.date < end && $0.date <= asOf }
+                .filter { $0.date >= max(start, planStart) && $0.date < end && $0.date <= asOf }
                 .reduce(0) { $0 + $1.distanceMeters }
         } ?? 0
 

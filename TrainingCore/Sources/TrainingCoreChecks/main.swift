@@ -163,6 +163,136 @@ h.suite("Monday-anchored weeks") {
     h.check(progress.currentWeekPlannedMeters > 0, "current week shows planned volume, not 0 of 0")
 }
 
+// MARK: Rest days between runs
+
+h.suite("Rest days between runs") {
+    let gen = VDOTPlanGenerator()
+    let fitness = FitnessSnapshot(distanceMeters: 10_000, timeSeconds: 45 * 60, date: date(2026, 1, 1))
+    func firstWeekRunDays(start: Date, daysPerWeek: Int) throws -> [Int] {
+        let plan = try gen.makePlan(
+            goal: Goal(race: .marathon, raceDate: date(2027, 4, 25), daysPerWeek: daysPerWeek),
+            fitness: fitness, startDate: start, calendar: cal
+        )
+        return plan.weeks[0].workouts.filter(\.type.isRunning).map { cal.component(.weekday, from: $0.date) }
+    }
+    func backToBack(_ weekdays: [Int]) -> Bool {
+        // Weekday numbers 2 (Mon) … 7 (Sat), 1 (Sun); map to Mon=0 … Sun=6.
+        let days = weekdays.map { ($0 + 5) % 7 }.sorted()
+        return zip(days, days.dropFirst()).contains { $1 - $0 == 1 }
+    }
+
+    // Start dates Monday 2026-01-05 through Sunday 2026-01-11, 3 to 6 runs a week.
+    for offset in 1...6 {
+        let start = date(2026, 1, 5 + offset)
+        for dpw in 3...6 {
+            let days = try firstWeekRunDays(start: start, daysPerWeek: dpw)
+            h.check(!days.isEmpty && !backToBack(days),
+                    "start \(cal.weekdaySymbols[cal.component(.weekday, from: start) - 1]), \(dpw)/week: no back-to-back runs in the first week (\(days))")
+        }
+    }
+
+    // A Wednesday start with 3 a week keeps all three runs, spaced out.
+    let wed = try firstWeekRunDays(start: date(2026, 1, 7), daysPerWeek: 3)
+    h.check(wed == [4, 6, 1], "Wednesday start, 3/week → Wed, Fri, Sun (got \(wed))")
+    // A Friday start can't fit three runs without stacking them: it drops one.
+    let fri = try firstWeekRunDays(start: date(2026, 1, 9), daysPerWeek: 3)
+    h.check(fri == [6, 1], "Friday start, 3/week → Fri and Sun, not Fri, Sat, Sun (got \(fri))")
+
+    // Full weeks with up to 4 runs never stack runs either.
+    for dpw in 3...4 {
+        let plan = try gen.makePlan(
+            goal: Goal(race: .marathon, raceDate: date(2027, 4, 25), daysPerWeek: dpw),
+            fitness: fitness, startDate: date(2026, 1, 7), calendar: cal
+        )
+        let full = plan.weeks.dropFirst().filter { $0.phase != .raceWeek }
+        h.check(full.allSatisfy { !backToBack($0.workouts.filter(\.type.isRunning).map { cal.component(.weekday, from: $0.date) }) },
+                "\(dpw)/week: no back-to-back runs in any full week")
+    }
+}
+
+// MARK: Day swaps
+
+h.suite("Day swaps") {
+    let fitness = FitnessSnapshot(distanceMeters: 10_000, timeSeconds: 45 * 60, date: date(2026, 1, 1))
+    let goal = Goal(race: .marathon, raceDate: date(2027, 4, 25), daysPerWeek: 3)
+    let inputs = PlanInputs(goal: goal, fitness: fitness, startDate: date(2026, 1, 12))  // a Monday
+    let base = try inputs.makePlan(calendar: cal)
+    let week = base.weeks[1].workouts
+    let run = try require(week.first { $0.type == .easy }, "an easy run")
+    let rest = try require(week.first { $0.type == .rest && $0.date > run.date }, "a later rest day")
+    let long = try require(week.first { $0.type == .longRun }, "the long run")
+
+    // Run ↔ rest: the run moves to the rest day and the rest takes its place.
+    var moved = inputs
+    moved.daySwaps = [DaySwap(run.date, rest.date)]
+    let swapped = try moved.makePlan(calendar: cal)
+    let atRest = try require(swapped.allWorkouts.first { cal.isDate($0.date, inSameDayAs: rest.date) }, "rest day slot")
+    let atRun = try require(swapped.allWorkouts.first { cal.isDate($0.date, inSameDayAs: run.date) }, "run day slot")
+    h.check(atRest.type == .easy && atRest.id == run.id && atRest.distanceMeters == run.distanceMeters, "the run moves onto the rest day, keeping its id")
+    h.check(atRun.type == .rest, "the rest day takes the run's old day")
+    h.check(swapped.weeks[1].plannedVolumeMeters == base.weeks[1].plannedVolumeMeters, "a swap within a week keeps its volume")
+
+    // Run ↔ run: the easy run and the long run trade days.
+    moved.daySwaps = [DaySwap(run.date, long.date)]
+    let runs = try moved.makePlan(calendar: cal)
+    h.check(runs.allWorkouts.first { cal.isDate($0.date, inSameDayAs: run.date) }?.type == .longRun
+            && runs.allWorkouts.first { cal.isDate($0.date, inSameDayAs: long.date) }?.type == .easy,
+            "two runs trade days")
+
+    // Swapping back restores the original plan.
+    moved.daySwaps = [DaySwap(run.date, rest.date), DaySwap(rest.date, run.date)]
+    let back = try moved.makePlan(calendar: cal)
+    h.check(back.weeks[1].workouts.map(\.type) == base.weeks[1].workouts.map(\.type), "swapping twice puts the days back")
+
+    // Race day never moves.
+    let race = try require(base.allWorkouts.last, "race day")
+    moved.daySwaps = [DaySwap(race.date, cal.date(byAdding: .day, value: -1, to: race.date)!)]
+    h.check(try moved.makePlan(calendar: cal).allWorkouts.last?.type == .raceDay, "race day can't be swapped")
+
+    // Swaps survive encoding, and older data without swaps still decodes.
+    moved.daySwaps = [DaySwap(run.date, rest.date)]
+    let decoded = try JSONDecoder().decode(PlanInputs.self, from: JSONEncoder().encode(moved))
+    h.check(decoded == moved, "swaps round-trip through JSON")
+    var legacy = try JSONSerialization.jsonObject(with: JSONEncoder().encode(inputs)) as! [String: Any]
+    legacy.removeValue(forKey: "daySwaps")
+    let old = try JSONDecoder().decode(PlanInputs.self, from: JSONSerialization.data(withJSONObject: legacy))
+    h.check(old.daySwaps.isEmpty, "inputs without swaps decode with none")
+}
+
+// MARK: Progress counts
+
+h.suite("Progress counts") {
+    let gen = VDOTPlanGenerator()
+    let fitness = FitnessSnapshot(distanceMeters: 10_000, timeSeconds: 45 * 60, date: date(2026, 1, 1))
+    let plan = try gen.makePlan(
+        goal: Goal(race: .marathon, raceDate: date(2027, 4, 25), daysPerWeek: 3),
+        fitness: fitness, startDate: date(2026, 1, 7), calendar: cal  // Wednesday
+    )
+    // Wed, Fri, Sun. A run on Monday, before the plan starts, isn't progress.
+    let wedRun = try require(plan.weeks[0].workouts.first { $0.type.isRunning }, "Wednesday run")
+    let beforeStart = CompletedRun(date: date(2026, 1, 5), distanceMeters: 8_000, durationSeconds: 2_700)
+    let onWed = CompletedRun(date: wedRun.date, distanceMeters: wedRun.distanceMeters, durationSeconds: 2_400, plannedWorkoutID: wedRun.id)
+
+    // Friday morning, Friday's run not done yet: only Wednesday is due.
+    let friday = date(2026, 1, 9)
+    let p = PlanProgress.make(plan: plan, completedRuns: [beforeStart, onWed], asOf: friday, calendar: cal)
+    h.check(p.workoutsScheduledToDate == 1 && p.workoutsCompleted == 1, "today's open run isn't due yet (\(p.workoutsCompleted) of \(p.workoutsScheduledToDate))")
+    h.approx(p.runsDoneFraction, 1, tolerance: 0.0001, "1 of 1 runs done → 100%")
+    h.approx(p.completedDistanceMeters, wedRun.distanceMeters, tolerance: 0.5, "a run before the plan starts isn't counted")
+    h.approx(p.plannedToDateMeters, wedRun.distanceMeters, tolerance: 0.5, "planned to date is only the due run")
+    h.approx(p.currentWeekCompletedMeters, wedRun.distanceMeters, tolerance: 0.5, "this week ignores the pre-start run too")
+
+    // Once Friday's run is done, it's due and counted.
+    let friRun = try require(plan.weeks[0].workouts.filter(\.type.isRunning).dropFirst().first, "Friday run")
+    let onFri = CompletedRun(date: friRun.date, distanceMeters: friRun.distanceMeters, durationSeconds: 2_400, plannedWorkoutID: friRun.id)
+    let p2 = PlanProgress.make(plan: plan, completedRuns: [onWed, onFri], asOf: friday, calendar: cal)
+    h.check(p2.workoutsScheduledToDate == 2 && p2.workoutsCompleted == 2, "today's run counts once it's done")
+
+    // Saturday with Friday skipped: 1 of 2.
+    let p3 = PlanProgress.make(plan: plan, completedRuns: [onWed], asOf: date(2026, 1, 10), calendar: cal)
+    h.approx(p3.runsDoneFraction, 0.5, tolerance: 0.0001, "missed Friday → 1 of 2 runs done")
+}
+
 // MARK: Adaptation engine
 
 h.suite("Adaptation engine") {

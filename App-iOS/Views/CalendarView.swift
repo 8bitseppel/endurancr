@@ -1,9 +1,12 @@
 import SwiftUI
 import TrainingCore
 
-/// The full plan, grouped by week, with each week's phase and volume.
+/// The full plan, grouped by week, with each week's phase and volume. Past days are
+/// struck through; any day from today on can be held and dragged onto another day
+/// to swap the two sessions.
 struct CalendarView: View {
     let coordinator: PlanCoordinator
+    @State private var targetedDay: Date?
 
     var body: some View {
         NavigationStack {
@@ -12,7 +15,7 @@ struct CalendarView: View {
                     ForEach(plan.weeks, id: \.index) { week in
                         Section(header: weekHeader(week)) {
                             ForEach(week.workouts) { workout in
-                                WorkoutRow(workout: workout, zones: plan.paceZones)
+                                row(workout, zones: plan.paceZones)
                             }
                         }
                     }
@@ -22,6 +25,51 @@ struct CalendarView: View {
             }
             .navigationTitle("Plan")
             .refreshable { await coordinator.refreshAdaptation() }
+            .toolbar {
+                if coordinator.hasMovedDays {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Undo moves") {
+                            Task { await coordinator.resetMovedDays() }
+                        }
+                    }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                if coordinator.displayPlan != nil {
+                    Text("Hold a day and drag it onto another to swap them.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                        .padding(.vertical, 8).frame(maxWidth: .infinity)
+                        .background(.bar)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ workout: PlannedWorkout, zones: PaceZones) -> some View {
+        let isPast = Calendar.current.startOfDay(for: workout.date) < Calendar.current.startOfDay(for: .now)
+        let base = WorkoutRow(workout: workout, zones: zones, isPast: isPast)
+        if coordinator.canMove(workout) {
+            let key = workout.date.timeIntervalSince1970
+            base
+                .draggable(String(key)) {
+                    WorkoutRow(workout: workout, zones: zones, isPast: false)
+                        .padding().frame(width: 320)
+                        .background(.background, in: .rect(cornerRadius: 12))
+                }
+                .dropDestination(for: String.self) { items, _ in
+                    guard let from = items.first.flatMap(Double.init).map(Date.init(timeIntervalSince1970:)),
+                          !Calendar.current.isDate(from, inSameDayAs: workout.date) else { return false }
+                    withAnimation { coordinator.swapDays(from, workout.date) }
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    return true
+                } isTargeted: { targeted in
+                    if targeted { targetedDay = workout.date }
+                    else if targetedDay == workout.date { targetedDay = nil }
+                }
+                .listRowBackground(targetedDay == workout.date ? Color.accentColor.opacity(0.18) : nil)
+        } else {
+            base
         }
     }
 
@@ -38,6 +86,7 @@ struct CalendarView: View {
 private struct WorkoutRow: View {
     let workout: PlannedWorkout
     let zones: PaceZones
+    var isPast = false
 
     var body: some View {
         HStack(alignment: .top) {
@@ -56,7 +105,7 @@ private struct WorkoutRow: View {
                             .font(.caption).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    if let structure = workout.structure {
+                    if let structure = workout.structure, !isPast {
                         WorkoutStepsView(structure: structure, zones: zones)
                             .padding(.top, 1)
                     }
@@ -75,5 +124,10 @@ private struct WorkoutRow: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
+        // Days already behind you are struck through and dimmed.
+        .strikethrough(isPast)
+        .opacity(isPast ? 0.5 : 1)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(isPast ? "In the past" : "")
     }
 }

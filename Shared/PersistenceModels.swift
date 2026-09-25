@@ -59,11 +59,7 @@ final class StoredPlan {
     /// and is not stored; this is enough for read-only surfaces like the watch's
     /// "today" view.
     var plan: TrainingPlan? {
-        guard let inputs else { return nil }
-        return try? VDOTPlanGenerator().makePlan(
-            goal: inputs.goal, fitness: inputs.fitness,
-            startDate: inputs.startDate, calendar: .current
-        )
+        try? inputs?.makePlan(calendar: .current)
     }
 }
 

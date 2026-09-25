@@ -301,8 +301,8 @@ struct ProgressDashboardView: View {
                     detail: progress.currentWeekNumber.map { "Week \($0) of \(progress.totalWeeks)" } ?? "",
                     fraction: progress.overallCompletionFraction)
                 bar("Runs done so far",
-                    detail: "\(progress.workoutsCompleted) of \(progress.workoutsScheduledToDate) due until today",
-                    fraction: progress.adherenceFraction)
+                    detail: "\(progress.workoutsCompleted) of \(progress.workoutsScheduledToDate) runs that were due",
+                    fraction: progress.runsDoneFraction)
                 LabeledContent("Distance so far",
                                value: "\(Format.distance(progress.completedDistanceMeters)) of \(Format.distance(progress.plannedToDateMeters))")
                     .font(.subheadline)
@@ -311,7 +311,7 @@ struct ProgressDashboardView: View {
             Text("Sticking to the plan")
         } footer: {
             if progress.plannedToDateMeters > 0 {
-                Text("Runs done so far only counts runs that were already due, not the ones still ahead.")
+                Text("Only runs that were already due count. Today's run counts once you've done it.")
             }
         }
     }
