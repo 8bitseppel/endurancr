@@ -43,6 +43,7 @@ final class HealthKitService {
     }
 
     func requestAuthorization() async {
+        if DemoMode.isOn { isAuthorized = true; return }
         guard Self.isAvailable else {
             lastError = "Health data isn't available on this device."
             return
@@ -57,6 +58,7 @@ final class HealthKitService {
 
     /// Fetches running workouts since `date`, mapped to the engine's `CompletedRun`.
     func fetchRuns(since date: Date) async -> [CompletedRun] {
+        if DemoMode.isOn { return DemoMode.runs.filter { $0.date >= date } }
         let workouts = await fetchRunningWorkouts(since: date)
         var runs: [CompletedRun] = []
         for workout in workouts {
@@ -99,6 +101,7 @@ final class HealthKitService {
 
     /// Fetches daily resting-heart-rate samples since `date`, for fatigue detection.
     func fetchRestingHeartRates(since date: Date) async -> [RestingHeartRateSample] {
+        if DemoMode.isOn { return [] }
         let type = HKQuantityType(.restingHeartRate)
         let predicate = HKQuery.predicateForSamples(withStart: date, end: nil)
         let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
@@ -146,6 +149,7 @@ final class HealthKitService {
     }
 
     private func fetchRunningWorkouts(since date: Date) async -> [HKWorkout] {
+        if DemoMode.isOn { return [] }
         let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
             HKQuery.predicateForWorkouts(with: .running),
             HKQuery.predicateForSamples(withStart: date, end: nil),

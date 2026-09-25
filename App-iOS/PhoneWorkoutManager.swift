@@ -89,6 +89,21 @@ final class PhoneWorkoutManager: NSObject, @unchecked Sendable {
         )
     }
 
+    #if DEBUG
+    /// Fills in a run in progress for Simulator screenshots (see `DemoMode`),
+    /// without touching HealthKit, location or the Live Activity.
+    func showDemoRun(plannedWorkout: PlannedWorkout, vdot: Double) {
+        self.plannedWorkout = plannedWorkout
+        self.targetPace = plannedWorkout.targetPaceSecPerKm
+        self.zones = VDOTCalculator().paceZones(forVDOT: vdot)
+        distanceMeters = 6_420
+        elapsedSeconds = 37 * 60 + 14
+        currentPaceSecPerKm = targetPace.map { ($0.lowerBound + $0.upperBound) / 2 } ?? 348
+        routePointCount = 412
+        isRunning = true
+    }
+    #endif
+
     func start(
         goalName: String = "", workoutTitle: String = "Run",
         targetPace: ClosedRange<Double>? = nil,

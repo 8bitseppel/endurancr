@@ -50,8 +50,8 @@ struct LiveRunView: View {
                     )
                 } else {
                     // Free run: no plan, so just live pace and distance.
-                    metric("Distance", Format.distance(workout.distanceMeters), tint: .cyan)
-                    metric("Pace", Format.pace(workout.paceSecPerKm), tint: .green)
+                    metric("Distance", Format.distance(workout.distanceMeters), tint: .accentColor)
+                    metric("Pace", Format.pace(workout.paceSecPerKm), tint: .primary)
                 }
 
                 gpsStatus
@@ -150,7 +150,7 @@ struct LiveRunView: View {
     private func metricPair(
         _ label: String, _ value: String,
         _ targetLabel: String, _ targetValue: String,
-        valueTint: Color = .cyan
+        valueTint: Color = .accentColor
     ) -> some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 0) {

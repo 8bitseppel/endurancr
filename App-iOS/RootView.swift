@@ -14,6 +14,8 @@ struct RootView: View {
     // Tracks a genuine trip to the background so we only re-adapt when the app is
     // truly reopened — not on the .inactive blips from sheets or Control Center.
     @State private var wasBackgrounded = false
+    // Only set in demo mode, to show a run in progress for screenshots.
+    @State private var demoRecorder: PhoneWorkoutManager?
 
     var body: some View {
         Group {
@@ -22,7 +24,9 @@ struct RootView: View {
                 // empty state on its own. Once a goal is set, surface the tab bar
                 // (coach card as the landing tab) so the analytical views are one
                 // tap away at the bottom.
-                if coordinator.inputs != nil {
+                if DemoMode.screen == "run", let demoRecorder {
+                    NavigationStack { PhoneLiveRunView(recorder: demoRecorder) }
+                } else if coordinator.inputs != nil {
                     MainTabView(coordinator: coordinator)
                 } else {
                     CoachView(coordinator: coordinator)
@@ -35,6 +39,13 @@ struct RootView: View {
             if coordinator == nil {
                 coordinator = PlanCoordinator(context: context, health: health)
             }
+            #if DEBUG
+            if DemoMode.screen == "run", let planned = DemoMode.todaysWorkout, let plan = DemoMode.plan {
+                let recorder = PhoneWorkoutManager()
+                recorder.showDemoRun(plannedWorkout: planned, vdot: plan.vdot)
+                demoRecorder = recorder
+            }
+            #endif
             await health.requestAuthorization()
             await coordinator?.refreshAdaptation()
         }
@@ -56,17 +67,22 @@ struct RootView: View {
 
 struct MainTabView: View {
     let coordinator: PlanCoordinator
+    @State private var tab = DemoMode.screen ?? "today"
 
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             TodayView(coordinator: coordinator)
                 .tabItem { Label("Today", systemImage: "figure.run") }
+                .tag("today")
             ProgressDashboardView(coordinator: coordinator)
                 .tabItem { Label("Progress", systemImage: "chart.line.uptrend.xyaxis") }
+                .tag("progress")
             CalendarView(coordinator: coordinator)
                 .tabItem { Label("Plan", systemImage: "calendar") }
+                .tag("plan")
             HowItWorksView()
                 .tabItem { Label("How it works", systemImage: "book") }
+                .tag("how")
         }
     }
 }

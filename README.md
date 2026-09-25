@@ -26,6 +26,17 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
 - **Free.** No subscription and no in-app purchases.
 - **Open source.** You can read every line that touches your data.
 
+<p align="center">
+  <img src="docs/screenshots/iphone-1-today.png" width="200" alt="Today">
+  <img src="docs/screenshots/iphone-2-progress.png" width="200" alt="Progress">
+  <img src="docs/screenshots/iphone-4-run.png" width="200" alt="Running">
+</p>
+<p align="center">
+  <img src="docs/screenshots/watch-1-today.png" width="150" alt="Watch home">
+  <img src="docs/screenshots/watch-2-run.png" width="150" alt="Watch during a run">
+  <img src="docs/screenshots/watch-3-summary.png" width="150" alt="Watch after a run">
+</p>
+
 ## Features
 
 - A goal (for example a marathon on a given date) or a target VDOT, and a plan that
@@ -78,6 +89,13 @@ To run it on your own devices, set your own team in `project.yml`
 (`DEVELOPMENT_TEAM`) and change the bundle identifiers (`app.endurancr`,
 `app.endurancr.widgets`, `app.endurancr.watchkitapp`) to a prefix you own. Then run
 `xcodegen generate` again.
+
+## Screenshots and releases
+
+`./scripts/screenshots.sh` takes the screenshots in `docs/screenshots/` on the iPhone and
+Apple Watch Simulators, using sample data that only exists in Debug builds
+(`Shared/DemoMode.swift`). `./scripts/release.sh` raises the build number and archives a
+build for TestFlight.
 
 ## Privacy
 

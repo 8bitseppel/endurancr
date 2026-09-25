@@ -16,7 +16,7 @@ struct RouteMapView: View {
         Map {
             if coordinates.count > 1 {
                 MapPolyline(coordinates: coordinates)
-                    .stroke(.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
             }
             if let start = coordinates.first {
                 Marker("Start", systemImage: "flag", coordinate: start)

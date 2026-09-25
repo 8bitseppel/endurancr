@@ -26,8 +26,9 @@ node_modules/
 
 # Local tooling and personal files
 .claude/
-screenshots/
+/screenshots/
 *.mobileprovision
 *.p12
 *.cer
 .env
+*.swp

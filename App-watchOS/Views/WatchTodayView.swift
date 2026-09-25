@@ -9,6 +9,8 @@ struct WatchTodayView: View {
     /// Runs shorter than this don't warrant a post-run summary (stationary tests,
     /// accidental start/finish). 100 m is below any real run yet above GPS jitter.
     private static let minSummaryDistanceMeters: Double = 100
+    /// Dark plum label on the light lilac accent, as on endurancr.app.
+    static let plumInk = Color(red: 0x24 / 255, green: 0x10 / 255, blue: 0x30 / 255)
 
     @Environment(HealthKitService.self) private var health
     // Observes the store so a plan synced from the iPhone refreshes the view live.
@@ -24,6 +26,8 @@ struct WatchTodayView: View {
     // HealthKit's save is still settling.
     @State private var runSummary: WatchRunSummary?
     @State private var weekCompletedAtStart: Double = 0
+    // This week's planned vs. completed volume for the home screen ring.
+    @State private var weekProgress: PlanProgress?
 
     var body: some View {
         NavigationStack {
@@ -35,7 +39,8 @@ struct WatchTodayView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 4)
             }
-            .navigationTitle("endurancr")
+            .containerBackground(Color.accentColor.opacity(0.45).gradient, for: .navigation)
+            .task(id: storedPlans.first?.updatedAt) { await loadWeekProgress() }
             .navigationDestination(isPresented: $showLiveRun) {
                 LiveRunView(workout: workout, plannedWorkout: runWorkout, zones: runZones)
             }
@@ -58,7 +63,7 @@ struct WatchTodayView: View {
                     )
                 }
             }
-            .sheet(item: $runSummary) { summary in
+            .sheet(item: $runSummary, onDismiss: { Task { await loadWeekProgress() } }) { summary in
                 NavigationStack { WatchRunSummaryView(summary: summary) }
             }
         }
@@ -94,31 +99,82 @@ struct WatchTodayView: View {
     private var header: some View {
         switch state {
         case .workout(let planned):
-            VStack(spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("TODAY")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.tint)
                 Text(Format.workoutTitle(planned.type)).font(.headline)
                 Text(Format.distance(planned.distanceMeters))
-                    .font(.title3).monospacedDigit()
+                    .font(.system(.title, design: .rounded).weight(.semibold))
+                    .monospacedDigit()
+                    .lineLimit(1).minimumScaleFactor(0.6)
                 Text(Format.paceRange(planned.targetPaceSecPerKm))
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote).monospacedDigit()
+                    .foregroundStyle(.secondary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            weekRing
         case .rest:
-            VStack(spacing: 4) {
-                Text("Rest day").font(.headline)
-                Text("Recover well.").font(.footnote).foregroundStyle(.secondary)
-            }
+            message("Rest day", "Recover well.", systemImage: "moon.zzz.fill")
+            weekRing
         case .noSessionToday:
-            VStack(spacing: 4) {
-                Text("Nothing scheduled").font(.headline)
-                Text("Start a free run anytime.").font(.footnote).foregroundStyle(.secondary)
-            }
+            message("Nothing scheduled", "Start a free run anytime.", systemImage: "calendar")
+            weekRing
         case .noGoal:
-            VStack(spacing: 4) {
-                Text("No goal yet").font(.headline)
-                Text("Set a goal on your iPhone, or just start a free run.")
-                    .font(.footnote).foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
+            message("No goal yet", "Set a goal on your iPhone, or just start a free run.",
+                    systemImage: "flag.fill")
         }
+    }
+
+    private func message(_ title: String, _ detail: String, systemImage: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Image(systemName: systemImage)
+                .font(.title3)
+                .foregroundStyle(.tint)
+            Text(title).font(.headline)
+            Text(detail).font(.footnote).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// This week's completed volume against the plan, as a small ring plus numbers.
+    @ViewBuilder
+    private var weekRing: some View {
+        if let weekProgress, weekProgress.currentWeekPlannedMeters > 0 {
+            let fraction = min(1, weekProgress.currentWeekCompletedMeters / weekProgress.currentWeekPlannedMeters)
+            HStack(spacing: 10) {
+                Gauge(value: fraction) {
+                    EmptyView()
+                } currentValueLabel: {
+                    Text("\(Int((fraction * 100).rounded()))")
+                        .font(.system(.caption, design: .rounded).weight(.semibold))
+                        .monospacedDigit()
+                }
+                .gaugeStyle(.accessoryCircularCapacity)
+                .tint(.accentColor)
+                .scaleEffect(0.8)
+                .frame(width: 40, height: 40)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(weekProgress.currentWeekNumber.map { "Week \($0)" } ?? "This week")
+                        .font(.footnote.weight(.semibold))
+                    Text("\(Format.distance(weekProgress.currentWeekCompletedMeters)) of \(Format.distance(weekProgress.currentWeekPlannedMeters))")
+                        .font(.caption2).monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                }
+                Spacer(minLength: 0)
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private func loadWeekProgress() async {
+        guard let plan = currentPlan else { weekProgress = nil; return }
+        let since = plan.weeks.first?.startDate
+            ?? Calendar.current.date(byAdding: .month, value: -1, to: .now)!
+        let runs = await health.fetchRuns(since: since)
+        weekProgress = PlanProgress.make(plan: plan, completedRuns: runs, asOf: .now)
     }
 
     private var startButton: some View {
@@ -147,10 +203,14 @@ struct WatchTodayView: View {
             }
         } label: {
             Label("Start Run", systemImage: "figure.run")
+                .fontWeight(.semibold)
+                .foregroundStyle(Self.plumInk)
                 .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.glassProminent)
+        .tint(.accentColor)
         .controlSize(.large)
+        .padding(.top, 4)
     }
 
     private enum TodayState {

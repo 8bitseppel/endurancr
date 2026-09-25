@@ -47,7 +47,7 @@ struct WatchRunSummaryView: View {
                     Text(Format.distance(summary.distanceMeters))
                         .font(.system(.largeTitle, design: .rounded).weight(.semibold))
                         .monospacedDigit()
-                        .foregroundStyle(.cyan)
+                        .foregroundStyle(.tint)
                     Text("DISTANCE")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
@@ -62,8 +62,14 @@ struct WatchRunSummaryView: View {
                     weeklyProgress
                 }
 
-                Button("Done") { dismiss() }
-                    .buttonStyle(.borderedProminent)
+                Button { dismiss() } label: {
+                    Text("Done")
+                        .fontWeight(.semibold)
+                        .foregroundStyle(WatchTodayView.plumInk)
+                        .frame(maxWidth: .infinity)
+                }
+                    .buttonStyle(.glassProminent)
+                    .tint(.accentColor)
                     .controlSize(.large)
                     .padding(.top, 2)
             }
@@ -87,13 +93,13 @@ struct WatchRunSummaryView: View {
             Text(summary.weekNumber.map { "Week \($0)" } ?? "This week")
                 .font(.headline)
             ProgressView(value: summary.weekFraction)
-                .tint(.orange)
+                .tint(.accentColor)
             Text("\(Format.distance(summary.weekCompletedMeters)) of \(Format.distance(summary.weekTargetMeters))")
                 .font(.caption).monospacedDigit()
                 .foregroundStyle(.secondary)
             Text(summary.weekRemainingMeters > 0
                  ? "\(Format.distance(summary.weekRemainingMeters)) to go"
-                 : "Target met - nice work")
+                 : "Target met. Nice work.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }

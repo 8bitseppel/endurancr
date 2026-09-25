@@ -282,7 +282,7 @@ struct ProgressDashboardView: View {
                 }
             } else {
                 HStack(spacing: 20) {
-                    gauge(fraction: progress.adherenceFraction, tint: .blue)
+                    gauge(fraction: progress.adherenceFraction, tint: .accentColor)
                     VStack(alignment: .leading, spacing: 4) {
                         LabeledContent("Workouts done", value: "\(progress.workoutsCompleted)/\(progress.workoutsScheduledToDate)")
                         LabeledContent("Distance", value: "\(Format.distance(progress.completedDistanceMeters)) / \(Format.distance(progress.plannedToDateMeters))")

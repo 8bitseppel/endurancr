@@ -8,6 +8,7 @@ struct EndurancrApp: App {
 
     init() {
         container = StoredPlan.makeContainer()
+        DemoMode.seed(container)
         PlanSync.shared.activate()
     }
 

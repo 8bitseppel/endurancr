@@ -38,7 +38,7 @@ struct RunSummaryView: View {
         NavigationStack {
             List {
                 Section {
-                    stat("Distance", Format.distance(data.distanceMeters), tint: .cyan)
+                    stat("Distance", Format.distance(data.distanceMeters), tint: .accentColor)
                     stat("Time", Format.duration(data.durationSeconds))
                     stat("Average pace", Format.pace(data.averagePaceSecPerKm), tint: .green)
                 } header: {
@@ -55,10 +55,10 @@ struct RunSummaryView: View {
                             Text(weekLine)
                                 .font(.headline)
                             ProgressView(value: data.weekFraction)
-                                .tint(.orange)
+                                .tint(.accentColor)
                             Text(data.weekRemainingMeters > 0
                                  ? "\(Format.distance(data.weekRemainingMeters)) still to go this week"
-                                 : "Week's target met - nice work")
+                                 : "Week's target met. Nice work.")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
