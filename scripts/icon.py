@@ -1,54 +1,37 @@
 #!/usr/bin/env python3
-"""Draws the endurancr icon: a sun of running lanes with a keyhole, mirrored in
-water, centred and filling the icon. Writes website/logo.svg and renders the app
-icons (iPhone light, dark, tinted, Apple Watch) and the website PNGs.
+"""Draws the endurancr icon: a finisher medal on its ribbon, on electric violet.
+Writes website/logo.svg and favicon.svg and renders the app icons (iPhone light,
+dark, tinted, Apple Watch) and the website PNGs.
 
 Needs Python 3 with Playwright (pip install playwright; playwright install chromium).
 Run from the repository root: python3 scripts/icon.py
 """
 import asyncio
-import math
 from pathlib import Path
 
-C = 512
-LANES = ((425, 18, .28), (335, 52, 1), (245, 18, .28))  # radius, width, opacity
-MIRROR = (.14, .22, .14)
-
 THEMES = {
-    "light": dict(bg=("#f4eef8", "#dccbe8"), ink="#3b1f4b", hole="#f4eef8"),
-    "dark": dict(bg=("#5a3a6e", "#241030"), ink="#f4eef8", hole="#2b1638"),
-    "tinted": dict(bg=("#000000", "#000000"), ink="#ffffff", hole="#000000"),
+    "light": dict(bg=("#8a4fe0", "#240c40"), ink="#f6f0ff", soft="#c9a8f2", back="#240c40"),
+    "dark": dict(bg=("#2c1446", "#0b0414"), ink="#ece0fb", soft="#9a7cc4", back="#0b0414"),
+    "tinted": dict(bg=("#000000", "#000000"), ink="#ffffff", soft="#8a8a8a", back="#000000"),
 }
 
 
-def arc(r, upper):
-    sweep = 1 if upper else 0
-    return f"M{C - r} {C} A{r} {r} 0 0 {sweep} {C + r} {C}"
+def medal(t, ring=True):
+    body = (f'<path d="M280 90 H430 L604 500 H444 Z" fill="{t["soft"]}"/>'
+            f'<path d="M744 90 H594 L420 500 H580 Z" fill="{t["ink"]}"/>'
+            f'<circle cx="512" cy="670" r="232" fill="{t["ink"]}"/>')
+    if ring:
+        body += f'<circle cx="512" cy="670" r="166" fill="none" stroke="{t["back"]}" stroke-width="22"/>'
+    return body + f'<circle cx="512" cy="670" r="{64 if ring else 90}" fill="{t["soft"]}"/>'
 
 
-def stroke(d, w, op, ink):
-    return (f'<path d="{d}" fill="none" stroke="{ink}" stroke-width="{w}" '
-            f'stroke-linecap="round" opacity="{op}"/>')
-
-
-def keyhole(cx, cy, r, ink, hole):
-    return (f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="{ink}"/>'
-            f'<circle cx="{cx}" cy="{cy - 0.18 * r:.1f}" r="{0.26 * r:.1f}" fill="{hole}"/>'
-            f'<path d="M{cx - 0.13 * r:.1f} {cy - 0.05 * r:.1f} L{cx - 0.22 * r:.1f} {cy + 0.5 * r:.1f} '
-            f'H{cx + 0.22 * r:.1f} L{cx + 0.13 * r:.1f} {cy - 0.05 * r:.1f} Z" fill="{hole}"/>')
-
-
-def svg(theme, rounded):
+def svg(theme, rounded, ring=True):
     t = THEMES[theme]
     corner = ' rx="230"' if rounded else ""
-    body = "".join(stroke(arc(r, True), w, op, t["ink"]) for r, w, op in LANES)
-    body += "".join(stroke(arc(r, False), w, op, t["ink"]) for (r, w, _), op in zip(LANES, MIRROR))
-    body += stroke(f"M60 {C} H964", 18, .45, t["ink"])
-    body += keyhole(C, 398, 100, t["ink"], t["hole"])
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="endurancr">'
-            f'<defs><radialGradient id="g" cx="0.5" cy="0.34" r="0.72"><stop offset="0" stop-color="{t["bg"][0]}"/>'
+            f'<defs><radialGradient id="g" cx="0.3" cy="0.2" r="1"><stop offset="0" stop-color="{t["bg"][0]}"/>'
             f'<stop offset="1" stop-color="{t["bg"][1]}"/></radialGradient></defs>'
-            f'<rect width="1024" height="1024"{corner} fill="url(#g)"/>{body}</svg>')
+            f'<rect width="1024" height="1024"{corner} fill="url(#g)"/>{medal(t, ring)}</svg>')
 
 
 async def render(jobs):
@@ -67,6 +50,8 @@ async def render(jobs):
 
 def main():
     Path("website/logo.svg").write_text(svg("light", rounded=True))
+    # The favicon drops the thin ring, which would blur at 16 to 32 pixels.
+    Path("website/favicon.svg").write_text(svg("light", rounded=True, ring=False))
     ios = "App-iOS/Assets.xcassets/AppIcon.appiconset"
     watch = "App-watchOS/Assets.xcassets/AppIcon.appiconset"
     asyncio.run(render([
@@ -76,6 +61,7 @@ def main():
         (svg("light", False), 1024, f"{watch}/AppIcon-Watch.png", False),
         (svg("light", False), 180, "website/apple-touch-icon.png", False),
         (svg("light", True), 512, "website/icon-512.png", True),
+        (svg("light", True, ring=False), 32, "website/favicon-32.png", True),
     ]))
 
 
