@@ -7,7 +7,9 @@ import WatchConnectivity
 
 /// Peer-to-peer plan sync between the paired iPhone and Apple Watch over
 /// WatchConnectivity. Local-only, no cloud: the phone is the source of truth and
-/// publishes the (~1 KB) `PlanInputs` JSON as the session's "application context".
+/// publishes the (~1 KB) `PlanInputs` JSON as the session's "application context",
+/// plus its adapted current and next week (`AdaptedWeeks`) so the watch shows the
+/// same distances and paces as the phone, not the unadapted base plan.
 /// WatchConnectivity stores the latest context and delivers it to the watch even
 /// when the watch app is not running, so the watch mirrors the plan into its own
 /// SwiftData store and its today view works standalone.
@@ -40,12 +42,16 @@ final class PlanSync: NSObject {
 
     // MARK: Phone -> Watch
 
-    /// Publishes the latest inputs to the watch (or clears them when `nil`).
-    /// Coalesces to the newest state, so it is safe to call on every plan change.
-    func publish(inputs: PlanInputs?) {
+    /// Publishes the latest inputs and adapted weeks to the watch (or clears them
+    /// when `inputs` is `nil`). Coalesces to the newest state, so it is safe to call
+    /// on every plan change.
+    func publish(inputs: PlanInputs?, adapted: AdaptedWeeks?) {
         var context: [String: Any] = [:]
         if let inputs, let data = try? JSONEncoder().encode(inputs) {
             context["inputs"] = data
+            if let adapted, let data = try? JSONEncoder().encode(adapted) {
+                context["adapted"] = data
+            }
         }
         pendingContext = context
         flush()
@@ -65,13 +71,14 @@ final class PlanSync: NSObject {
     /// whatever it held. A `nil` payload means the phone has no plan, so the watch
     /// clears too. Takes `Data?` (Sendable) rather than the raw context dictionary
     /// so it can cross the actor boundary from the WCSession delegate thread.
-    private func apply(inputsData: Data?) {
+    private func apply(inputsData: Data?, adaptedData: Data?) {
         guard let container else { return }
         let moc = ModelContext(container)
         try? moc.delete(model: StoredPlan.self)
         if let inputsData,
            let inputs = try? JSONDecoder().decode(PlanInputs.self, from: inputsData) {
-            moc.insert(StoredPlan(inputs: inputs))
+            let adapted = adaptedData.flatMap { try? JSONDecoder().decode(AdaptedWeeks.self, from: $0) }
+            moc.insert(StoredPlan(inputs: inputs, adapted: adapted))
         }
         try? moc.save()
     }
@@ -84,16 +91,18 @@ extension PlanSync: WCSessionDelegate {
         // Extract the Sendable payload off the delegate thread, then hand off to the
         // main actor for the flush/apply.
         let inputsData = session.receivedApplicationContext["inputs"] as? Data
+        let adaptedData = session.receivedApplicationContext["adapted"] as? Data
         Task { @MainActor in
             self.flush()                    // phone: (re)send once activated
-            self.apply(inputsData: inputsData) // watch: catch up on last delivered state
+            self.apply(inputsData: inputsData, adaptedData: adaptedData) // watch: catch up
         }
     }
 
     nonisolated func session(_ session: WCSession,
                              didReceiveApplicationContext applicationContext: [String: Any]) {
         let inputsData = applicationContext["inputs"] as? Data
-        Task { @MainActor in self.apply(inputsData: inputsData) }
+        let adaptedData = applicationContext["adapted"] as? Data
+        Task { @MainActor in self.apply(inputsData: inputsData, adaptedData: adaptedData) }
     }
 
     #if os(iOS)

@@ -23,7 +23,11 @@ final class PlanCoordinator {
     private let adaptation = AdaptationEngine()
 
     private(set) var inputs: PlanInputs?
-    private(set) var currentPlan: TrainingPlan?
+    /// Every change is pushed to the watch, so a swap, a vacation or a fresh
+    /// adaptation shows there too.
+    private(set) var currentPlan: TrainingPlan? {
+        didSet { syncToWatch() }
+    }
     private(set) var recentRuns: [CompletedRun] = []
     private(set) var restingHeartRates: [RestingHeartRateSample] = []
     private(set) var fatigue: FatigueAssessment?
@@ -38,13 +42,12 @@ final class PlanCoordinator {
     private func loadLatest() {
         inputs = storedEntity?.inputs
         currentPlan = regeneratedBasePlan()
-        syncToWatch()
     }
 
-    /// Pushes the current inputs to the paired Apple Watch (peer-to-peer, no cloud).
-    /// Called after every change so the watch's today view stays in step.
+    /// Pushes the current inputs and the adapted weeks around today to the paired
+    /// Apple Watch (peer-to-peer, no cloud), so its today view matches this one.
     private func syncToWatch() {
-        PlanSync.shared.publish(inputs: inputs)
+        PlanSync.shared.publish(inputs: inputs, adapted: displayPlan.flatMap { AdaptedWeeks(plan: $0) })
     }
 
     /// Rebuilds the un-adapted plan from the stored inputs, or `nil` if there are none.
@@ -92,7 +95,6 @@ final class PlanCoordinator {
         try context.save()
         inputs = newInputs
         currentPlan = plan
-        syncToWatch()
     }
 
     /// Replaces the goal/fitness inputs (e.g. from the goal editor) and rebuilds the
@@ -111,7 +113,6 @@ final class PlanCoordinator {
         inputs = newInputs
         persistInputs()
         currentPlan = plan
-        syncToWatch()
     }
 
     /// Rebuilds the plan from stored inputs (goal + rules + fitness) and re-applies
@@ -145,7 +146,6 @@ final class PlanCoordinator {
         try context.save()
         inputs = restored
         currentPlan = plan
-        syncToWatch()
     }
 
     // MARK: Storage
@@ -199,7 +199,6 @@ final class PlanCoordinator {
         recentRuns = []
         restingHeartRates = []
         fatigue = nil
-        syncToWatch()
     }
 
     // MARK: Achieved goals
@@ -288,19 +287,6 @@ final class PlanCoordinator {
         currentPlan = currentPlan?.applyingSwaps([swap], calendar: cal)
     }
 
-    /// True when the athlete has moved at least one day.
-    var hasMovedDays: Bool { !(inputs?.daySwaps.isEmpty ?? true) }
-
-    /// Puts every moved day back where the plan had it.
-    func resetMovedDays() async {
-        guard var inputs, !inputs.daySwaps.isEmpty else { return }
-        inputs.daySwaps = []
-        self.inputs = inputs
-        persistInputs()
-        currentPlan = regeneratedBasePlan()
-        await refreshAdaptation()
-    }
-
     /// Adds a vacation / unavailable period to the goal and persists it.
     func addUnavailablePeriod(start: Date, end: Date, reason: String) {
         guard var inputs else { return }
@@ -332,6 +318,5 @@ final class PlanCoordinator {
         guard let inputs, let entity = storedEntity else { return }
         entity.inputs = inputs
         try? context.save()
-        syncToWatch()
     }
 }

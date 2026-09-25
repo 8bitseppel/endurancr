@@ -13,12 +13,16 @@ final class StoredPlan {
     var createdAt: Date
     var updatedAt: Date
     private var inputsData: Data
+    /// The phone's adapted current and next week (`AdaptedWeeks`), set only on the
+    /// watch. Optional so existing stores migrate without a reset.
+    private var adaptedData: Data? = nil
 
-    init(inputs: PlanInputs, id: UUID = UUID(), createdAt: Date = .now) {
+    init(inputs: PlanInputs, adapted: AdaptedWeeks? = nil, id: UUID = UUID(), createdAt: Date = .now) {
         self.id = id
         self.createdAt = createdAt
         self.updatedAt = createdAt
         self.inputsData = (try? JSONEncoder().encode(inputs)) ?? Data()
+        self.adaptedData = adapted.flatMap { try? JSONEncoder().encode($0) }
     }
 
     /// The decoded inputs, or `nil` if the stored data is unreadable.
@@ -54,12 +58,45 @@ final class StoredPlan {
         }
     }
 
-    /// The base plan regenerated from the stored inputs. Runtime adaptation
-    /// (re-pacing, rescheduling, fatigue easing) is layered by `PlanCoordinator`
-    /// and is not stored; this is enough for read-only surfaces like the watch's
-    /// "today" view.
+    /// The plan regenerated from the stored inputs. On the watch, the phone's
+    /// adapted weeks replace their base versions, so today's run and the week ring
+    /// match what the iPhone shows. On the phone, adaptation is layered at runtime
+    /// by `PlanCoordinator` instead.
     var plan: TrainingPlan? {
-        try? inputs?.makePlan(calendar: .current)
+        guard var plan = try? inputs?.makePlan(calendar: .current) else { return nil }
+        if let adaptedData, let adapted = try? JSONDecoder().decode(AdaptedWeeks.self, from: adaptedData) {
+            plan = adapted.applied(to: plan)
+        }
+        return plan
+    }
+}
+
+/// The phone's adapted version of the weeks around today (re-paced, eased for
+/// fatigue, redistributed, vacations blanked), sent to the watch with the inputs.
+/// Only a couple of weeks: the full calendar is too large for WatchConnectivity's
+/// application context, and the watch only shows today and this week.
+struct AdaptedWeeks: Codable, Sendable {
+    var vdot: Double
+    var paceZones: PaceZones
+    var weeks: [TrainingWeek]
+
+    /// The current week and the next one from `plan`.
+    init?(plan: TrainingPlan, asOf now: Date = .now) {
+        guard let current = plan.weeks.lastIndex(where: { $0.startDate <= now }) else { return nil }
+        vdot = plan.vdot
+        paceZones = plan.paceZones
+        weeks = Array(plan.weeks[current..<min(current + 2, plan.weeks.count)])
+    }
+
+    /// `plan` with these weeks in place of the ones of the same index.
+    func applied(to plan: TrainingPlan) -> TrainingPlan {
+        var plan = plan
+        plan.vdot = vdot
+        plan.paceZones = paceZones
+        for week in weeks {
+            if let i = plan.weeks.firstIndex(where: { $0.index == week.index }) { plan.weeks[i] = week }
+        }
+        return plan
     }
 }
 

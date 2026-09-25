@@ -24,15 +24,6 @@ struct CalendarView: View {
                 }
             }
             .navigationTitle("Plan")
-            .toolbar {
-                if coordinator.hasMovedDays {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Undo moves") {
-                            Task { await coordinator.resetMovedDays() }
-                        }
-                    }
-                }
-            }
         }
     }
 
