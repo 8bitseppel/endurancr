@@ -1,6 +1,8 @@
 #!/bin/sh
 # Takes Simulator screenshots of endurancr on iPhone and Apple Watch, using the
-# Debug-only demo data (see Shared/DemoMode.swift). Output: screenshots/.
+# Debug-only demo data (see Shared/DemoMode.swift). Long screens are also
+# recorded while they scroll and saved as GIFs. Output: screenshots/.
+# Needs ffmpeg for the GIFs (brew install ffmpeg).
 #
 #   ./scripts/screenshots.sh
 #
@@ -70,15 +72,37 @@ shot() {
   echo "    $OUT/$4.png"
 }
 
+# rec <device> <bundle id> <screen> <file name> <gif width>
+# Takes the screenshot, then records the screen scrolling down and back up.
+rec() {
+  shot "$1" "$2" "$3" "$4"
+  xcrun simctl terminate "$1" "$2" 2>/dev/null || true
+  xcrun simctl launch "$1" "$2" -demo -demoScreen "$3" -demoScroll YES >/dev/null
+  sleep 2.5
+  xcrun simctl io "$1" recordVideo --codec=h264 --force "$BUILD/$4.mov" >/dev/null 2>&1 &
+  recorder=$!
+  sleep 12
+  kill -INT "$recorder"
+  wait "$recorder" || true
+  ffmpeg -loglevel error -y -i "$BUILD/$4.mov" -vf \
+    "fps=12,scale=$5:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" \
+    "$OUT/$4.gif"
+  echo "    $OUT/$4.gif"
+}
+
+# The order follows a first week with the app: set a goal, run, check in.
 echo "==> iPhone"
-shot "$PHONE" app.endurancr - iphone-1-today
-shot "$PHONE" app.endurancr progress iphone-2-progress
-shot "$PHONE" app.endurancr plan iphone-3-plan
+shot "$PHONE" app.endurancr welcome iphone-1-welcome
+rec  "$PHONE" app.endurancr goal iphone-2-goal 400
+shot "$PHONE" app.endurancr - iphone-3-today
 shot "$PHONE" app.endurancr run iphone-4-run
+shot "$PHONE" app.endurancr summary iphone-5-summary
+rec  "$PHONE" app.endurancr progress iphone-6-progress 400
+shot "$PHONE" app.endurancr plan iphone-7-plan
 
 echo "==> Apple Watch"
-shot "$WATCH" app.endurancr.watchkitapp - watch-1-today
-shot "$WATCH" app.endurancr.watchkitapp run watch-2-run
-shot "$WATCH" app.endurancr.watchkitapp summary watch-3-summary
+rec "$WATCH" app.endurancr.watchkitapp - watch-1-today 312
+rec "$WATCH" app.endurancr.watchkitapp run watch-2-run 312
+rec "$WATCH" app.endurancr.watchkitapp summary watch-3-summary 312
 
 echo "==> Done"

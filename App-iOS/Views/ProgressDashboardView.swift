@@ -52,6 +52,7 @@ struct ProgressDashboardView: View {
                 }
             }
             .navigationTitle("Progress")
+            .demoAutoScroll()
             .refreshable { await coordinator.refreshAdaptation() }
             .sheet(isPresented: $showingGoalEditor) {
                 GoalEditorView(coordinator: coordinator)
@@ -203,8 +204,20 @@ struct ProgressDashboardView: View {
 
     // MARK: Next workout
 
+    /// The next session after today's, since today's already has its own
+    /// Start run section above.
+    private func upcomingWorkout(_ progress: PlanProgress) -> PlannedWorkout? {
+        guard let next = progress.nextWorkout, Calendar.current.isDateInToday(next.date) else {
+            return progress.nextWorkout
+        }
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: .now))!
+        return coordinator.displayPlan?.allWorkouts
+            .filter { $0.type != .rest && $0.date >= tomorrow }
+            .min { $0.date < $1.date }
+    }
+
     @ViewBuilder private func nextWorkoutSection(_ progress: PlanProgress) -> some View {
-        if let next = progress.nextWorkout {
+        if let next = upcomingWorkout(progress) {
             Section("Next workout") {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .firstTextBaseline) {
@@ -254,7 +267,7 @@ struct ProgressDashboardView: View {
                         .foregroundStyle(.secondary).monospacedDigit()
                 }
                 ProgressView(value: min(done / planned, 1))
-                    .tint(.green)
+                    .tint(.accentColor)
             }
         }
     }

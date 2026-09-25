@@ -50,7 +50,7 @@ private extension WorkoutManager {
     static var demo: WorkoutManager {
         let workout = WorkoutManager()
         workout.distanceMeters = 6_420
-        workout.elapsedSeconds = 37 * 60 + 14
+        workout.elapsedSeconds = 38 * 60 + 50
         workout.heartRate = 142
         workout.routePointCount = 412
         workout.isRunning = true
@@ -60,8 +60,10 @@ private extension WorkoutManager {
 
 private extension WatchRunSummary {
     static var demo: WatchRunSummary {
-        WatchRunSummary(distanceMeters: 10_040, durationSeconds: 58 * 60 + 12, saved: true,
-                        weekNumber: 7, weekCompletedMeters: 24_600, weekTargetMeters: 38_100)
+        let run = DemoMode.finishedRun
+        return WatchRunSummary(distanceMeters: run.meters, durationSeconds: run.seconds, saved: true,
+                               weekNumber: run.week, weekCompletedMeters: run.weekDone,
+                               weekTargetMeters: run.weekTarget)
     }
 }
 #endif

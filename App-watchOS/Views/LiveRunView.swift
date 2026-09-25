@@ -62,6 +62,7 @@ struct LiveRunView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 4)
         }
+        .demoAutoScroll()
         .navigationTitle(workout.isPaused ? "Paused" : "Running")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: activeStep?.index) { old, new in
@@ -79,7 +80,7 @@ struct LiveRunView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(step.label.isEmpty ? "Target" : step.label)
                 .font(.caption).fontWeight(.semibold)
-                .foregroundStyle(.orange)
+                .foregroundStyle(.tint)
             Text("\(Format.distanceCompact(step.distanceMeters)) @ \(step.targetPaceSecPerKm.map(Format.pace) ?? "--")")
                 .font(.footnote).monospacedDigit()
                 .foregroundStyle(.secondary)

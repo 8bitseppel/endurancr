@@ -76,6 +76,7 @@ struct WatchRunSummaryView: View {
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 4)
         }
+        .demoAutoScroll()
         .navigationTitle("Run complete")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { WKInterfaceDevice.current().play(.success) }

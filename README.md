@@ -27,14 +27,20 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
 - **Open source.** You can read every line that touches your data.
 
 <p align="center">
-  <img src="docs/screenshots/iphone-1-today.png" width="200" alt="Today">
-  <img src="docs/screenshots/iphone-2-progress.png" width="200" alt="Progress">
-  <img src="docs/screenshots/iphone-4-run.png" width="200" alt="Running">
+  <img src="docs/screenshots/iphone-1-welcome.png" width="180" alt="Start: set your goal">
+  <img src="docs/screenshots/iphone-2-goal.gif" width="180" alt="Setting up the goal">
+  <img src="docs/screenshots/iphone-3-today.png" width="180" alt="Today">
+  <img src="docs/screenshots/iphone-4-run.png" width="180" alt="Running">
 </p>
 <p align="center">
-  <img src="docs/screenshots/watch-1-today.png" width="150" alt="Watch home">
-  <img src="docs/screenshots/watch-2-run.png" width="150" alt="Watch during a run">
-  <img src="docs/screenshots/watch-3-summary.png" width="150" alt="Watch after a run">
+  <img src="docs/screenshots/iphone-5-summary.png" width="180" alt="Run complete">
+  <img src="docs/screenshots/iphone-6-progress.gif" width="180" alt="Progress">
+  <img src="docs/screenshots/iphone-7-plan.png" width="180" alt="Plan">
+</p>
+<p align="center">
+  <img src="docs/screenshots/watch-1-today.gif" width="156" alt="Watch home">
+  <img src="docs/screenshots/watch-2-run.gif" width="156" alt="Watch during a run">
+  <img src="docs/screenshots/watch-3-summary.gif" width="156" alt="Watch after a run">
 </p>
 
 ## Features
@@ -94,7 +100,8 @@ To run it on your own devices, set your own team in `project.yml`
 
 `./scripts/screenshots.sh` takes the screenshots in `docs/screenshots/` on the iPhone and
 Apple Watch Simulators, using sample data that only exists in Debug builds
-(`Shared/DemoMode.swift`). `./scripts/release.sh` raises the build number and archives a
+(`Shared/DemoMode.swift`). Long screens are recorded while they scroll and saved as
+GIFs (needs ffmpeg). `./scripts/release.sh` raises the build number and archives a
 build for TestFlight.
 
 ## Privacy

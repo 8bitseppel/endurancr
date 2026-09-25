@@ -147,6 +147,10 @@ struct TodayView: View {
     }
 
     private func daysToGo(_ date: Date) -> Int {
-        max(0, Calendar.current.dateComponents([.day], from: .now, to: date).day ?? 0)
+        let calendar = Calendar.current
+        let days = calendar.dateComponents(
+            [.day], from: calendar.startOfDay(for: .now), to: calendar.startOfDay(for: date)
+        ).day
+        return max(0, days ?? 0)
     }
 }

@@ -76,14 +76,15 @@ struct GoalEditorView: View {
 
     init(coordinator: PlanCoordinator) {
         self.coordinator = coordinator
-        let goal = coordinator.inputs?.goal
-        let fitness = coordinator.inputs?.fitness
+        let inputs = coordinator.inputs ?? DemoMode.goalPrefill
+        let goal = inputs?.goal
+        let fitness = inputs?.fitness
 
         _name = State(initialValue: goal?.name ?? "")
         _raceKind = State(initialValue: RaceKind(distance: goal?.race ?? .marathon))
         _raceDate = State(initialValue: goal?.raceDate
             ?? Calendar.current.date(byAdding: .month, value: 6, to: .now) ?? .now)
-        _startDate = State(initialValue: coordinator.inputs?.startDate
+        _startDate = State(initialValue: inputs?.startDate
             ?? Calendar.current.startOfDay(for: .now))
         _daysPerWeek = State(initialValue: goal?.daysPerWeek ?? 5)
         _restWeekdays = State(initialValue: goal?.restWeekdays ?? [])
@@ -148,6 +149,7 @@ struct GoalEditorView: View {
             }
             .navigationTitle(isEditing ? "Edit Goal" : "New Plan")
             .navigationBarTitleDisplayMode(.inline)
+            .demoAutoScroll()
             .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

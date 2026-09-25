@@ -40,6 +40,7 @@ struct WatchTodayView: View {
                 .padding(.horizontal, 4)
             }
             .containerBackground(Color.accentColor.opacity(0.45).gradient, for: .navigation)
+            .demoAutoScroll()
             .task(id: storedPlans.first?.updatedAt) { await loadWeekProgress() }
             .navigationDestination(isPresented: $showLiveRun) {
                 LiveRunView(workout: workout, plannedWorkout: runWorkout, zones: runZones)

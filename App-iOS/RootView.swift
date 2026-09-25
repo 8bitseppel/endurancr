@@ -26,6 +26,12 @@ struct RootView: View {
                 // tap away at the bottom.
                 if DemoMode.screen == "run", let demoRecorder {
                     NavigationStack { PhoneLiveRunView(recorder: demoRecorder) }
+                } else if DemoMode.screen == "goal" {
+                    GoalEditorView(coordinator: coordinator)
+                } else if DemoMode.screen == "summary" {
+                    #if DEBUG
+                    RunSummaryView(data: .demo)
+                    #endif
                 } else if coordinator.inputs != nil {
                     MainTabView(coordinator: coordinator)
                 } else {
@@ -86,3 +92,16 @@ struct MainTabView: View {
         }
     }
 }
+
+#if DEBUG
+extension RunSummaryData {
+    /// Today's run just finished, for the demo summary screen.
+    static var demo: RunSummaryData {
+        let run = DemoMode.finishedRun
+        return RunSummaryData(
+            distanceMeters: run.meters, durationSeconds: run.seconds, saved: true,
+            weekNumber: run.week, weekCompletedMeters: run.weekDone, weekTargetMeters: run.weekTarget
+        )
+    }
+}
+#endif

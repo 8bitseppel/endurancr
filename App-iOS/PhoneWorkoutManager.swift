@@ -97,7 +97,7 @@ final class PhoneWorkoutManager: NSObject, @unchecked Sendable {
         self.targetPace = plannedWorkout.targetPaceSecPerKm
         self.zones = VDOTCalculator().paceZones(forVDOT: vdot)
         distanceMeters = 6_420
-        elapsedSeconds = 37 * 60 + 14
+        elapsedSeconds = 38 * 60 + 50
         currentPaceSecPerKm = targetPace.map { ($0.lowerBound + $0.upperBound) / 2 } ?? 348
         routePointCount = 412
         isRunning = true
