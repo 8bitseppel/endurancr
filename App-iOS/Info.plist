@@ -33,15 +33,6 @@
     <array>
         <string>UIInterfaceOrientationPortrait</string>
     </array>
-    <!-- iPad (TARGETED_DEVICE_FAMILY 1,2) must support all orientations for
-         multitasking, otherwise App Store upload validation rejects the build. -->
-    <key>UISupportedInterfaceOrientations~ipad</key>
-    <array>
-        <string>UIInterfaceOrientationPortrait</string>
-        <string>UIInterfaceOrientationPortraitUpsideDown</string>
-        <string>UIInterfaceOrientationLandscapeLeft</string>
-        <string>UIInterfaceOrientationLandscapeRight</string>
-    </array>
     <key>NSHealthShareUsageDescription</key>
     <string>endurancr reads your runs, routes, heart rate, resting heart rate, VO2 max, steps, running speed and power from Apple Health to track your progress and adapt your training plan. This data stays on your device and is never sent anywhere.</string>
     <key>NSHealthUpdateUsageDescription</key>
