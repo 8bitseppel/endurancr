@@ -242,12 +242,20 @@ public struct VDOTPlanGenerator: PlanGenerator {
         let weekendDays = allowed.filter { weekday($0) == 1 || weekday($0) == 7 }  // Sun / Sat
         let longOffset = weekendDays.max() ?? allowed.max()!
 
+        let others = allowed.filter { $0 != longOffset }
+
+        // A full week repeats, so Sunday runs straight into next Monday. Space the
+        // runs around that cycle: fewest back-to-back days, no long streak, and a
+        // rest day after the long run (then before it) when the days allow.
+        if earliestOffset <= 0 {
+            return (bestCyclicSpacing(others: others, longOffset: longOffset, need: k - 1), longOffset)
+        }
+
         // Choose the other running days. Prefer ones that leave a rest day on both
         // sides of the long run (so the biggest effort has a recovery buffer), but
         // only if dropping those neighbours still leaves enough days to honour
         // daysPerWeek. Then spread the chosen days evenly so rest falls between
         // efforts and any unavoidable adjacency lands on the lighter easy days.
-        let others = allowed.filter { $0 != longOffset }
         let isolated = others.filter { abs($0 - longOffset) > 1 }
         func spread(_ need: Int) -> [Int] {
             let pool = isolated.count >= need ? isolated : others
@@ -297,6 +305,46 @@ public struct VDOTPlanGenerator: PlanGenerator {
             let days = (pick + [longOffset]).sorted()
             let s = score(days)
             if s < bestScore { best = days; bestScore = s }
+        }
+        return best
+    }
+
+    /// Like `bestSpacing`, but for a week that repeats: Sunday (6) and the next
+    /// Monday (0) count as back to back. Ranks by fewest back-to-back pairs, then
+    /// the shortest run of consecutive days, then a rest day after the long run,
+    /// then one before it, then the widest smallest gap. Ties keep the earliest set.
+    static func bestCyclicSpacing(others: [Int], longOffset: Int, need: Int) -> [Int] {
+        func combinations(_ items: ArraySlice<Int>, _ n: Int) -> [[Int]] {
+            guard n > 0 else { return [[]] }
+            guard let first = items.first else { return [] }
+            let rest = items.dropFirst()
+            return combinations(rest, n - 1).map { [first] + $0 } + combinations(rest, n)
+        }
+        func score(_ days: [Int]) -> [Int] {
+            let set = Set(days)
+            let pairs = days.filter { set.contains(($0 + 1) % 7) }.count
+            // Longest streak around the cycle (all seven days is a streak of 7).
+            var streak = 0
+            if set.count == 7 { streak = 7 } else {
+                for start in days where !set.contains((start + 6) % 7) {
+                    var length = 1
+                    while set.contains((start + length) % 7) { length += 1 }
+                    streak = max(streak, length)
+                }
+            }
+            let runAfterLong = set.contains((longOffset + 1) % 7) ? 1 : 0
+            let runBeforeLong = set.contains((longOffset + 6) % 7) ? 1 : 0
+            let gaps = days.indices.map { i in
+                i + 1 < days.count ? days[i + 1] - days[i] : days[0] + 7 - days[i]
+            }
+            return [pairs, streak, runAfterLong, runBeforeLong, -(gaps.min() ?? 7)]
+        }
+        var best: [Int] = [longOffset]
+        var bestScore: [Int]? = nil
+        for pick in combinations(others[...], min(need, others.count)) {
+            let days = (pick + [longOffset]).sorted()
+            let s = score(days)
+            if bestScore.map({ s.lexicographicallyPrecedes($0) }) ?? true { best = days; bestScore = s }
         }
         return best
     }
@@ -366,11 +414,11 @@ public struct VDOTPlanGenerator: PlanGenerator {
             ? rawVolume * Double(runDays.count) / Double(normalRunDays)
             : rawVolume
 
-        // Non-long running days carry the easy/quality volume; quality slots are
-        // assigned by their position among these so a threshold/interval always
-        // lands on a real day regardless of where the long run sits.
+        // Non-long running days carry the easy/quality volume; the quality sessions
+        // go on the ones that keep them away from the long run and each other.
         let otherDays = runDays.filter { $0 != longOffset }
         let n = otherDays.count
+        let qualityDays = Self.qualityDays(otherDays: otherDays, longOffset: longOffset, phase: phase)
 
         // The long run must stay the week's single longest run. Its phase fraction
         // (0.28–0.36) can dip below an even per-day share when there are few running
@@ -396,8 +444,8 @@ public struct VDOTPlanGenerator: PlanGenerator {
                     targetPaceSecPerKm: window(zones.easySecPerKm),
                     notes: isMarathonPeak ? "Long run, finish last third at marathon pace" : "Long run, easy and conversational"
                 ))
-            } else if let position = otherDays.firstIndex(of: offset) {
-                let (type, _) = qualityAssignment(position: position, count: runDays.count, phase: phase)
+            } else if otherDays.contains(offset) {
+                let type = qualityDays[offset] ?? .easy
                 // Quality days (intervals/tempo) carry a structured breakdown; the
                 // parts sum to easyEach, so weekly volume is unchanged.
                 let structure = Self.structure(for: type, totalMeters: easyEach)
@@ -432,17 +480,32 @@ public struct VDOTPlanGenerator: PlanGenerator {
         return workouts
     }
 
-    /// Decides whether a mid-week running slot is a quality session. (The note is
-    /// regenerated from the structured breakdown in `note(for:structure:)`.)
-    private func qualityAssignment(position: Int, count: Int, phase: TrainingPhase) -> (WorkoutType, String) {
-        let intervalPosition = count - 2
-        if phase == .peak, position == intervalPosition, intervalPosition != 1 {
-            return (.interval, "")
+    /// Which of the week's other running days carry quality sessions. Build and
+    /// maintenance weeks get a threshold run, peak weeks add intervals when there
+    /// are at least three other days. A quality day avoids the days right before
+    /// and after the long run, and the two never sit back to back. Of equally good
+    /// choices the threshold stays on the second running day, as it always was.
+    static func qualityDays(otherDays: [Int], longOffset: Int, phase: TrainingPhase) -> [Int: WorkoutType] {
+        let n = otherDays.count
+        guard phase == .build || phase == .peak || phase == .maintenance, n >= 2 else { return [:] }
+        func nextToLong(_ day: Int) -> Int {
+            (day == (longOffset + 6) % 7 ? 2 : 0) + (day == (longOffset + 1) % 7 ? 1 : 0)
         }
-        if (phase == .build || phase == .peak || phase == .maintenance), position == 1 {
-            return (.threshold, "")
+        func index(_ day: Int) -> Int { otherDays.firstIndex(of: day)! }
+        if phase == .peak, n >= 3 {
+            var best: (Int, Int)? = nil
+            var bestScore: [Int]? = nil
+            for a in otherDays { for b in otherDays where b > a {
+                let score = [b - a == 1 ? 1 : 0, nextToLong(a) + nextToLong(b), abs(index(a) - 1)]
+                if bestScore.map({ score.lexicographicallyPrecedes($0) }) ?? true { best = (a, b); bestScore = score }
+            } }
+            guard let (threshold, interval) = best else { return [:] }
+            return [threshold: .threshold, interval: .interval]
         }
-        return (.easy, "Easy run")
+        let threshold = otherDays.min { a, b in
+            [nextToLong(a), abs(index(a) - 1)].lexicographicallyPrecedes([nextToLong(b), abs(index(b) - 1)])
+        }!
+        return [threshold: .threshold]
     }
 
     // MARK: Structured quality sessions

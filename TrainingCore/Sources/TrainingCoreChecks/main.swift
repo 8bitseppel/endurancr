@@ -198,15 +198,24 @@ h.suite("Rest days between runs") {
     let fri = try firstWeekRunDays(start: date(2026, 1, 9), daysPerWeek: 3)
     h.check(fri == [6, 1], "Friday start, 3/week → Fri and Sun, not Fri, Sat, Sun (got \(fri))")
 
-    // Full weeks with up to 4 runs never stack runs either.
-    for dpw in 3...4 {
+    // Full weeks repeat, so Sunday's long run runs into next Monday. Count that
+    // pair too: 3 a week never stacks runs, 4 a week stacks at most one pair, and
+    // the day after the long run is a rest day whenever a week has one to spare.
+    for dpw in 3...6 {
         let plan = try gen.makePlan(
             goal: Goal(race: .marathon, raceDate: date(2027, 4, 25), daysPerWeek: dpw),
             fitness: fitness, startDate: date(2026, 1, 7), calendar: cal
         )
-        let full = plan.weeks.dropFirst().filter { $0.phase != .raceWeek }
-        h.check(full.allSatisfy { !backToBack($0.workouts.filter(\.type.isRunning).map { cal.component(.weekday, from: $0.date) }) },
-                "\(dpw)/week: no back-to-back runs in any full week")
+        let full = plan.weeks.dropFirst().filter { $0.phase != .raceWeek && $0.phase != .taper }
+        let layouts = full.map { Set($0.workouts.filter(\.type.isRunning).map { (cal.component(.weekday, from: $0.date) + 5) % 7 }) }
+        let pairs = layouts.map { days in days.filter { days.contains(($0 + 1) % 7) }.count }
+        h.check(pairs.allSatisfy { $0 <= max(0, dpw - (7 - dpw)) },
+                "\(dpw)/week: fewest back-to-back runs, Sunday to Monday included (got \(pairs.max() ?? 0))")
+        h.check(layouts.allSatisfy { !$0.contains(0) }, "\(dpw)/week: the Monday after the Sunday long run is a rest day")
+        let qualityNextToLong = full.flatMap(\.workouts).contains {
+            ($0.type == .threshold || $0.type == .interval) && [1, 2].contains(cal.component(.weekday, from: $0.date))
+        }
+        h.check(!qualityNextToLong, "\(dpw)/week: no threshold or intervals right before or after the long run")
     }
 }
 

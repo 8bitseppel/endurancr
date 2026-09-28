@@ -40,6 +40,12 @@ struct HowItWorksView: View {
                 )
 
                 topic(
+                    "Which days you run",
+                    icon: "calendar",
+                    detail: "The long run goes on Sunday, or Saturday if you keep Sundays free. The other runs are spread over the week as it repeats, so Sunday's long run counts as right before next Monday: as few runs back to back as your days per week allow, no long streaks, and a rest day after the long run whenever there's one to spare. With 5 days a week that's Tuesday, Wednesday, Thursday, Saturday and Sunday. Threshold runs and intervals never sit right before or after the long run, or next to each other."
+                )
+
+                topic(
                     "Adapting to your runs",
                     icon: "arrow.triangle.2.circlepath",
                     detail: "Strong recent runs nudge your VDOT up (gently, at most a couple of points at a time) and re-pace only your upcoming workouts. A missed long run is rescheduled onto your next open day; past weeks are never rewritten. If you are behind on the current week, the missing km move onto the week's remaining easy runs: each grows by at most half and never past the long run, and the long run and hard sessions keep their distance. Hold a day in Plan and drag it onto another to swap them. Your Apple Watch shows the same adjusted days as your iPhone."

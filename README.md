@@ -54,6 +54,8 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   pace and the finish prediction start up to 3 VDOT lower, and long runs earn it
   back (fully at 25 km for a marathon). Until they do, you get a full build, never
   a "good to go" plan. Easy and interval paces keep your speed.
+- Runs are spread over the repeating week: a rest day after the Sunday long run when
+  there's one to spare, and no threshold or intervals right next to the long run.
 - Swap days by dragging them in the plan; the watch shows the same adjusted days.
 - Live run screens on Apple Watch and iPhone, with a Live Activity and controls on
   the Lock Screen.
