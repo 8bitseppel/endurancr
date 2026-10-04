@@ -98,7 +98,7 @@ Upload in this order (the files in `screenshots/appstore/` are named that way):
 
 ### Build
 
-Pick build 11 (1.0.0), the first iPhone-only build, once it's uploaded from Xcode Organizer.
+Pick the newest build once it's uploaded from Xcode Organizer.
 Export compliance is answered in Info.plist (ITSAppUsesNonExemptEncryption = NO), so
 there is no encryption question.
 

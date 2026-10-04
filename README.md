@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://apps.apple.com/app/endurancr/id6815730653">App Store</a> ·
   <a href="https://endurancr.app">endurancr.app</a> ·
   <a href="https://endurancr.app/privacy">Privacy</a> ·
   <a href="LICENSE">MIT License</a>
@@ -54,6 +55,9 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   pace and the finish prediction start up to 3 VDOT lower, and long runs earn it
   back (fully at 25 km for a marathon). Until they do, you get a full build, never
   a "good to go" plan. Easy and interval paces keep your speed.
+- Long runs that build to the race: for a marathon, 32 km runs 5 and 3 weeks before race
+  day (growing about 2 km a week, never more than half the week), for a half
+  marathon 19 km, then shorter long runs in the two taper weeks.
 - Runs are spread over the repeating week: a rest day after the Sunday long run when
   there's one to spare, and no threshold or intervals right next to the long run.
 - Swap days by dragging them in the plan; the watch shows the same adjusted days.
@@ -111,7 +115,7 @@ Apple Watch Simulators, using sample data that only exists in Debug builds
 (`Shared/DemoMode.swift`): a 4:30 marathon plan from a 12.2 km run at 5:36/km, six
 weeks in. Long screens are recorded while they scroll and saved as
 GIFs (needs ffmpeg). `./scripts/release.sh` raises the build number and archives a
-build for TestFlight.
+build for the App Store.
 
 ## Privacy
 

@@ -74,8 +74,12 @@ h.suite("VDOT plan generator") {
     h.check(taper.count == 2, "two taper weeks")
     h.check(taper.allSatisfy { $0.plannedVolumeMeters < peak }, "taper weeks lighter than peak")
 
+    // Cutbacks count back from the last progression week, so the peak long run
+    // 3 weeks out sits in a full week with a lighter one before it.
     let progression = plan.weeks.filter { [.base, .build, .peak].contains($0.phase) }
-    h.check(progression[3].plannedVolumeMeters < progression[2].plannedVolumeMeters, "4th progression week is a cutback")
+    let lastBuild = progression.count - 1
+    h.check(progression[lastBuild - 1].plannedVolumeMeters < progression[lastBuild].plannedVolumeMeters, "the week before the last build week is a cutback")
+    h.check(progression[lastBuild - 5].plannedVolumeMeters < progression[lastBuild - 6].plannedVolumeMeters, "and every 4th week before that")
 
     let longCapOK = plan.allWorkouts.filter { $0.type == .longRun }
         .allSatisfy { $0.distanceMeters <= VDOTPlanGenerator.longRunCap(for: .marathon) + 1 }
@@ -396,6 +400,44 @@ h.suite("Weekly volume redistribution") {
     // A week that isn't the current week is never touched.
     let far = engine.redistributedWithinWeek(plan: base, completedRuns: [short], asOf: date(2026, 5, 1), calendar: cal)
     h.check(far.weeks[0].workouts == base.weeks[0].workouts, "non-current week left unchanged")
+}
+
+// MARK: Peak long run
+
+h.suite("Peak long run: 32 km for the marathon, 19 km for the half") {
+    func longRun(_ plan: TrainingPlan, weeksOut: Int) -> Double {
+        plan.weeks[plan.weeks.count - 1 - weeksOut].workouts.first { $0.type == .longRun }?.distanceMeters ?? 0
+    }
+    let fitness = FitnessSnapshot(distanceMeters: 12_200, timeSeconds: 12.2 * 336, date: date(2026, 10, 3))
+    for (label, start) in [("28 weeks", date(2026, 10, 5)), ("16 weeks", date(2027, 1, 4))] {
+        let goal = Goal(race: .marathon, raceDate: date(2027, 4, 25), targetTimeSeconds: 4.5 * 3600, daysPerWeek: 5, restWeekdays: [2])
+        let plan = try VDOTPlanGenerator().makePlan(goal: goal, fitness: fitness, startDate: start, calendar: cal)
+        h.check(longRun(plan, weeksOut: 3) >= 32_000 - 1, "\(label): a 32 km long run 3 weeks before race day")
+        h.check(longRun(plan, weeksOut: 5) >= 28_000, "\(label): and a long one 2 weeks earlier")
+        h.check(longRun(plan, weeksOut: 4) < 0.7 * 32_000, "\(label): with a shorter long run between them")
+        h.check(longRun(plan, weeksOut: 2) < 20_000 && longRun(plan, weeksOut: 1) < 14_000, "\(label): the taper long runs are shorter (19 km, 13 km)")
+        let longs = plan.weeks.dropLast().compactMap { wk in wk.workouts.first { $0.type == .longRun }?.distanceMeters }
+        let longestSoFar = longs.indices.map { longs[...$0].max()! }
+        h.check(zip(longestSoFar, longs.dropFirst()).allSatisfy { $1 - $0 <= 5_000 }, "\(label): the long run never beats the longest so far by more than 5 km")
+        h.check(plan.weeks.allSatisfy { wk in
+            let long = wk.workouts.first { $0.type == .longRun }?.distanceMeters ?? 0
+            return long <= 0.5 * wk.plannedVolumeMeters + 1 || long <= 0.36 * wk.plannedVolumeMeters + 1
+        }, "\(label): the long run is at most half the week")
+    }
+    // A short plan grows at most 2 km a week, so it stops short of 32 km.
+    let shortGoal = Goal(race: .marathon, raceDate: date(2027, 4, 25), daysPerWeek: 5)
+    let short = try VDOTPlanGenerator().makePlan(goal: shortGoal, fitness: fitness, startDate: date(2027, 2, 15), calendar: cal)
+    h.check(longRun(short, weeksOut: 3) < 32_000, "a 10-week plan doesn't jump to 32 km")
+    // A marathon runner who is already good to go still gets the 32 km run.
+    let marathon = FitnessSnapshot(distanceMeters: 42_195, timeSeconds: 4.4 * 3600, date: date(2026, 10, 3))
+    let ready = try VDOTPlanGenerator().makePlan(goal: Goal(race: .marathon, raceDate: date(2027, 4, 25), targetTimeSeconds: 4.5 * 3600, daysPerWeek: 5),
+                                                  fitness: marathon, startDate: date(2026, 10, 5), calendar: cal)
+    h.check(ready.isMaintenance && longRun(ready, weeksOut: 3) >= 32_000 - 1, "a maintenance marathon plan has the 32 km run too")
+    // The half builds to 19 km, the last one 3 weeks out.
+    let half = try VDOTPlanGenerator().makePlan(goal: Goal(race: .halfMarathon, raceDate: date(2027, 4, 25), daysPerWeek: 5),
+                                                 fitness: fitness, startDate: date(2026, 10, 5), calendar: cal)
+    h.check(longRun(half, weeksOut: 3) >= 19_000 - 1, "half: a 19 km long run 3 weeks before race day")
+    h.check(longRun(half, weeksOut: 2) < 19_000 && longRun(half, weeksOut: 1) < 19_000, "half: the taper long runs are shorter")
 }
 
 // MARK: Endurance adjustment

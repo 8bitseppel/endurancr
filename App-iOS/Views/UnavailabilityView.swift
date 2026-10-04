@@ -51,8 +51,21 @@ private struct AddUnavailabilityView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var reason = "Vacation"
-    @State private var start = Date.now
-    @State private var end = Calendar.current.date(byAdding: .day, value: 6, to: .now) ?? .now
+    @State private var start: Date
+    @State private var end: Date
+
+    /// Starts the day after the latest period already scheduled, so trips in a row
+    /// are quick to enter. Today when there's none, or the latest is in the past.
+    init(coordinator: PlanCoordinator) {
+        self.coordinator = coordinator
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: .now)
+        let dayAfter = coordinator.unavailablePeriods.map(\.end).max()
+            .flatMap { cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: $0)) }
+        let first = max(today, dayAfter ?? today)
+        _start = State(initialValue: first)
+        _end = State(initialValue: cal.date(byAdding: .day, value: 6, to: first) ?? first)
+    }
 
     var body: some View {
         NavigationStack {

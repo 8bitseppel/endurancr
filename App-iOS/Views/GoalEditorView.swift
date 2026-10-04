@@ -28,10 +28,13 @@ struct GoalEditorView: View {
     @State private var recentMinutes: Int
     @State private var recentSeconds: Int
     @State private var healthRun: CompletedRun?
-    @State private var showingPickHealthRun = false
 
     @State private var draftPeriods: [UnavailablePeriod]
-    @State private var showingAddVacation = false
+    /// The screen pushed on top of the form. One `navigationDestination(item:)`
+    /// instead of one per screen: two `isPresented` destinations on the same stack
+    /// fought each other, so "Add time off" only worked once.
+    @State private var route: Route?
+    enum Route: Hashable { case pickHealthRun, addVacation }
     @State private var error: String?
     @State private var showReplaceConfirm = false
     @State private var showDeleteConfirm = false
@@ -188,15 +191,17 @@ struct GoalEditorView: View {
                 Text("Removes your plan and training rules. Recorded runs stay in Apple Health.")
             }
             // Pushed within this editor's own navigation stack rather than a
-            // sheet-over-a-sheet (which dismisses the editor on some iOS versions).
-            .navigationDestination(isPresented: $showingPickHealthRun) {
-                PickHealthRunView(coordinator: coordinator) { healthRun = $0 }
-            }
-            // Same reason as above: pushed rather than presented as a sheet on top
-            // of this editor's own sheet, which collapsed the whole stack back to
-            // the "Set your goal" screen on some iOS versions.
-            .navigationDestination(isPresented: $showingAddVacation) {
-                AddDraftVacationView { draftPeriods.append($0) }
+            // sheet-over-a-sheet, which collapsed the whole stack back to the
+            // "Set your goal" screen on some iOS versions.
+            .navigationDestination(item: $route) { route in
+                switch route {
+                case .pickHealthRun:
+                    PickHealthRunView(coordinator: coordinator) { healthRun = $0 }
+                case .addVacation:
+                    AddDraftVacationView(startingAfter: draftPeriods.map(\.end).max()) {
+                        draftPeriods.append($0)
+                    }
+                }
             }
         }
     }
@@ -329,7 +334,7 @@ struct GoalEditorView: View {
                 }
                 if HealthKitService.isAvailable {
                     Button {
-                        showingPickHealthRun = true
+                        route = .pickHealthRun
                     } label: {
                         Label("Use a recent run from Health", systemImage: "heart.text.square")
                     }
@@ -355,7 +360,7 @@ struct GoalEditorView: View {
                 draftPeriods.removeAll { ids.contains($0.id) }
             }
             Button {
-                showingAddVacation = true
+                route = .addVacation
             } label: {
                 Label("Add time off", systemImage: "plus")
             }
@@ -522,8 +527,20 @@ private struct AddDraftVacationView: View {
     let onAdd: (UnavailablePeriod) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var reason = "Vacation"
-    @State private var start = Date.now
-    @State private var end = Calendar.current.date(byAdding: .day, value: 6, to: .now) ?? .now
+    @State private var start: Date
+    @State private var end: Date
+
+    /// A new period starts the day after `startingAfter` (the end of the latest one
+    /// already added), so several trips in a row are quick to enter. Today otherwise.
+    init(startingAfter latestEnd: Date?, onAdd: @escaping (UnavailablePeriod) -> Void) {
+        self.onAdd = onAdd
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: .now)
+        let dayAfter = latestEnd.flatMap { cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: $0)) }
+        let first = max(today, dayAfter ?? today)
+        _start = State(initialValue: first)
+        _end = State(initialValue: cal.date(byAdding: .day, value: 6, to: first) ?? first)
+    }
 
     @State private var editingDate: EditingDate?
     enum EditingDate { case from, to }

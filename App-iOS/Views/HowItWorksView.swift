@@ -36,7 +36,7 @@ struct HowItWorksView: View {
                 topic(
                     "Why each run is that length",
                     icon: "ruler",
-                    detail: "Each week has a total distance, and the run lengths come from splitting it. That weekly total starts around half your peak and climbs at most ~8% a week, with an easier cutback every 4th week and two taper weeks before the race. Peak weekly volume scales with your race (longer race → more km). Within a week, the long run is always the single longest run, a set share of the week's total, capped by race distance so it never overreaches (e.g. 32 km for a marathon, 16 km for a 10K). The remaining distance is spread evenly across your other running days as easy or quality sessions, and no easy run is ever longer than the long run."
+                    detail: "Each week has a total distance, and the run lengths come from splitting it. That weekly total starts around half your peak and climbs at most ~8% a week, with an easier cutback every 4th week (counted back from race day) and two taper weeks before the race. Peak weekly volume scales with your race (longer race → more km). Within a week, the long run is always the single longest run, a set share of the week's total, capped by race distance so it never overreaches (e.g. 16 km for a 10K). For a marathon it builds to 32 km, about 2 km a week: a 32 km run 5 weeks and again 3 weeks before race day with a shorter one between, then 19 km and 13 km in the taper, as in the plans of Hal Higdon and Hansons. A half marathon builds to 19 km the same way. The long run never takes more than half the week, so a short plan stops below the peak instead of jumping to it. The remaining distance is spread evenly across your other running days as easy or quality sessions, and no easy run is ever longer than the long run."
                 )
 
                 topic(
@@ -150,6 +150,11 @@ struct HowItWorksView: View {
                     title: "Daniels' Running Formula (4th ed.)",
                     author: "Jack Tupper Daniels, PhD · Human Kinetics, 2021",
                     detail: "The training system: VDOT, the five pace zones, periodization, and long-run guidance."
+                )
+                source(
+                    title: "Marathon and half marathon training plans",
+                    author: "Hal Higdon (halhigdon.com) · Hansons Marathon Method",
+                    detail: "When the longest long runs go: 32 km for the marathon and 19 km for the half, the last one about 3 weeks before race day."
                 )
                 source(
                     title: "Oxygen Power: Performance Tables for Distance Runners",
