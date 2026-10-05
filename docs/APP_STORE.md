@@ -128,3 +128,22 @@ Live Activity: shows the running run on the Lock Screen with Pause and Finish.
 ### Version release
 
 Manually release this version (so you choose the day it goes live).
+
+## Version 1.0.2
+
+### Promotional text (170)
+
+Your marathon plan now builds to two 32 km long runs, your half to 19 km. A private, adaptive running plan, paced with the VDOT method from Jack Tupper Daniels.
+
+### What's New (4000)
+
+Longer long runs for the big races
+- Marathon plans now build to a 32 km long run, 5 weeks and again 3 weeks before race day, with a shorter one in between. The two taper weeks bring it down to 19 km and 13 km.
+- Half marathon plans build to 19 km the same way.
+- The long run grows about 2 km a week and never takes more than half the week. A shorter plan stops below the peak instead of jumping to it.
+- Lighter weeks are counted back from race day, so the week between the two 32 km runs is an easier one.
+
+Time off
+- Add as many vacations as you like when you set a goal. Each new one starts the day after the last.
+
+How it works explains the new long-run rules, with Hal Higdon and Hansons as sources.
