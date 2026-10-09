@@ -31,15 +31,19 @@ final class HealthKitService {
         ]
     }
 
-    /// Types we write when the watch records a run.
+    /// Types we write when a run is recorded. Only the watch measures heart rate,
+    /// so only the watch asks to save it.
     private var shareTypes: Set<HKSampleType> {
-        [
+        var types: Set<HKSampleType> = [
             .workoutType(),
-            HKQuantityType(.heartRate),
             HKQuantityType(.distanceWalkingRunning),
             HKQuantityType(.activeEnergyBurned),
             HKSeriesType.workoutRoute(),
         ]
+        #if os(watchOS)
+        types.insert(HKQuantityType(.heartRate))
+        #endif
+        return types
     }
 
     func requestAuthorization() async {

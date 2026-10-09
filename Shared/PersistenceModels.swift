@@ -37,18 +37,22 @@ final class StoredPlan {
 
     /// Builds the app's SwiftData container. If the on-disk store can't be opened
     /// (e.g. a pre-release schema change like the inputs refactor), the store is
-    /// wiped and rebuilt — the plan is regenerable (re-onboard / adapt from Health),
-    /// so nothing important is lost and the app doesn't crash on launch.
+    /// moved aside and rebuilt, so the app doesn't crash on launch. The plan is
+    /// regenerable (re-onboard / adapt from Health); the old file is kept.
     static func makeContainer() -> ModelContainer {
         let schema = Schema([StoredPlan.self, AchievedGoal.self])
         let config = ModelConfiguration(schema: schema)
         do {
             return try ModelContainer(for: schema, configurations: config)
         } catch {
+            // Moved aside, not deleted: achieved goals can't be rebuilt from Health,
+            // so the old store stays on disk for a later recovery.
             let url = config.url
             let fm = FileManager.default
+            let stamp = Int(Date().timeIntervalSince1970)
             for suffix in ["", "-wal", "-shm"] {
-                try? fm.removeItem(at: URL(fileURLWithPath: url.path + suffix))
+                let file = URL(fileURLWithPath: url.path + suffix)
+                try? fm.moveItem(at: file, to: URL(fileURLWithPath: url.path + ".unreadable-\(stamp)" + suffix))
             }
             do {
                 return try ModelContainer(for: schema, configurations: config)

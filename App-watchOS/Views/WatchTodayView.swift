@@ -28,6 +28,8 @@ struct WatchTodayView: View {
     @State private var weekCompletedAtStart: Double = 0
     // This week's planned vs. completed volume for the home screen ring.
     @State private var weekProgress: PlanProgress?
+    /// Why a run couldn't start, e.g. no Health access.
+    @State private var startError: String?
 
     var body: some View {
         NavigationStack {
@@ -43,15 +45,15 @@ struct WatchTodayView: View {
             .navigationDestination(isPresented: $showLiveRun) {
                 LiveRunView(workout: workout, plannedWorkout: runWorkout, zones: runZones)
             }
-            .onChange(of: showLiveRun) { wasShowing, showing in
-                // The run screen closed. Summarize only an explicit Finish (a back
-                // swipe leaves didFinish false) of a run that actually covered ground
-                // - a stationary or accidental run stays silent.
-                guard wasShowing, !showing, workout.didFinish,
-                      workout.distanceMeters >= Self.minSummaryDistanceMeters else { return }
-                let distance = workout.distanceMeters
-                let duration = workout.elapsedSeconds
-                let saved = workout.lastError == nil
+            .onChange(of: workout.saveState) { _, state in
+                // Summarize once Health has the finished run (or refused it), with
+                // the saved workout's own time and distance. A stationary or
+                // accidental run stays silent.
+                guard state == .saved || state == .failed, workout.didFinish else { return }
+                let distance = workout.savedDistanceMeters ?? workout.distanceMeters
+                guard distance >= Self.minSummaryDistanceMeters else { return }
+                let duration = workout.savedDuration ?? workout.elapsedSeconds
+                let saved = state == .saved
                 let prior = weekCompletedAtStart
                 let plan = currentPlan
                 Task {
@@ -65,6 +67,13 @@ struct WatchTodayView: View {
             .onChange(of: workout.isRunning, initial: true) { _, running in
                 // A run recovered after a crash: back to its run screen.
                 if running, !showLiveRun { captureToday(); showLiveRun = true }
+            }
+            .alert("Couldn't start the run", isPresented: Binding(
+                get: { startError != nil }, set: { if !$0 { startError = nil } }
+            )) {
+                Button("OK") { startError = nil }
+            } message: {
+                Text("\(startError ?? "") Check that endurancr may use Health in the Settings app.")
             }
             .sheet(item: $runSummary, onDismiss: { Task { await loadWeekProgress() } }) { summary in
                 NavigationStack { WatchRunSummaryView(summary: summary) }
@@ -209,8 +218,14 @@ struct WatchTodayView: View {
 
     private var startButton: some View {
         Button {
+            // A run is already going (e.g. the screen was left): back to it.
+            if workout.isRunning { showLiveRun = true; return }
             captureToday()
-            workout.start(plannedWorkout: runWorkout, zones: runZones, goalName: currentPlan?.goal.name ?? "")
+            guard workout.start(plannedWorkout: runWorkout, zones: runZones,
+                                goalName: currentPlan?.goal.name ?? "") else {
+                startError = workout.lastError ?? "The run couldn't start."
+                return
+            }
             showLiveRun = true
             // Record this week's completed volume *before* the run so the post-run
             // summary has a true prior baseline (the run isn't in HealthKit yet).

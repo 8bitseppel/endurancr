@@ -16,8 +16,10 @@ struct RunMirrorUpdate: Codable, Sendable, Equatable {
     var elapsedSeconds: TimeInterval
     var distanceMeters: Double
     var heartRate: Double
-    /// Pace so far (sec/km), as the watch shows it.
+    /// Pace right now (sec/km), as the watch shows it.
     var paceSecPerKm: Double
+    /// Average pace over the whole run (sec/km).
+    var averagePaceSecPerKm: Double
     /// Paused by hand or by the watch's Auto-Pause.
     var isPaused: Bool
 

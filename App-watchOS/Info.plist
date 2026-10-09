@@ -33,7 +33,7 @@
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>endurancr uses your location only while you record a run, to measure distance and map your route. Your route stays on your devices and in Apple Health.</string>
     <key>NSHealthShareUsageDescription</key>
-    <string>endurancr reads your heart rate, distance and energy from Apple Health while you run so it can show live metrics and record the workout. This data stays on your devices and is never sent anywhere.</string>
+    <string>endurancr reads your runs, routes, heart rate, resting heart rate, VO2 max, steps, running speed and power from Apple Health, to show live metrics while you run and your week's progress. This data stays on your devices and is never sent anywhere.</string>
     <key>NSHealthUpdateUsageDescription</key>
     <string>endurancr saves the runs it records (workout, heart rate, distance, energy and GPS route) to Apple Health. Nothing leaves your devices.</string>
 </dict>

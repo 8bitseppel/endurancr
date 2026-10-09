@@ -60,6 +60,15 @@ struct CalendarView: View {
         }
     }
 
+    private func isExpandable(_ workout: PlannedWorkout) -> Bool {
+        (workout.structure != nil || !workout.notes.isEmpty) && workout.type != .rest
+    }
+
+    private func toggleExpanded(_ workout: PlannedWorkout, isExpanded: Bool) {
+        guard isExpandable(workout) else { return }
+        withAnimation(.snappy) { expandedDay = isExpanded ? nil : workout.date }
+    }
+
     @ViewBuilder
     private func card(_ workout: PlannedWorkout, zones: PaceZones) -> some View {
         let cal = Calendar.current
@@ -77,9 +86,23 @@ struct CalendarView: View {
         .scaleEffect(isTargeted ? 1.02 : 1)
         .animation(.snappy(duration: 0.2), value: isTargeted)
         .contentShape(.rect(cornerRadius: 14))
-        .onTapGesture {
-            guard workout.structure != nil || !workout.notes.isEmpty, workout.type != .rest else { return }
-            withAnimation(.snappy) { expandedDay = isExpanded ? nil : workout.date }
+        .onTapGesture { toggleExpanded(workout, isExpanded: isExpanded) }
+        // VoiceOver: the card opens like a button, and days swap without dragging.
+        .accessibilityAddTraits(isExpandable(workout) ? .isButton : [])
+        .accessibilityAction { toggleExpanded(workout, isExpanded: isExpanded) }
+        .accessibilityActions {
+            if coordinator.canMove(workout) {
+                ForEach([-1, 1], id: \.self) { offset in
+                    if let other = cal.date(byAdding: .day, value: offset, to: workout.date) {
+                        Button("Swap with \(other.formatted(.dateTime.weekday(.wide)))") {
+                            withAnimation(.snappy) {
+                                expandedDay = nil
+                                coordinator.swapDays(workout.date, other)
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         if coordinator.canMove(workout) {

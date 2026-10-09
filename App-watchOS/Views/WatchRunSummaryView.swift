@@ -43,15 +43,14 @@ struct WatchRunSummaryView: View {
     enum Page { case run, week }
 
     var body: some View {
-        TabView(selection: $page) {
-            runPage.tag(Page.run)
-            weekPage.tag(Page.week)
+        CrownPages(selection: $page, first: .run, second: .week) {
+            runPage
+        } secondPage: {
+            weekPage
         }
-        .tabViewStyle(.verticalPage)
         .navigationTitle("Run complete")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { WKInterfaceDevice.current().play(.success) }
-        .demoFlipPages($page, to: .week)
     }
 
     /// Page 1: what the run did. It fits without scrolling at the usual text sizes;
@@ -143,5 +142,7 @@ struct WatchRunSummaryView: View {
                 .monospacedDigit()
                 .foregroundStyle(tint)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label.capitalized) \(value)")
     }
 }

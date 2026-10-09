@@ -19,6 +19,10 @@ import TrainingCore
 @MainActor
 @Observable
 final class PhoneWorkoutManager: NSObject {
+    /// The one recorder for the whole app, so every tab shows the same run and a
+    /// run survives the tabs being rebuilt (e.g. a goal deleted mid-run).
+    static let shared = PhoneWorkoutManager()
+
     private let store = HKHealthStore()
     private var builder: HKWorkoutBuilder?
     private var routeBuilder: HKWorkoutRouteBuilder?
@@ -40,6 +44,10 @@ final class PhoneWorkoutManager: NSObject {
     /// Rolling (timestamp, cumulative distance) samples used for current pace.
     private var paceWindow: [(t: TimeInterval, d: Double)] = []
     private let paceWindowSeconds: TimeInterval = 30
+    /// When the last accepted GPS fix arrived, so a stop shows no pace.
+    private var lastFixDate: Date?
+    /// When the Live Activity last got new numbers; it's updated every few seconds.
+    private var lastActivityUpdate = Date.distantPast
 
     // Fixed for this run (shown on the Live Activity).
     private var goalName = ""
@@ -62,6 +70,11 @@ final class PhoneWorkoutManager: NSObject {
     /// Number of GPS points captured so far (a simple "route is tracking" signal).
     var routePointCount = 0
     var lastError: String?
+
+    /// Whether the finished run reached Apple Health. The summary waits for this
+    /// instead of guessing from `lastError`, which also collects GPS hiccups.
+    enum SaveState: Equatable { case idle, saving, saved, failed }
+    private(set) var saveState = SaveState.idle
 
     /// The target pace window for today's workout, if any.
     var targetPaceRange: ClosedRange<Double>? { targetPace }
@@ -140,6 +153,8 @@ final class PhoneWorkoutManager: NSObject {
         routePointCount = 0
         lastError = nil
         isPaused = false
+        lastFixDate = nil
+        saveState = .idle
 
         builder.beginCollection(withStart: start) { [weak self] _, error in
             let message = error?.localizedDescription
@@ -188,7 +203,9 @@ final class PhoneWorkoutManager: NSObject {
         segmentStart = nil
         isPaused = true
         timer?.invalidate(); timer = nil
-        locationManager.stopUpdatingLocation()
+        // GPS keeps running while paused (fixes are ignored): stopping it would let
+        // iOS suspend the app in the background, and a Resume from the Lock Screen
+        // couldn't start it again.
         lastLocation = nil          // so the distance across the paused gap isn't counted
         paceWindow = []
         currentPaceSecPerKm = 0
@@ -202,7 +219,6 @@ final class PhoneWorkoutManager: NSObject {
         segmentStart = Date()
         isPaused = false
         addWorkoutEvent(.resume)
-        locationManager.startUpdatingLocation()
         startTimer()
         updateLiveActivity()
     }
@@ -252,14 +268,20 @@ final class PhoneWorkoutManager: NSObject {
     private func saveWorkout(builder: HKWorkoutBuilder, samples: [HKSample], end: Date) async {
         let routeBuilder = self.routeBuilder
         self.routeBuilder = nil
+        saveState = .saving
         do {
             if !samples.isEmpty { try await builder.addSamples(samples) }
             try await builder.endCollection(at: end)
             if let workout = try await builder.finishWorkout() {
-                try await routeBuilder?.finishRoute(with: workout, metadata: nil)
+                saveState = .saved
+                // The workout is in Health now; a missing route doesn't undo that.
+                _ = try? await routeBuilder?.finishRoute(with: workout, metadata: nil)
+            } else {
+                saveState = .failed
             }
         } catch {
             lastError = error.localizedDescription
+            saveState = .failed
         }
         isRunning = false
     }
@@ -278,7 +300,13 @@ final class PhoneWorkoutManager: NSObject {
             MainActor.assumeIsolated {
                 guard let self, !self.isPaused, let seg = self.segmentStart else { return }
                 self.elapsedSeconds = self.accumulatedSeconds + Date().timeIntervalSince(seg)
-                self.updateLiveActivity()
+                // No usable fix for 10 s (standing, or under cover): no pace, rather
+                // than the last running pace still showing as on target.
+                if let fix = self.lastFixDate, Date().timeIntervalSince(fix) > 10 {
+                    self.currentPaceSecPerKm = 0
+                }
+                // The Lock Screen clock counts by itself; new numbers every 5 s are enough.
+                if Date().timeIntervalSince(self.lastActivityUpdate) >= 5 { self.updateLiveActivity() }
             }
         }
     }
@@ -306,9 +334,12 @@ final class PhoneWorkoutManager: NSObject {
         guard let first = paceWindow.first, let last = paceWindow.last else { return }
         let dd = last.d - first.d
         let dt = last.t - first.t
-        // Need a little movement and time span for a meaningful reading.
+        // Need a little movement and time span for a meaningful reading; barely
+        // moving over a long span is standing, so no pace.
         if dd > 5, dt > 3 {
             currentPaceSecPerKm = dt / (dd / 1_000)
+        } else if dt > 10 {
+            currentPaceSecPerKm = 0
         }
     }
 
@@ -355,12 +386,14 @@ final class PhoneWorkoutManager: NSObject {
             targetDistanceMeters: plannedWorkout?.distanceMeters ?? 0,
             stepLabel: stepLabel,
             stepTargetPaceSecPerKm: stepPace,
-            stepTargetDistanceMeters: stepDistance
+            stepTargetDistanceMeters: stepDistance,
+            clockStart: isPaused ? nil : Date().addingTimeInterval(-elapsedSeconds)
         )
     }
 
     private func updateLiveActivity() {
         guard let activity else { return }
+        lastActivityUpdate = Date()
         let state = currentContentState()
         let id = activity.id
         Task { await Self.liveActivity(id)?.update(ActivityContent(state: state, staleDate: nil)) }
@@ -397,12 +430,15 @@ extension PhoneWorkoutManager: @preconcurrency CLLocationManagerDelegate {
         // Keep only accurate fixes so distance/route aren't polluted by noise. 20 m
         // is a converged outdoor fix; the old 50 m let early scatter through and a run
         // begun sitting still immediately showed ~40 m of phantom distance.
-        let filtered = locations.filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 20 }
+        // Stale/cached fixes CoreLocation replays at startup are dropped too, from
+        // the distance and from the saved route alike.
+        let filtered = locations.filter {
+            $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 20 && -$0.timestamp.timeIntervalSinceNow <= 5
+        }
         guard !filtered.isEmpty else { return }
+        lastFixDate = Date()
 
         for location in filtered {
-            // Drop stale/cached fixes CoreLocation replays at startup.
-            if -location.timestamp.timeIntervalSinceNow > 5 { continue }
 
             if let previous = lastLocation {
                 let step = location.distance(from: previous)

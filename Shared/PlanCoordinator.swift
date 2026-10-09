@@ -233,12 +233,16 @@ final class PlanCoordinator {
     /// adapted plan is fully reproducible from the stored inputs + HealthKit.
     func refreshAdaptation() async {
         guard let base = regeneratedBasePlan() else { return }
+        let inputsAtStart = inputs
         isWorking = true
         defer { isWorking = false }
 
         let since = base.weeks.first?.startDate ?? Calendar.current.date(byAdding: .month, value: -1, to: .now)!
         let runs = await health.fetchRuns(since: since)
         let resting = await health.fetchRestingHeartRates(since: since)
+        // The goal changed while Health answered (a swap, an edit, a deleted goal):
+        // that change already updated the plan, so don't put the old one back.
+        guard inputs == inputsAtStart else { return }
         recentRuns = runs
         restingHeartRates = resting
 

@@ -32,7 +32,19 @@ struct PhoneLiveRunView: View {
                 if let step = recorder.activeStep, step.kind != .steady {
                     metric("Step", "\(step.label) · \(Format.distanceCompact(step.distanceMeters))")
                 }
-                metric("Current pace", Format.pace(recorder.currentPaceSecPerKm), tint: paceTint)
+                // The symbol and VoiceOver say what the colour says.
+                LabeledContent("Current pace") {
+                    HStack(spacing: 4) {
+                        Text(Format.pace(recorder.currentPaceSecPerKm)).monospacedDigit()
+                        if let onTarget = recorder.isOnTarget {
+                            Image(systemName: onTarget ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                                .font(.subheadline)
+                        }
+                    }
+                    .font(.title3)
+                    .foregroundStyle(paceTint)
+                }
+                .accessibilityValue(recorder.isOnTarget.map { $0 ? "on target" : "off target" } ?? "")
                 if let target = stepTargetPace {
                     metric("Target pace", Format.pace(target))
                 } else if let target = recorder.targetPaceRange {

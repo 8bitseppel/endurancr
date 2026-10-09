@@ -24,6 +24,8 @@ final class MirroredRunManager: NSObject {
     private var activity: Activity<RunActivityAttributes>?
     private var observers: [NSObjectProtocol] = []
 
+    private var lastActivityUpdate = Date.distantPast
+
     /// The latest numbers from the watch, while a mirrored run is going.
     private(set) var latest: RunMirrorUpdate?
 
@@ -77,10 +79,13 @@ final class MirroredRunManager: NSObject {
     }
 
     private func receive(_ update: RunMirrorUpdate) {
+        let pauseChanged = latest?.isPaused != update.isPaused
         latest = update
         if activity == nil {
             startLiveActivity(update)
-        } else if let activity {
+        } else if let activity, pauseChanged || Date().timeIntervalSince(lastActivityUpdate) >= 5 {
+            // The Lock Screen clock counts by itself; new numbers every 5 s are enough.
+            lastActivityUpdate = Date()
             let state = Self.contentState(update)
             let id = activity.id
         Task { await Self.liveActivity(id)?.update(ActivityContent(state: state, staleDate: nil)) }
@@ -132,14 +137,15 @@ final class MirroredRunManager: NSObject {
             elapsedSeconds: update.elapsedSeconds,
             distanceMeters: update.distanceMeters,
             currentPaceSecPerKm: update.paceSecPerKm,
-            averagePaceSecPerKm: update.paceSecPerKm,
+            averagePaceSecPerKm: update.averagePaceSecPerKm,
             elevationGainMeters: 0,
             isPaused: update.isPaused,
             targetDistanceMeters: update.targetDistanceMeters,
             stepLabel: update.stepLabel,
             stepTargetPaceSecPerKm: update.stepTargetPaceSecPerKm,
             stepTargetDistanceMeters: update.stepTargetDistanceMeters,
-            heartRate: update.heartRate
+            heartRate: update.heartRate,
+            clockStart: update.isPaused ? nil : Date().addingTimeInterval(-update.elapsedSeconds)
         )
     }
 }

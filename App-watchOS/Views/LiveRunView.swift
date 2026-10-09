@@ -22,6 +22,7 @@ struct LiveRunView: View {
     /// Paces for the athlete's current fitness. `nil` = free run.
     var zones: PaceZones?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
     @State private var page = Page.metrics
     enum Page { case metrics, controls }
 
@@ -34,13 +35,20 @@ struct LiveRunView: View {
     }
 
     var body: some View {
-        TabView(selection: $page) {
-            metricsPage.tag(Page.metrics)
-            controlsPage.tag(Page.controls)
+        CrownPages(selection: $page, first: .metrics, second: .controls) {
+            metricsPage
+        } secondPage: {
+            controlsPage
         }
-        .tabViewStyle(.verticalPage)
         .navigationTitle(workout.isAutoPaused ? "Auto-paused" : workout.isPaused ? "Paused" : "Running")
         .navigationBarTitleDisplayMode(.inline)
+        // Leaving the screen would leave the run recording with no way back to it;
+        // Finish is the way out.
+        .navigationBarBackButtonHidden(true)
+        .onChange(of: isLuminanceReduced) { _, dimmed in
+            // Wrist down: show the numbers, not the buttons, as Apple's Workout app does.
+            if dimmed { page = .metrics }
+        }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button {
@@ -69,7 +77,6 @@ struct LiveRunView: View {
             // watchOS's Auto-Pause, felt at the traffic light without looking.
             WKInterfaceDevice.current().play(paused ? .stop : .start)
         }
-        .demoFlipPages($page, to: .controls)
     }
 
     /// Page 1: everything needed while running, on one screen. It never scrolls,
@@ -164,8 +171,7 @@ struct LiveRunView: View {
             .controlSize(.large)
 
             Button(role: .destructive) {
-                workout.end()
-                dismiss()
+                workout.end()   // the screen closes when the run stops (onChange above)
             } label: {
                 Label("Finish", systemImage: "stop.fill")
                     .frame(maxWidth: .infinity)
@@ -187,6 +193,7 @@ struct LiveRunView: View {
                 .font(.system(.title3, design: .rounded).weight(.semibold))
                 .monospacedDigit()
         }
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(workout.heartRate > 0 ? "Heart rate \(Int(workout.heartRate)) beats per minute" : "Heart rate acquiring")
     }
 
@@ -240,21 +247,68 @@ struct LiveRunView: View {
     }
 }
 
-extension View {
-    /// In demo screen recordings, shows the second page and comes back, the way a
-    /// runner would turn the Digital Crown. Does nothing otherwise.
-    func demoFlipPages<Page: Hashable>(_ page: Binding<Page>, to second: Page) -> some View {
+/// Two vertical pages turned with the Digital Crown or a swipe. In demo screen
+/// recordings it scrolls slowly to the second page and back instead, the way a
+/// runner turns the Crown, so the website's videos don't jump.
+struct CrownPages<Page: Hashable, First: View, Second: View>: View {
+    @Binding var selection: Page
+    let first: Page
+    let second: Page
+    @ViewBuilder let firstPage: First
+    @ViewBuilder let secondPage: Second
+
+    init(selection: Binding<Page>, first: Page, second: Page,
+         @ViewBuilder firstPage: () -> First, @ViewBuilder secondPage: () -> Second) {
+        _selection = selection
+        self.first = first
+        self.second = second
+        self.firstPage = firstPage()
+        self.secondPage = secondPage()
+    }
+
+    var body: some View {
         #if DEBUG
-        task {
-            guard DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoScroll") else { return }
-            let first = page.wrappedValue
-            try? await Task.sleep(for: .seconds(5))
-            withAnimation { page.wrappedValue = second }
-            try? await Task.sleep(for: .seconds(5))
-            withAnimation { page.wrappedValue = first }
+        if DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoScroll") {
+            DemoCrownScroll(firstPage: firstPage, secondPage: secondPage)
+        } else {
+            pages
         }
         #else
-        self
+        pages
         #endif
     }
+
+    private var pages: some View {
+        TabView(selection: $selection) {
+            firstPage.tag(first)
+            secondPage.tag(second)
+        }
+        .tabViewStyle(.verticalPage)
+    }
 }
+
+#if DEBUG
+/// Both pages stacked, scrolled down and back up with a slow ease, like a Crown turn.
+private struct DemoCrownScroll<First: View, Second: View>: View {
+    let firstPage: First
+    let secondPage: Second
+    @State private var onSecond = false
+
+    var body: some View {
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                firstPage.frame(height: geometry.size.height)
+                secondPage.frame(height: geometry.size.height)
+            }
+            .offset(y: onSecond ? -geometry.size.height : 0)
+        }
+        .clipped()
+        .task {
+            try? await Task.sleep(for: .seconds(4))
+            withAnimation(.easeInOut(duration: 1.6)) { onSecond = true }
+            try? await Task.sleep(for: .seconds(4.5))
+            withAnimation(.easeInOut(duration: 1.6)) { onSecond = false }
+        }
+    }
+}
+#endif

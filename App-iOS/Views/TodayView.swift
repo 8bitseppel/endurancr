@@ -9,7 +9,7 @@ struct TodayView: View {
     private static let minSummaryDistanceMeters: Double = 100
 
     let coordinator: PlanCoordinator
-    @State private var recorder = PhoneWorkoutManager()
+    @State private var recorder = PhoneWorkoutManager.shared
     @State private var showLiveRun = false
     @State private var runSummary: RunSummaryData?
     @State private var showingGoalEditor = false
@@ -103,14 +103,15 @@ struct TodayView: View {
             .navigationDestination(isPresented: $showLiveRun) {
                 PhoneLiveRunView(recorder: recorder)
             }
-            .onChange(of: showLiveRun) { wasShowing, showing in
-                // The run screen closed after a finish (here or from the Live Activity).
-                // Snapshot what was just run, re-adapt from Health, then show a summary
-                // with where the week now stands.
-                guard wasShowing, !showing, recorder.distanceMeters >= Self.minSummaryDistanceMeters else { return }
+            .onChange(of: recorder.saveState) { _, state in
+                // A run finished (here, on another tab or from the Live Activity) and
+                // Health has it, or refused it. Snapshot what was just run, re-adapt
+                // from Health, then show a summary with where the week now stands.
+                guard state == .saved || state == .failed,
+                      recorder.distanceMeters >= Self.minSummaryDistanceMeters else { return }
                 let distance = recorder.distanceMeters
                 let duration = recorder.elapsedSeconds
-                let saved = recorder.lastError == nil
+                let saved = state == .saved
                 // Week completed before this run. HealthKit's save is async and may not
                 // be visible to the re-fetch yet, so never show less than this.
                 let priorWeek = coordinator.progress?.currentWeekCompletedMeters ?? 0

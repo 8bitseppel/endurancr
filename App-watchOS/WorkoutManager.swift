@@ -56,24 +56,45 @@ final class WorkoutManager: NSObject {
     /// for a zero-distance run.
     var didFinish = false
 
+    /// Whether the finished run reached Apple Health. The summary waits for this
+    /// instead of guessing from `lastError`, which also collects GPS hiccups.
+    enum SaveState: Equatable { case idle, saving, saved, failed }
+    private(set) var saveState = SaveState.idle
+    /// The saved workout's own time and distance, once HealthKit has it.
+    private(set) var savedDuration: TimeInterval?
+    private(set) var savedDistanceMeters: Double?
+    /// Latest running speed (m/s) from the watch's sensors, for the live pace.
+    private var currentSpeed: Double = 0
+
     /// The run's time at `date`, for a clock that ticks every second rather than
     /// only when HealthKit delivers new data. Paused time doesn't count.
     func elapsedTime(at date: Date) -> TimeInterval {
         builder?.elapsedTime(at: date) ?? elapsedSeconds
     }
 
-    /// Current pace (sec/km) derived from distance and elapsed time.
+    /// Pace right now (sec/km), from the watch's running speed; the average until
+    /// the first speed reading arrives. 0 while standing still.
     var paceSecPerKm: Double {
+        if currentSpeed > 0.5 { return 1_000 / currentSpeed }
+        return currentSpeed > 0 ? 0 : averagePaceSecPerKm
+    }
+
+    /// Average pace over the whole run (sec/km).
+    var averagePaceSecPerKm: Double {
         guard distanceMeters > 0 else { return 0 }
         return elapsedSeconds / (distanceMeters / 1_000)
     }
 
-    func start(plannedWorkout: PlannedWorkout? = nil, zones: PaceZones? = nil, goalName: String = "") {
-        didFinish = false
-        isAutoPaused = false
+    /// Starts recording. Returns false (with `lastError` set) when HealthKit
+    /// refuses, e.g. without Health access, so no empty run screen opens.
+    @discardableResult
+    func start(plannedWorkout: PlannedWorkout? = nil, zones: PaceZones? = nil, goalName: String = "") -> Bool {
+        guard session == nil else { return true }   // already running: keep it
+        resetLiveState()
         self.plannedWorkout = plannedWorkout
         self.zones = zones
         self.goalName = goalName
+        RunContext(plannedWorkout: plannedWorkout, zones: zones, goalName: goalName).save()
         let config = HKWorkoutConfiguration()
         config.activityType = .running
         config.locationType = .outdoor
@@ -82,18 +103,40 @@ final class WorkoutManager: NSObject {
             let session = try HKWorkoutSession(healthStore: store, configuration: config)
             let builder = attach(session)
 
+            // Prepare, then mirror to the iPhone, then start, as Apple's sample does.
+            // Without the iPhone nearby the run just records here.
+            session.prepare()
+            session.startMirroringToCompanionDevice { _, _ in }
             let startDate = Date()
             session.startActivity(with: startDate)
             builder.beginCollection(withStart: startDate) { [weak self] _, error in
                 let message = error?.localizedDescription
                 Self.onMain { if let message { self?.lastError = message } }
             }
-            // Show the run on the iPhone too. Without it nearby the run just records here.
-            session.startMirroringToCompanionDevice { _, _ in }
             isRunning = true
+            return true
         } catch {
             lastError = error.localizedDescription
+            RunContext.clear()
+            return false
         }
+    }
+
+    /// Clears the last run's numbers, so a new or recovered run starts from zero.
+    private func resetLiveState() {
+        didFinish = false
+        isPaused = false
+        isAutoPaused = false
+        heartRate = 0
+        activeEnergyKcal = 0
+        distanceMeters = 0
+        elapsedSeconds = 0
+        currentSpeed = 0
+        routePointCount = 0
+        lastError = nil
+        saveState = .idle
+        savedDuration = nil
+        savedDistanceMeters = nil
     }
 
     /// Connects a new or recovered session: its live builder, a route builder and GPS.
@@ -119,7 +162,12 @@ final class WorkoutManager: NSObject {
             guard let session else { return }
             Self.onMain {
                 guard let self, self.session == nil else { return }
-                self.didFinish = false
+                self.resetLiveState()
+                // Today's session and goal, saved when the run started.
+                let context = RunContext.load()
+                self.plannedWorkout = context?.plannedWorkout
+                self.zones = context?.zones
+                self.goalName = context?.goalName ?? ""
                 self.attach(session)
                 self.isPaused = session.state == .paused
                 self.isRunning = true
@@ -149,6 +197,7 @@ final class WorkoutManager: NSObject {
             distanceMeters: distanceMeters,
             heartRate: heartRate,
             paceSecPerKm: paceSecPerKm,
+            averagePaceSecPerKm: averagePaceSecPerKm,
             isPaused: isPaused || isAutoPaused,
             stepLabel: structured ? step?.label ?? "" : "",
             stepTargetPaceSecPerKm: structured ? step?.targetPaceSecPerKm ?? 0 : 0,
@@ -177,7 +226,8 @@ final class WorkoutManager: NSObject {
 
     private func beginLocationUpdates() {
         locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.activityType = .fitness
         locationManager.requestWhenInUseAuthorization()
         locationManager.startUpdatingLocation()
     }
@@ -188,19 +238,50 @@ final class WorkoutManager: NSObject {
         guard let builder else { return }
         let routeBuilder = self.routeBuilder
         self.routeBuilder = nil   // no more GPS points go in once the run is over
+        saveState = .saving
+        RunContext.clear()
         do {
             try await builder.endCollection(at: date)
-            guard let workout = try await builder.finishWorkout() else { return }
-            try await routeBuilder?.finishRoute(with: workout, metadata: nil)
+            guard let workout = try await builder.finishWorkout() else {
+                saveState = .failed
+                return
+            }
+            savedDuration = workout.duration
+            savedDistanceMeters = workout.statistics(for: HKQuantityType(.distanceWalkingRunning))?
+                .sumQuantity()?.doubleValue(for: .meter())
+            saveState = .saved
+            // The workout is in Health now; a missing route doesn't undo that.
+            _ = try? await routeBuilder?.finishRoute(with: workout, metadata: nil)
         } catch {
             lastError = error.localizedDescription
+            saveState = .failed
         }
+        session = nil
+        self.builder = nil
     }
+}
+
+/// Today's session and goal for a run in progress, kept on disk so a run
+/// recovered after a crash still shows (and mirrors) its targets.
+private struct RunContext: Codable {
+    var plannedWorkout: PlannedWorkout?
+    var zones: PaceZones?
+    var goalName: String
+
+    private static let key = "activeRunContext"
+
+    func save() { UserDefaults.standard.set(try? JSONEncoder().encode(self), forKey: Self.key) }
+
+    static func load() -> RunContext? {
+        UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode(RunContext.self, from: $0) }
+    }
+
+    static func clear() { UserDefaults.standard.removeObject(forKey: key) }
 }
 
 /// One statistic the live builder collected, read where HealthKit delivered it.
 private enum LiveMetric: Sendable {
-    case heartRate(Double), energy(Double), distance(Double)
+    case heartRate(Double), energy(Double), distance(Double), speed(Double)
 
     init?(_ statistics: HKStatistics?) {
         guard let statistics else { return nil }
@@ -214,6 +295,9 @@ private enum LiveMetric: Sendable {
         case HKQuantityType(.distanceWalkingRunning):
             guard let meters = statistics.sumQuantity()?.doubleValue(for: .meter()) else { return nil }
             self = .distance(meters)
+        case HKQuantityType(.runningSpeed):
+            guard let speed = statistics.mostRecentQuantity()?.doubleValue(for: .meter().unitDivided(by: .second())) else { return nil }
+            self = .speed(speed)
         default:
             return nil
         }
@@ -277,7 +361,8 @@ extension WorkoutManager: CLLocationManagerDelegate {
         MainActor.assumeIsolated {
             // Keep only reasonably accurate fixes so the route isn't polluted by noise.
             let filtered = locations.filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 50 }
-            guard !filtered.isEmpty, let routeBuilder else { return }
+            // Paused (by hand or by Auto-Pause): the route waits too.
+            guard !filtered.isEmpty, !isPaused, !isAutoPaused, let routeBuilder else { return }
             routeBuilder.insertRouteData(filtered) { [weak self] _, error in
                 let message = error?.localizedDescription
                 Self.onMain { if let message { self?.lastError = message } }
@@ -308,6 +393,7 @@ extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
                 case .heartRate(let bpm): heartRate = bpm
                 case .energy(let kcal): activeEnergyKcal = kcal
                 case .distance(let meters): distanceMeters = meters
+                case .speed(let speed): currentSpeed = speed
                 }
             }
             elapsedSeconds = elapsed

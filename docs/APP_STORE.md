@@ -118,11 +118,16 @@ To try it:
 2. Today shows the day's run. "Start run" records it on iPhone with GPS; on Apple
    Watch the same run records heart rate too.
 
-HealthKit: reads past runs, heart rate and VO2 max to set and adapt the plan, and
-saves recorded runs as workouts. Nothing leaves the device.
+HealthKit: reads past runs and routes, heart rate, resting heart rate, VO2 max,
+steps, running speed and power to set and adapt the plan, and saves recorded runs
+as workouts. Nothing leaves the device.
 Location (including background): used only while a run is being recorded, so
 distance, pace and the route keep counting with the screen locked.
 Live Activity: shows the running run on the Lock Screen with Pause and Finish.
+Apple Watch (new in 1.0.3): start a run on the watch, then open endurancr on the
+iPhone. The watch run appears on the iPhone's Lock Screen through HealthKit workout
+mirroring, and Pause and Finish there control the watch. On the watch, double tap
+pauses and resumes.
 ```
 
 ### Version release
@@ -156,10 +161,8 @@ Pause with a double tap on Apple Watch and follow your watch run on the iPhone L
 
 ### What's New (4000)
 
-Use build 20.
-
 Apple Watch
-- Your watch run now shows on your iPhone's Lock Screen as a Live Activity, with heart rate, distance and pace. Pause and Finish there act on the watch.
+- Your watch run now shows on your iPhone's Lock Screen as a Live Activity, with heart rate, distance and pace, once you've opened endurancr on the iPhone during the run. Pause and Finish there act on the watch.
 - Double tap (pinch twice) to pause or resume without touching the screen.
 - A clearer run screen: the first page shows only what you need while running, time, heart rate, distance and pace with their targets. Turn the Digital Crown or swipe up for Pause and Finish.
 - The run clock now ticks every second, also in Always On.
@@ -170,6 +173,10 @@ Apple Watch
 Also
 - Better VoiceOver on the watch run screen: each number is read with its label and target.
 - Smaller fixes for steadier recording and saving of runs.
+
+### Build
+
+Pick build 21 for 1.0.3. Builds 15 to 20 aren't for release (20 is the first without the invalid iPhone background mode, 21 adds the review fixes).
 
 ### Screenshots (refreshed for 1.0.3)
 

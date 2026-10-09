@@ -10,7 +10,7 @@ struct ProgressDashboardView: View {
     private let calculator = VDOTCalculator()
     @State private var showingGoalEditor = false
     @State private var showingDataManagement = false
-    @State private var recorder = PhoneWorkoutManager()
+    @State private var recorder = PhoneWorkoutManager.shared
     @State private var showLiveRun = false
     @State private var showCompleteConfirm = false
 
@@ -158,7 +158,7 @@ struct ProgressDashboardView: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(progress.daysUntilRace)")
-                        .font(.system(size: 44, weight: .bold, design: .rounded))
+                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
                         .contentTransition(.numericText())
                     Text("days to \(plan.goal.displayName)")
                         .font(.subheadline).foregroundStyle(.secondary)

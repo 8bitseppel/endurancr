@@ -24,7 +24,10 @@ struct RunLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    labeled("Time", RunMetricFormat.duration(context.state.elapsedSeconds))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Time").font(.caption2).foregroundStyle(.secondary)
+                        RunClock(state: context.state).font(.headline)
+                    }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     labeled("Distance", RunMetricFormat.distance(context.state.distanceMeters))
@@ -169,11 +172,10 @@ private struct LockScreenView: View {
                         .monospacedDigit()
                         .foregroundStyle(.red)
                         .labelStyle(.titleAndIcon)
+                        .accessibilityLabel("Heart rate \(Int(context.state.heartRate)) beats per minute")
                 }
-                Text(context.state.isPaused ? "PAUSED"
-                     : RunMetricFormat.duration(context.state.elapsedSeconds))
+                RunClock(state: context.state)
                     .font(.subheadline.weight(.semibold))
-                    .monospacedDigit()
                     .foregroundStyle(context.state.isPaused ? .yellow : .secondary)
             }
 
@@ -191,7 +193,9 @@ private struct LockScreenView: View {
                     label: "Pace",
                     value: RunMetricFormat.pace(context.state.currentPaceSecPerKm),
                     sub: hasTargetPace ? "target \(targetPace(context))" : nil,
-                    tint: paceTint
+                    tint: paceTint,
+                    symbol: onTarget.map { $0 ? "checkmark.circle.fill" : "exclamationmark.circle.fill" },
+                    status: onTarget.map { $0 ? "on target" : "off target" }
                 )
             }
 
@@ -207,18 +211,26 @@ private struct LockScreenView: View {
         }
     }
 
-    private func metricBlock(label: String, value: String, sub: String?, tint: Color = .primary) -> some View {
+    /// `symbol` and `status` say what the colour says (on or off target), so the
+    /// meaning doesn't rest on colour alone.
+    private func metricBlock(label: String, value: String, sub: String?, tint: Color = .primary,
+                             symbol: String? = nil, status: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label.uppercased())
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(.title, design: .rounded).weight(.semibold))
-                .monospacedDigit()
-                .contentTransition(.numericText())
-                .foregroundStyle(tint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
+            HStack(spacing: 4) {
+                Text(value)
+                    .font(.system(.title, design: .rounded).weight(.semibold))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                if let symbol {
+                    Image(systemName: symbol).font(.subheadline)
+                }
+            }
+            .foregroundStyle(tint)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
             if let sub {
                 Text(sub)
                     .font(.caption2)
@@ -228,5 +240,24 @@ private struct LockScreenView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(status ?? "")
+    }
+}
+
+/// The run's time. While running it counts by itself from `clockStart`, so it stays
+/// smooth between the app's updates; paused, it says so.
+private struct RunClock: View {
+    let state: RunActivityAttributes.ContentState
+
+    var body: some View {
+        if state.isPaused {
+            Text("PAUSED")
+        } else if let start = state.clockStart {
+            Text(timerInterval: start...Date.distantFuture, countsDown: false)
+                .monospacedDigit()
+        } else {
+            Text(RunMetricFormat.duration(state.elapsedSeconds)).monospacedDigit()
+        }
     }
 }

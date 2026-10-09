@@ -90,11 +90,15 @@ extension PlanSync: WCSessionDelegate {
                              error: Error?) {
         // Extract the Sendable payload off the delegate thread, then hand off to the
         // main actor for the flush/apply.
-        let inputsData = session.receivedApplicationContext["inputs"] as? Data
-        let adaptedData = session.receivedApplicationContext["adapted"] as? Data
+        let context = session.receivedApplicationContext
+        let inputsData = context["inputs"] as? Data
+        let adaptedData = context["adapted"] as? Data
+        // Catch up only on a real context: an empty one (a failed activation, or the
+        // phone hasn't sent anything yet) would otherwise delete the watch's plan.
+        let hasContext = error == nil && !context.isEmpty
         Task { @MainActor in
             self.flush()                    // phone: (re)send once activated
-            self.apply(inputsData: inputsData, adaptedData: adaptedData) // watch: catch up
+            if hasContext { self.apply(inputsData: inputsData, adaptedData: adaptedData) } // watch: catch up
         }
     }
 
@@ -110,6 +114,11 @@ extension PlanSync: WCSessionDelegate {
     nonisolated func sessionDidBecomeInactive(_ session: WCSession) {}
     nonisolated func sessionDidDeactivate(_ session: WCSession) {
         session.activate()
+    }
+    // The watch app was just installed or paired: send it the plan now rather than
+    // at the next plan change.
+    nonisolated func sessionWatchStateDidChange(_ session: WCSession) {
+        Task { @MainActor in self.flush() }
     }
     #endif
 }

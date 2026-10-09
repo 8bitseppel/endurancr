@@ -9,7 +9,7 @@ import TrainingCore
 /// away behind the toolbar menu, so the front stays about the run you do today.
 struct CoachView: View {
     let coordinator: PlanCoordinator
-    @State private var recorder = PhoneWorkoutManager()
+    @State private var recorder = PhoneWorkoutManager.shared
     @State private var showLiveRun = false
     @State private var showingGoalEditor = false
     @State private var showingProgress = false

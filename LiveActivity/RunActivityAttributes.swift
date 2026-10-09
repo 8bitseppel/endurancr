@@ -26,6 +26,9 @@ struct RunActivityAttributes: ActivityAttributes {
         var stepTargetDistanceMeters: Double = 0
         /// Heart rate (bpm) when the run is recorded on Apple Watch; 0 otherwise.
         var heartRate: Double = 0
+        /// While running, the moment the clock would have read 0:00, so the Lock
+        /// Screen counts the time by itself between updates. Nil while paused.
+        var clockStart: Date? = nil
     }
 
     /// Fixed for the life of the activity.
