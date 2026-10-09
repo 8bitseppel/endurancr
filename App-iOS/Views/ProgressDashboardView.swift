@@ -10,6 +10,7 @@ struct ProgressDashboardView: View {
     private let calculator = VDOTCalculator()
     @State private var showingGoalEditor = false
     @State private var showingDataManagement = false
+    @AppStorage(PhoneWorkoutManager.autoPauseKey) private var autoPause = true
     @State private var recorder = PhoneWorkoutManager()
     @State private var showLiveRun = false
     @State private var showCompleteConfirm = false
@@ -30,6 +31,7 @@ struct ProgressDashboardView: View {
                     volumeSection(plan)
                     pacesSection(plan)
                     planningSection
+                    recordingSection
                 } else {
                     ContentUnavailableView {
                         Label("No plan yet", systemImage: "flag.checkered")
@@ -476,6 +478,19 @@ struct ProgressDashboardView: View {
             } label: {
                 Label("Backup & restore", systemImage: "arrow.up.arrow.down.circle")
             }
+        }
+    }
+
+    /// Recording settings for runs on this iPhone. The watch has its own switch.
+    private var recordingSection: some View {
+        Section {
+            Toggle(isOn: $autoPause) {
+                Label("Auto-pause", systemImage: "pause.circle")
+            }
+        } header: {
+            Text("Recording")
+        } footer: {
+            Text("Pauses a run on this iPhone while you stand still, at a traffic light for example, and resumes when you run again. Turn it on or off for Apple Watch on the watch's run screen.")
         }
     }
 

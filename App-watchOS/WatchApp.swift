@@ -49,8 +49,11 @@ private extension WorkoutManager {
     /// A run in progress for Simulator screenshots (see `DemoMode`).
     static var demo: WorkoutManager {
         let workout = WorkoutManager()
-        workout.distanceMeters = 6_420
-        workout.elapsedSeconds = 38 * 60 + 50
+        // Two thirds into today's run, right on its target pace.
+        let planned = DemoMode.todaysWorkout
+        let pace = planned?.targetPaceSecPerKm.map { ($0.lowerBound + $0.upperBound) / 2 } ?? 363
+        workout.distanceMeters = ((planned?.distanceMeters ?? 9_600) * 0.66 / 10).rounded() * 10
+        workout.elapsedSeconds = (workout.distanceMeters / 1_000 * pace).rounded()
         workout.heartRate = 142
         workout.routePointCount = 412
         workout.isRunning = true

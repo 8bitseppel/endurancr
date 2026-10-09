@@ -1,6 +1,7 @@
 import Foundation
 import HealthKit
 import CoreLocation
+import TrainingCore
 
 /// Records a running workout on Apple Watch using `HKWorkoutSession` +
 /// `HKLiveWorkoutBuilder`, streaming live metrics and saving the finished
@@ -15,10 +16,17 @@ final class WorkoutManager: NSObject, @unchecked Sendable {
     private var builder: HKLiveWorkoutBuilder?
     private var routeBuilder: HKWorkoutRouteBuilder?
     private let locationManager = CLLocationManager()
+    /// Pauses the run while the runner stands still and resumes it when they move.
+    private var autoPause = AutoPauseDetector()
+    /// Set at once by the Pause button (the session's own state arrives later), so
+    /// a pause by hand is never resumed by moving.
+    private var pausedByHand = false
 
     // Live, observable metrics.
     var isRunning = false
     var isPaused = false
+    /// The pause came from standing still, so moving again resumes it.
+    var isAutoPaused = false
     var heartRate: Double = 0
     var activeEnergyKcal: Double = 0
     var distanceMeters: Double = 0
@@ -37,8 +45,18 @@ final class WorkoutManager: NSObject, @unchecked Sendable {
         return elapsedSeconds / (distanceMeters / 1_000)
     }
 
+    /// Whether the run pauses itself while the runner stands still. On unless the
+    /// runner turned it off on the run screen.
+    static var isAutoPauseOn: Bool {
+        UserDefaults.standard.object(forKey: autoPauseKey) as? Bool ?? true
+    }
+    static let autoPauseKey = "autoPause"
+
     func start() {
         didFinish = false
+        autoPause.reset()
+        pausedByHand = false
+        isAutoPaused = false
         let config = HKWorkoutConfiguration()
         config.activityType = .running
         config.locationType = .outdoor
@@ -66,8 +84,36 @@ final class WorkoutManager: NSObject, @unchecked Sendable {
         }
     }
 
-    func pause() { session?.pause() }
-    func resume() { session?.resume() }
+    func pause() {
+        pausedByHand = true
+        isAutoPaused = false
+        autoPause.reset()
+        session?.pause()
+    }
+
+    func resume() {
+        pausedByHand = false
+        isAutoPaused = false
+        autoPause.reset()
+        session?.resume()
+    }
+
+    /// Feeds the GPS speed to the auto-pause, unless the runner paused by hand.
+    private func checkAutoPause(_ locations: [CLLocation]) {
+        guard Self.isAutoPauseOn, !pausedByHand, let session else { return }
+        for location in locations where -location.timestamp.timeIntervalSinceNow <= 5 {
+            switch autoPause.update(speed: location.speed, at: location.timestamp) {
+            case .pause:
+                session.pause()
+                DispatchQueue.main.async { self.isAutoPaused = true }
+            case .resume:
+                session.resume()
+                DispatchQueue.main.async { self.isAutoPaused = false }
+            case nil:
+                break
+            }
+        }
+    }
 
     func end() {
         // Set synchronously so the view's dismiss handler sees the explicit finish
@@ -148,6 +194,7 @@ extension WorkoutManager: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         // Keep only reasonably accurate fixes so the route isn't polluted by noise.
         let filtered = locations.filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 50 }
+        checkAutoPause(filtered.filter { $0.horizontalAccuracy <= 20 })
         guard !filtered.isEmpty, let routeBuilder else { return }
         routeBuilder.insertRouteData(filtered) { [weak self] _, error in
             if let error { DispatchQueue.main.async { self?.lastError = error.localizedDescription } }

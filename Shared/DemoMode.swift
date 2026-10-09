@@ -33,21 +33,36 @@ enum DemoMode {
     /// Values the goal form opens with on the `goal` screen.
     static var goalPrefill: PlanInputs? { screen == "goal" ? inputs : nil }
 
-    static var inputs: PlanInputs {
+    /// The sample inputs, with the one weekday kept free picked so that today is an
+    /// easy run whatever day the screenshots are taken (Monday when that works).
+    static let inputs: PlanInputs = {
+        let calendar = Calendar.current
+        let candidates = [2, 3, 4, 5, 6, 7, 1].map { inputs(restWeekday: $0) }
+        return candidates.first { inputs in
+            let plan = try? VDOTPlanGenerator().makePlan(
+                goal: inputs.goal, fitness: inputs.fitness,
+                startDate: inputs.startDate, calendar: calendar
+            )
+            return plan?.allWorkouts.first { calendar.isDateInToday($0.date) }?.type == .easy
+        } ?? candidates[0]
+    }()
+
+    private static func inputs(restWeekday: Int) -> PlanInputs {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: .now)
         // Monday six weeks ago, so week 1 is a full week.
         let thisMonday = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: today))!
         let start = calendar.date(byAdding: .day, value: -42, to: thisMonday)!
-        // 31 weeks in all, race on the last Sunday.
-        let race = calendar.date(byAdding: .day, value: 216, to: start)!
+        // 30 weeks in all, race on the last Sunday. Week 7 is then a full week, not
+        // one of the lighter weeks counted back from race day.
+        let race = calendar.date(byAdding: .day, value: 209, to: start)!
         let goal = Goal(
             name: "Hamburg Marathon",
             race: .marathon,
             raceDate: race,
             targetTimeSeconds: 4 * 3600 + 30 * 60,
             daysPerWeek: 5,
-            restWeekdays: [2]
+            restWeekdays: [restWeekday]
         )
         // A 12.2 km run at 5:36/km the day before the plan started.
         let fitness = FitnessSnapshot(

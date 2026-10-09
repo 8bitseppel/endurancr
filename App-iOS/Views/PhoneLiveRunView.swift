@@ -64,12 +64,14 @@ struct PhoneLiveRunView: View {
                     Label("Finish run", systemImage: "stop.fill")
                 }
             } footer: {
-                Text(recorder.isPaused
+                Text(recorder.isAutoPaused
+                    ? "Auto-paused while you stand still. It resumes by itself when you run again."
+                    : recorder.isPaused
                     ? "Paused. Time and distance are on hold. Resume to keep recording, or Finish to save to Health."
                     : "Keep your phone with you. Tracking continues with the screen off, and your stats show on the Lock Screen.")
             }
         }
-        .navigationTitle(recorder.isPaused ? "Paused" : "Running")
+        .navigationTitle(recorder.isAutoPaused ? "Auto-paused" : recorder.isPaused ? "Paused" : "Running")
         .navigationBarBackButtonHidden(true)
         .onChange(of: recorder.isRunning) { _, running in
             // The run can also be finished from the Live Activity (Lock Screen /

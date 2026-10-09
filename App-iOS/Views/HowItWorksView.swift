@@ -71,6 +71,12 @@ struct HowItWorksView: View {
                     detail: "The weekdays you don't want to train repeat every week; vacation periods are one-off breaks. You can also skip the year-end holidays (Christmas Eve to Boxing Day and New Year's Eve to New Year's Day) with one toggle. All of them blank out training on those days, and the plan works around them."
                 )
 
+                topic(
+                    "Auto-pause",
+                    icon: "pause.circle",
+                    detail: "While you record a run, endurancr watches your GPS speed. Stand still for 5 seconds (below 0.7 m/s, slower than a slow walk), at a traffic light for example, and the run pauses, counted from the moment you stopped, so that time never counts. Move for 2 seconds at 1.4 m/s or faster and it resumes, counted from when you set off. A pause you start yourself only ends when you tap Resume. It's on by default; switch it off in Progress on iPhone or on the second page of the run screen on Apple Watch."
+                )
+
                 sourcesSection
 
                 Section {

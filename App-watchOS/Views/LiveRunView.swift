@@ -2,9 +2,10 @@ import SwiftUI
 import TrainingCore
 import WatchKit
 
-/// Live run screen. Big-type metrics with the Pause/Resume and Finish controls
-/// right on the same scroll view, so they are always reachable (an earlier paged
-/// layout hid them behind a swipe the metrics scroll view swallowed).
+/// Live run screen on two vertical pages, moved between with the Digital Crown or
+/// a swipe. The first holds what matters while running (time, heart rate, distance
+/// and pace with their targets) and fits the screen without scrolling, so the
+/// swipe always reaches the second page: Pause/Resume, Finish, auto-pause and GPS.
 ///
 /// When today's session is a planned workout, the screen shows step-aware targets:
 /// the current step (e.g. "Rep 3/6") with its own target distance and pace, so an
@@ -18,6 +19,9 @@ struct LiveRunView: View {
     /// Paces for the athlete's current fitness. `nil` = free run.
     var zones: PaceZones?
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(WorkoutManager.autoPauseKey) private var autoPause = true
+    @State private var page = Page.metrics
+    enum Page { case metrics, controls }
 
     /// The step the athlete is currently in, given how far they've run.
     private var activeStep: WorkoutStep? {
@@ -28,42 +32,12 @@ struct LiveRunView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(Format.duration(workout.elapsedSeconds))
-                    .font(.system(.largeTitle, design: .rounded).weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(workout.isPaused ? .yellow : .primary)
-
-                heartRate
-
-                if let step = activeStep, let plannedWorkout {
-                    stepBanner(step)
-                    metricPair(
-                        "Distance", Format.distance(workout.distanceMeters),
-                        "Target", Format.distance(plannedWorkout.distanceMeters)
-                    )
-                    metricPair(
-                        "Pace", Format.pace(workout.paceSecPerKm),
-                        "Target", step.targetPaceSecPerKm.map(Format.pace) ?? "--",
-                        valueTint: paceTint(target: step.targetPaceSecPerKm)
-                    )
-                } else {
-                    // Free run: no plan, so just live pace and distance.
-                    metric("Distance", Format.distance(workout.distanceMeters), tint: .accentColor)
-                    metric("Pace", Format.pace(workout.paceSecPerKm), tint: .primary)
-                }
-
-                gpsStatus
-
-                controls
-                    .padding(.top, 6)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 4)
+        TabView(selection: $page) {
+            metricsPage.tag(Page.metrics)
+            controlsPage.tag(Page.controls)
         }
-        .demoAutoScroll()
-        .navigationTitle(workout.isPaused ? "Paused" : "Running")
+        .tabViewStyle(.verticalPage)
+        .navigationTitle(workout.isAutoPaused ? "Auto-paused" : workout.isPaused ? "Paused" : "Running")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: activeStep?.index) { old, new in
             // A new interval step began (e.g. warm-up -> first rep): a success tap so
@@ -72,6 +46,58 @@ struct LiveRunView: View {
                 WKInterfaceDevice.current().play(.success)
             }
         }
+        .onChange(of: workout.isAutoPaused) { _, paused in
+            // Felt at the traffic light without looking: stop, then start.
+            WKInterfaceDevice.current().play(paused ? .stop : .start)
+        }
+        .demoFlipPages($page)
+    }
+
+    /// Page 1: everything needed while running, sized to fit without scrolling.
+    private var metricsPage: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(Format.duration(workout.elapsedSeconds))
+                    .font(.system(.title, design: .rounded).weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(workout.isPaused ? .yellow : .primary)
+                Spacer(minLength: 4)
+                heartRate
+            }
+
+            if let step = activeStep, let plannedWorkout {
+                if !step.label.isEmpty { stepBanner(step) }
+                metricPair(
+                    "Distance", Format.distance(workout.distanceMeters),
+                    "Target", Format.distance(plannedWorkout.distanceMeters)
+                )
+                metricPair(
+                    "Pace", Format.pace(workout.paceSecPerKm),
+                    "Target", step.targetPaceSecPerKm.map(Format.pace) ?? "--",
+                    valueTint: paceTint(target: step.targetPaceSecPerKm)
+                )
+            } else {
+                // Free run: no plan, so just live pace and distance.
+                metric("Distance", Format.distance(workout.distanceMeters), tint: .accentColor)
+                metric("Pace", Format.pace(workout.paceSecPerKm), tint: .primary)
+            }
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.horizontal, 4)
+    }
+
+    /// Page 2: the controls, the auto-pause switch and GPS.
+    private var controlsPage: some View {
+        VStack(spacing: 8) {
+            controls
+            Toggle("Auto-pause", isOn: $autoPause)
+                .font(.footnote)
+            gpsStatus
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 4)
     }
 
     /// The current step: its label ("Rep 3/6"), step distance, and step target pace.
@@ -122,17 +148,13 @@ struct LiveRunView: View {
     }
 
     private var heartRate: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Image(systemName: "heart.fill").foregroundStyle(.red).font(.title3)
-            if workout.heartRate > 0 {
-                Text("\(Int(workout.heartRate))")
-                    .font(.system(.largeTitle, design: .rounded).weight(.semibold))
-                    .monospacedDigit()
-                Text("bpm").font(.caption).foregroundStyle(.secondary)
-            } else {
-                Text("acquiring…").font(.title3).foregroundStyle(.secondary)
-            }
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            Image(systemName: "heart.fill").foregroundStyle(.red).font(.footnote)
+            Text(workout.heartRate > 0 ? "\(Int(workout.heartRate))" : "--")
+                .font(.system(.title3, design: .rounded).weight(.semibold))
+                .monospacedDigit()
         }
+        .accessibilityLabel(workout.heartRate > 0 ? "Heart rate \(Int(workout.heartRate)) beats per minute" : "Heart rate acquiring")
     }
 
     private func metric(_ label: String, _ value: String, tint: Color) -> some View {
@@ -177,5 +199,23 @@ struct LiveRunView: View {
         )
         .font(.caption2)
         .foregroundStyle(workout.routePointCount > 0 ? Color.secondary : Color.orange)
+    }
+}
+
+extension View {
+    /// In demo screen recordings, shows the second page and comes back, the way a
+    /// runner would turn the Digital Crown. Does nothing otherwise.
+    func demoFlipPages(_ page: Binding<LiveRunView.Page>) -> some View {
+        #if DEBUG
+        task {
+            guard DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoScroll") else { return }
+            try? await Task.sleep(for: .seconds(5))
+            withAnimation { page.wrappedValue = .controls }
+            try? await Task.sleep(for: .seconds(5))
+            withAnimation { page.wrappedValue = .metrics }
+        }
+        #else
+        self
+        #endif
     }
 }

@@ -147,3 +147,48 @@ Time off
 - Add as many vacations as you like when you set a goal. Each new one starts the day after the last.
 
 How it works explains the new long-run rules, with Hal Higdon and Hansons as sources.
+
+## Version 1.0.3
+
+### Promotional text (170)
+
+Stop at a traffic light and your run pauses itself. A private running plan that adapts to every run, paced with the VDOT method from Jack Tupper Daniels.
+
+### What's New (4000)
+
+Auto-pause
+- Stop at a traffic light and your run pauses by itself, then carries on when you run again. The time standing still doesn't count, on iPhone and on Apple Watch.
+- It's on by default. Switch it off in Progress on iPhone, or on the run screen on Apple Watch.
+
+A clearer run screen on Apple Watch
+- The first page shows only what you need while running: time, heart rate, distance and pace with their targets. It fits the screen, no scrolling.
+- Turn the Digital Crown or swipe up for Pause, Finish and the auto-pause switch.
+
+How it works explains when and how auto-pause kicks in.
+
+### Screenshots (refreshed for 1.0.3)
+
+`./scripts/screenshots.sh`, then copy into `screenshots/appstore/` (same names and order
+as before). The sizes Apple accepts are on its screenshot specifications page.
+
+- iPhone 6.9" (1320 × 2868): `screenshots/appstore/iphone-*.png`
+- iPhone 6.5" (1284 × 2778): `screenshots/appstore/6.5-inch/`
+- iPhone 6.3" (1206 × 2622), the size Apple lists as required: `screenshots/appstore/6.3-inch/`
+- Apple Watch (416 × 496): `screenshots/appstore/watch-*.png`. The run screen now shows
+  its first page.
+
+### Creative assets (iOS 27 product page header and search results)
+
+`python3 scripts/appstore-creatives.py` writes `screenshots/appstore/creative/`:
+
+| File | Use | Size |
+|---|---|---|
+| `header-21x9.png` | Product page header, 21:9 | 3840 × 1646 |
+| `search-3x2.png` | Search results, 3:2 | 3840 × 2560 |
+
+Upload them in App Store Connect under the new version, or in the Asset Library. Then
+check them with the product page preview tool, in Dark Mode too. They follow Apple's asset
+best practices:
+- The real interface, one short phrase and a centered focal point.
+- No prices, URLs, awards or other platforms. The text is in English only, like the listing.
+- No alpha channel.
