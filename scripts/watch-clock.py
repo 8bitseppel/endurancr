@@ -57,7 +57,10 @@ def patch(im, mask):
 def patch_video(mov, gif):
     with tempfile.TemporaryDirectory() as tmp:
         frames = Path(tmp)
-        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(mov), "-vf", "fps=30",
+        # +igndts and tpad as in screenshots.sh: still stretches keep their real
+        # length, and the last frame holds 2 s.
+        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-fflags", "+igndts", "-i", str(mov),
+                        "-vf", "tpad=stop_mode=clone:stop_duration=2,fps=30",
                         str(frames / "f%05d.png")], check=True)
         mask = None
         for f in sorted(frames.glob("f*.png")):

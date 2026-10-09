@@ -74,7 +74,8 @@ shot() {
 }
 
 # rec <device> <bundle id> <screen> <file name> <gif width> <gif fps>
-# Takes the screenshot, then records the screen scrolling down and back up.
+# Takes the screenshot, then records the screen scrolling down and back up (the
+# watch's two-page screens turn to page 2 and back instead).
 rec() {
   shot "$1" "$2" "$3" "$4"
   xcrun simctl terminate "$1" "$2" 2>/dev/null || true
@@ -85,8 +86,11 @@ rec() {
   sleep 14
   kill -INT "$recorder"
   wait "$recorder" || true
-  ffmpeg -loglevel error -y -i "$BUILD/$4.mov" -vf \
-    "fps=$6,scale=$5:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle" \
+  # The Simulator only writes a frame when the screen changes, and its decode
+  # timestamps confuse ffmpeg: +igndts keeps the still stretches their real
+  # length (a page held 4 s stays 4 s), tpad holds the last frame 2 s.
+  ffmpeg -loglevel error -y -fflags +igndts -i "$BUILD/$4.mov" -vf \
+    "tpad=stop_mode=clone:stop_duration=2,fps=$6,scale=$5:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle" \
     "$OUT/$4.gif"
   echo "    $OUT/$4.gif"
 }

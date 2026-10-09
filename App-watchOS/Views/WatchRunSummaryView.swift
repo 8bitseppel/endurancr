@@ -43,11 +43,12 @@ struct WatchRunSummaryView: View {
     enum Page { case run, week }
 
     var body: some View {
-        CrownPages(selection: $page, first: .run, second: .week) {
-            runPage
-        } secondPage: {
-            weekPage
+        TabView(selection: $page) {
+            runPage.tag(Page.run)
+            weekPage.tag(Page.week)
         }
+        .tabViewStyle(.verticalPage)
+        .demoTurnPage($page, to: .week)
         .navigationTitle("Run complete")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { WKInterfaceDevice.current().play(.success) }

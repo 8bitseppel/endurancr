@@ -35,11 +35,12 @@ struct LiveRunView: View {
     }
 
     var body: some View {
-        CrownPages(selection: $page, first: .metrics, second: .controls) {
-            metricsPage
-        } secondPage: {
-            controlsPage
+        TabView(selection: $page) {
+            metricsPage.tag(Page.metrics)
+            controlsPage.tag(Page.controls)
         }
+        .tabViewStyle(.verticalPage)
+        .demoTurnPage($page, to: .controls)
         .navigationTitle(workout.isAutoPaused ? "Auto-paused" : workout.isPaused ? "Paused" : "Running")
         .navigationBarTitleDisplayMode(.inline)
         // Leaving the screen would leave the run recording with no way back to it;
@@ -247,84 +248,22 @@ struct LiveRunView: View {
     }
 }
 
-/// Two vertical pages turned with the Digital Crown or a swipe. In demo screen
-/// recordings it scrolls slowly to the second page and back instead, the way a
-/// runner turns the Crown, so the website's videos don't jump.
-struct CrownPages<Page: Hashable, First: View, Second: View>: View {
-    @Binding var selection: Page
-    let first: Page
-    let second: Page
-    @ViewBuilder let firstPage: First
-    @ViewBuilder let secondPage: Second
-
-    init(selection: Binding<Page>, first: Page, second: Page,
-         @ViewBuilder firstPage: () -> First, @ViewBuilder secondPage: () -> Second) {
-        _selection = selection
-        self.first = first
-        self.second = second
-        self.firstPage = firstPage()
-        self.secondPage = secondPage()
-    }
-
-    var body: some View {
+extension View {
+    /// In demo screen recordings, moves to the second page and back the way the
+    /// watch does when the Crown is turned: it sets the page and lets the paged
+    /// view run its own transition (the blur from page to page). Nothing otherwise.
+    func demoTurnPage<Page: Hashable>(_ page: Binding<Page>, to second: Page) -> some View {
         #if DEBUG
-        if DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoScroll") {
-            DemoCrownScroll(firstPage: firstPage, secondPage: secondPage)
-        } else {
-            pages
+        task {
+            guard DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoScroll") else { return }
+            let first = page.wrappedValue
+            try? await Task.sleep(for: .seconds(4))
+            withAnimation { page.wrappedValue = second }
+            try? await Task.sleep(for: .seconds(4.5))
+            withAnimation { page.wrappedValue = first }
         }
         #else
-        pages
+        self
         #endif
     }
-
-    private var pages: some View {
-        TabView(selection: $selection) {
-            firstPage.tag(first)
-            secondPage.tag(second)
-        }
-        .tabViewStyle(.verticalPage)
-    }
 }
-
-#if DEBUG
-/// Both pages stacked, scrolled down and back up with a slow ease, like a Crown turn.
-private struct DemoCrownScroll<First: View, Second: View>: View {
-    let firstPage: First
-    let secondPage: Second
-    @State private var onSecond = false
-
-    var body: some View {
-        GeometryReader { geometry in
-            VStack(spacing: 0) {
-                firstPage.frame(height: geometry.size.height)
-                secondPage.frame(height: geometry.size.height)
-            }
-            .offset(y: onSecond ? -geometry.size.height : 0)
-        }
-        .clipped()
-        .overlay {
-            // The page dots the real vertical pages show, measured on a 46 mm
-            // screenshot (points from the screen's top left); the lit one follows
-            // the scroll.
-            Color.clear
-                .ignoresSafeArea()
-                .overlay(alignment: .topLeading) {
-                    VStack(spacing: 2) {
-                        Circle().fill(.white.opacity(onSecond ? 0.36 : 1)).frame(width: 6, height: 6)
-                        Circle().fill(.white.opacity(onSecond ? 1 : 0.36)).frame(width: 6, height: 6)
-                    }
-                    .offset(x: 199.75, y: 60.75)
-                    .ignoresSafeArea()
-                }
-                .allowsHitTesting(false)
-        }
-        .task {
-            try? await Task.sleep(for: .seconds(4))
-            withAnimation(.easeInOut(duration: 1.6)) { onSecond = true }
-            try? await Task.sleep(for: .seconds(4.5))
-            withAnimation(.easeInOut(duration: 1.6)) { onSecond = false }
-        }
-    }
-}
-#endif
