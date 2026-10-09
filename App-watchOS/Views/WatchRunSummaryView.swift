@@ -34,52 +34,70 @@ struct WatchRunSummary: Identifiable {
     var hasWeek: Bool { weekTargetMeters > 0 }
 }
 
+/// Two vertical pages, like the run screen: the run itself first (saved, distance,
+/// time, pace), then the week and Done a Crown turn or swipe below.
 struct WatchRunSummaryView: View {
     let summary: WatchRunSummary
     @Environment(\.dismiss) private var dismiss
+    @State private var page = Page.run
+    enum Page { case run, week }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                saveStatus
-
-                VStack(spacing: 0) {
-                    Text(Format.distance(summary.distanceMeters))
-                        .font(.system(.largeTitle, design: .rounded).weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(.tint)
-                    Text("DISTANCE")
-                        .font(.caption2).foregroundStyle(.secondary)
-                }
-
-                HStack(alignment: .firstTextBaseline) {
-                    stat("TIME", Format.duration(summary.durationSeconds))
-                    Spacer(minLength: 8)
-                    stat("PACE", Format.pace(summary.averagePaceSecPerKm), tint: .green)
-                }
-
-                if summary.hasWeek {
-                    weeklyProgress
-                }
-
-                Button { dismiss() } label: {
-                    Text("Done")
-                        .fontWeight(.semibold)
-                        .foregroundStyle(WatchTodayView.plumInk)
-                        .frame(maxWidth: .infinity)
-                }
-                    .buttonStyle(.glassProminent)
-                    .tint(.accentColor)
-                    .controlSize(.large)
-                    .padding(.top, 2)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 4)
+        TabView(selection: $page) {
+            runPage.tag(Page.run)
+            weekPage.tag(Page.week)
         }
-        .demoAutoScroll()
+        .tabViewStyle(.verticalPage)
         .navigationTitle("Run complete")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { WKInterfaceDevice.current().play(.success) }
+        .demoFlipPages($page, to: .week)
+    }
+
+    /// Page 1: what the run did, sized to fit without scrolling.
+    private var runPage: some View {
+        VStack(spacing: 10) {
+            saveStatus
+
+            VStack(spacing: 0) {
+                Text(Format.distance(summary.distanceMeters))
+                    .font(.system(.largeTitle, design: .rounded).weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.tint)
+                Text("DISTANCE")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+
+            HStack(alignment: .firstTextBaseline) {
+                stat("TIME", Format.duration(summary.durationSeconds))
+                Spacer(minLength: 8)
+                stat("PACE", Format.pace(summary.averagePaceSecPerKm), tint: .green)
+            }
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.horizontal, 4)
+    }
+
+    /// Page 2: what's left this week, and Done.
+    private var weekPage: some View {
+        VStack(spacing: 10) {
+            if summary.hasWeek {
+                weeklyProgress
+            }
+            Button { dismiss() } label: {
+                Text("Done")
+                    .fontWeight(.semibold)
+                    .foregroundStyle(WatchTodayView.plumInk)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glassProminent)
+            .tint(.accentColor)
+            .controlSize(.large)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 4)
     }
 
     private var saveStatus: some View {

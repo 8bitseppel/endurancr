@@ -69,7 +69,7 @@ struct LiveRunView: View {
             // watchOS's Auto-Pause, felt at the traffic light without looking.
             WKInterfaceDevice.current().play(paused ? .stop : .start)
         }
-        .demoFlipPages($page)
+        .demoFlipPages($page, to: .controls)
     }
 
     /// Page 1: everything needed while running, sized to fit without scrolling.
@@ -226,14 +226,15 @@ struct LiveRunView: View {
 extension View {
     /// In demo screen recordings, shows the second page and comes back, the way a
     /// runner would turn the Digital Crown. Does nothing otherwise.
-    func demoFlipPages(_ page: Binding<LiveRunView.Page>) -> some View {
+    func demoFlipPages<Page: Hashable>(_ page: Binding<Page>, to second: Page) -> some View {
         #if DEBUG
         task {
             guard DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoScroll") else { return }
+            let first = page.wrappedValue
             try? await Task.sleep(for: .seconds(5))
-            withAnimation { page.wrappedValue = .controls }
+            withAnimation { page.wrappedValue = second }
             try? await Task.sleep(for: .seconds(5))
-            withAnimation { page.wrappedValue = .metrics }
+            withAnimation { page.wrappedValue = first }
         }
         #else
         self
