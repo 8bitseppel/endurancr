@@ -402,40 +402,6 @@ h.suite("Weekly volume redistribution") {
     h.check(far.weeks[0].workouts == base.weeks[0].workouts, "non-current week left unchanged")
 }
 
-// MARK: Auto-pause
-
-h.suite("Auto-pause at a traffic light") {
-    var detector = AutoPauseDetector()
-    let t0 = date(2026, 10, 9)
-    func at(_ s: Double) -> Date { t0.addingTimeInterval(s) }
-    var changes: [AutoPauseDetector.Change] = []
-    // Running at 3 m/s for 10 s, stopping for 30 s (GPS jitter up to 0.5 m/s), then running again.
-    for s in 0..<10 { if let c = detector.update(speed: 3, at: at(Double(s))) { changes.append(c) } }
-    for s in 10..<40 { if let c = detector.update(speed: s % 2 == 0 ? 0.1 : 0.5, at: at(Double(s))) { changes.append(c) } }
-    for s in 40..<50 { if let c = detector.update(speed: 3, at: at(Double(s))) { changes.append(c) } }
-    h.check(changes == [.pause(since: at(10)), .resume(since: at(40))], "pauses from when the runner stopped and resumes from when they set off (got \(changes))")
-
-    // A 3 s stop (shorter than 5 s) doesn't pause.
-    detector.reset()
-    var short: [AutoPauseDetector.Change] = []
-    for s in 0..<3 { if let c = detector.update(speed: 0.2, at: at(Double(s))) { short.append(c) } }
-    if let c = detector.update(speed: 3, at: at(3)) { short.append(c) }
-    if let c = detector.update(speed: 0.2, at: at(4)) { short.append(c) }
-    h.check(short.isEmpty && !detector.isPaused, "a short stop doesn't pause")
-
-    // A slow shuffle between the two speeds while paused doesn't resume, and a fix without speed is ignored.
-    detector.reset()
-    for s in 0...5 { _ = detector.update(speed: 0, at: at(Double(s))) }
-    h.check(detector.isPaused, "paused after 5 s standing")
-    var shuffle: [AutoPauseDetector.Change] = []
-    for s in 6..<20 { if let c = detector.update(speed: 1.0, at: at(Double(s))) { shuffle.append(c) } }
-    _ = detector.update(speed: -1, at: at(20))
-    h.check(shuffle.isEmpty && detector.isPaused, "a shuffle at 1 m/s doesn't resume")
-    // One fast fix isn't enough; 2 s of moving is.
-    h.check(detector.update(speed: 2, at: at(21)) == nil, "one fast fix isn't enough")
-    h.check(detector.update(speed: 2, at: at(23)) == .resume(since: at(21)), "2 s of moving resumes")
-}
-
 // MARK: Peak long run
 
 h.suite("Peak long run: 32 km for the marathon, 19 km for the half") {

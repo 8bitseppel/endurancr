@@ -72,9 +72,9 @@ struct HowItWorksView: View {
                 )
 
                 topic(
-                    "Auto-pause",
-                    icon: "pause.circle",
-                    detail: "While you record a run, endurancr watches your GPS speed. Stand still for 5 seconds (below 0.7 m/s, slower than a slow walk), at a traffic light for example, and the run pauses, counted from the moment you stopped, so that time never counts. Move for 2 seconds at 1.4 m/s or faster and it resumes, counted from when you set off. A pause you start yourself only ends when you tap Resume. It's on by default; switch it off in Progress on iPhone or on the second page of the run screen on Apple Watch."
+                    "Recording on Apple Watch",
+                    icon: "applewatch",
+                    detail: "A run on Apple Watch also shows on your iPhone's Lock Screen as a Live Activity, through Apple's workout mirroring, with heart rate and Pause and Finish buttons that act on the watch. If the run starts while endurancr is closed on the iPhone, it appears the next time you open the app. Auto-pause is Apple's: turn on Auto-Pause in the watch's Workout settings and watchOS notices when you stop, at a traffic light for example, and when you move again. The run screen then shows Auto-paused and taps your wrist, and Apple Health keeps the pause with the workout. endurancr doesn't detect stops itself, so runs recorded on iPhone don't auto-pause. On the watch, double tap (pinch twice) to pause or resume."
                 )
 
                 sourcesSection

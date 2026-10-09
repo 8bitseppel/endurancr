@@ -152,19 +152,15 @@ How it works explains the new long-run rules, with Hal Higdon and Hansons as sou
 
 ### Promotional text (170)
 
-Stop at a traffic light and your run pauses itself. A private running plan that adapts to every run, paced with the VDOT method from Jack Tupper Daniels.
+Pause with a double tap on Apple Watch and follow your watch run on the iPhone Lock Screen. A private running plan that adapts to every run.
 
 ### What's New (4000)
 
-Auto-pause
-- Stop at a traffic light and your run pauses by itself, then carries on when you run again. The time standing still doesn't count, on iPhone and on Apple Watch.
-- It's on by default. Switch it off in Progress on iPhone, or on the run screen on Apple Watch.
-
-A clearer run screen on Apple Watch
-- The first page shows only what you need while running: time, heart rate, distance and pace with their targets. It fits the screen, no scrolling.
-- Turn the Digital Crown or swipe up for Pause, Finish and the auto-pause switch.
-
-How it works explains when and how auto-pause kicks in.
+Apple Watch
+- Your run on the watch now shows on your iPhone's Lock Screen as a Live Activity, with heart rate, distance and pace. Pause and Finish there act on the watch.
+- Double tap (pinch twice) to pause or resume without touching the screen.
+- A clearer run screen: the first page shows only what you need while running, time, heart rate, distance and pace with their targets, with no scrolling. Turn the Digital Crown or swipe up for Pause and Finish.
+- Auto-Pause from your watch's Workout settings now shows on the run screen, with a tap on your wrist when the run pauses and resumes.
 
 ### Screenshots (refreshed for 1.0.3)
 

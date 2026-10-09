@@ -61,8 +61,9 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
 - Runs are spread over the repeating week: a rest day after the Sunday long run when
   there's one to spare, and no threshold or intervals right next to the long run.
 - Swap days by dragging them in the plan; the watch shows the same adjusted days.
-- Auto-pause: a run pauses after 5 seconds standing still (a traffic light) and resumes
-  once you move again, from GPS speed, on iPhone and Apple Watch. On by default.
+- A run on Apple Watch shows on the iPhone's Lock Screen too, through HealthKit workout
+  mirroring, with Pause and Finish. Auto-pause comes from watchOS (Auto-Pause in the
+  watch's Workout settings), and a double tap pauses or resumes.
 - Live run screens on Apple Watch and iPhone, with a Live Activity and controls on
   the Lock Screen.
 - The plan syncs directly between iPhone and Apple Watch with WatchConnectivity.

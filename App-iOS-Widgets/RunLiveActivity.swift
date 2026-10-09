@@ -163,6 +163,13 @@ private struct LockScreenView: View {
                         .background(Color.orange.opacity(0.18), in: Capsule())
                 }
                 Spacer(minLength: 8)
+                if context.state.heartRate > 0 {
+                    Label("\(Int(context.state.heartRate))", systemImage: "heart.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(.red)
+                        .labelStyle(.titleAndIcon)
+                }
                 Text(context.state.isPaused ? "PAUSED"
                      : RunMetricFormat.duration(context.state.elapsedSeconds))
                     .font(.subheadline.weight(.semibold))

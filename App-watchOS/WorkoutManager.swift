@@ -9,6 +9,11 @@ import TrainingCore
 /// `HKWorkoutRouteBuilder` and attached to the workout, so the route shows up in the
 /// Fitness/Health apps (and can be drawn in-app via MapKit). Delegate callbacks
 /// arrive off the main thread, so UI state is updated on the main queue.
+///
+/// The session is mirrored to the iPhone, which shows the run as a Live Activity
+/// (see `MirroredRunManager` and `RunMirrorUpdate`). Auto-pause is the watch's own:
+/// with Settings > Workout > Auto-Pause on, watchOS reports when the runner stops
+/// and moves again, and the run screen shows it.
 @Observable
 final class WorkoutManager: NSObject, @unchecked Sendable {
     private let store = HKHealthStore()
@@ -16,16 +21,19 @@ final class WorkoutManager: NSObject, @unchecked Sendable {
     private var builder: HKLiveWorkoutBuilder?
     private var routeBuilder: HKWorkoutRouteBuilder?
     private let locationManager = CLLocationManager()
-    /// Pauses the run while the runner stands still and resumes it when they move.
-    private var autoPause = AutoPauseDetector()
-    /// Set at once by the Pause button (the session's own state arrives later), so
-    /// a pause by hand is never resumed by moving.
-    private var pausedByHand = false
+    /// When the last update went to the iPhone, to send about once a second.
+    private var lastMirrorSent = Date.distantPast
+
+    // Today's session, for the targets the iPhone's Live Activity shows. Nil for a free run.
+    private var plannedWorkout: PlannedWorkout?
+    private var zones: PaceZones?
+    private var goalName = ""
 
     // Live, observable metrics.
     var isRunning = false
     var isPaused = false
-    /// The pause came from standing still, so moving again resumes it.
+    /// watchOS paused the run because the runner stopped (Auto-Pause in the
+    /// watch's Workout settings), until they move again.
     var isAutoPaused = false
     var heartRate: Double = 0
     var activeEnergyKcal: Double = 0
@@ -45,18 +53,12 @@ final class WorkoutManager: NSObject, @unchecked Sendable {
         return elapsedSeconds / (distanceMeters / 1_000)
     }
 
-    /// Whether the run pauses itself while the runner stands still. On unless the
-    /// runner turned it off on the run screen.
-    static var isAutoPauseOn: Bool {
-        UserDefaults.standard.object(forKey: autoPauseKey) as? Bool ?? true
-    }
-    static let autoPauseKey = "autoPause"
-
-    func start() {
+    func start(plannedWorkout: PlannedWorkout? = nil, zones: PaceZones? = nil, goalName: String = "") {
         didFinish = false
-        autoPause.reset()
-        pausedByHand = false
         isAutoPaused = false
+        self.plannedWorkout = plannedWorkout
+        self.zones = zones
+        self.goalName = goalName
         let config = HKWorkoutConfiguration()
         config.activityType = .running
         config.locationType = .outdoor
@@ -78,41 +80,43 @@ final class WorkoutManager: NSObject, @unchecked Sendable {
             builder.beginCollection(withStart: startDate) { [weak self] _, error in
                 if let error { DispatchQueue.main.async { self?.lastError = error.localizedDescription } }
             }
+            // Show the run on the iPhone too. Without it nearby the run just records here.
+            session.startMirroringToCompanionDevice { _, _ in }
             DispatchQueue.main.async { self.isRunning = true }
         } catch {
             lastError = error.localizedDescription
         }
     }
 
-    func pause() {
-        pausedByHand = true
-        isAutoPaused = false
-        autoPause.reset()
-        session?.pause()
-    }
+    func pause() { session?.pause() }
+    func resume() { session?.resume() }
 
-    func resume() {
-        pausedByHand = false
-        isAutoPaused = false
-        autoPause.reset()
-        session?.resume()
-    }
-
-    /// Feeds the GPS speed to the auto-pause, unless the runner paused by hand.
-    private func checkAutoPause(_ locations: [CLLocation]) {
-        guard Self.isAutoPauseOn, !pausedByHand, let session else { return }
-        for location in locations where -location.timestamp.timeIntervalSinceNow <= 5 {
-            switch autoPause.update(speed: location.speed, at: location.timestamp) {
-            case .pause:
-                session.pause()
-                DispatchQueue.main.async { self.isAutoPaused = true }
-            case .resume:
-                session.resume()
-                DispatchQueue.main.async { self.isAutoPaused = false }
-            case nil:
-                break
-            }
+    /// Sends the current numbers to the iPhone, at most about once a second.
+    private func sendToPhone(force: Bool = false) {
+        guard let session, force || Date().timeIntervalSince(lastMirrorSent) >= 1 else { return }
+        lastMirrorSent = Date()
+        var step: WorkoutStep?
+        if let plannedWorkout, let zones {
+            step = WorkoutSteps.activeStep(for: plannedWorkout, zones: zones, distanceCovered: distanceMeters)
         }
+        let structured = step.map { $0.kind != .steady } ?? false
+        let update = RunMirrorUpdate(
+            workoutTitle: plannedWorkout.map { Format.workoutTitle($0.type) } ?? "Run",
+            goalName: goalName,
+            targetPaceLower: plannedWorkout?.targetPaceSecPerKm?.lowerBound,
+            targetPaceUpper: plannedWorkout?.targetPaceSecPerKm?.upperBound,
+            targetDistanceMeters: plannedWorkout?.distanceMeters ?? 0,
+            elapsedSeconds: elapsedSeconds,
+            distanceMeters: distanceMeters,
+            heartRate: heartRate,
+            paceSecPerKm: paceSecPerKm,
+            isPaused: isPaused || isAutoPaused,
+            stepLabel: structured ? step?.label ?? "" : "",
+            stepTargetPaceSecPerKm: structured ? step?.targetPaceSecPerKm ?? 0 : 0,
+            stepTargetDistanceMeters: structured ? step?.distanceMeters ?? 0 : 0
+        )
+        guard let data = update.encoded() else { return }
+        session.sendToRemoteWorkoutSession(data: data) { _, _ in }
     }
 
     func end() {
@@ -162,8 +166,15 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
     ) {
         // Mirror the session's paused/running state to the UI.
         switch toState {
-        case .running: DispatchQueue.main.async { self.isPaused = false }
-        case .paused: DispatchQueue.main.async { self.isPaused = true }
+        case .running: DispatchQueue.main.async { self.isPaused = false; self.sendToPhone(force: true) }
+        case .paused: DispatchQueue.main.async { self.isPaused = true; self.sendToPhone(force: true) }
+        case .ended:
+            // Finished here, or with Finish on the iPhone's Live Activity.
+            DispatchQueue.main.async {
+                self.didFinish = true
+                self.isRunning = false
+                self.locationManager.stopUpdatingLocation()
+            }
         default: break
         }
 
@@ -186,6 +197,18 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
     func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
         DispatchQueue.main.async { self.lastError = error.localizedDescription }
     }
+
+    /// watchOS's Auto-Pause: it reports when the runner stops and moves again,
+    /// only if Auto-Pause is on in the watch's Workout settings.
+    func workoutSession(_ workoutSession: HKWorkoutSession, didGenerate event: HKWorkoutEvent) {
+        switch event.type {
+        case .motionPaused: DispatchQueue.main.async { self.isAutoPaused = true; self.sendToPhone(force: true) }
+        case .motionResumed: DispatchQueue.main.async { self.isAutoPaused = false; self.sendToPhone(force: true) }
+        default: break
+        }
+    }
+
+    func workoutSession(_ workoutSession: HKWorkoutSession, didReceiveDataFromRemoteWorkoutSession data: [Data]) {}
 }
 
 // MARK: - CLLocationManagerDelegate
@@ -194,7 +217,6 @@ extension WorkoutManager: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         // Keep only reasonably accurate fixes so the route isn't polluted by noise.
         let filtered = locations.filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 50 }
-        checkAutoPause(filtered.filter { $0.horizontalAccuracy <= 20 })
         guard !filtered.isEmpty, let routeBuilder else { return }
         routeBuilder.insertRouteData(filtered) { [weak self] _, error in
             if let error { DispatchQueue.main.async { self?.lastError = error.localizedDescription } }
@@ -216,7 +238,10 @@ extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
             guard let quantityType = type as? HKQuantityType else { continue }
             updateMetrics(from: builder.statistics(for: quantityType))
         }
-        DispatchQueue.main.async { self.elapsedSeconds = builder.elapsedTime }
+        DispatchQueue.main.async {
+            self.elapsedSeconds = builder.elapsedTime
+            self.sendToPhone()
+        }
     }
 
     func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {}

@@ -10,6 +10,7 @@ struct EndurancrApp: App {
         container = StoredPlan.makeContainer()
         DemoMode.seed(container)
         PlanSync.shared.activate()
+        MirroredRunManager.shared.listen()
     }
 
     var body: some Scene {

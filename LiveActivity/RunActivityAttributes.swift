@@ -24,6 +24,8 @@ struct RunActivityAttributes: ActivityAttributes {
         var stepTargetPaceSecPerKm: Double = 0
         /// Distance of the current step (m); 0 for a steady/free run.
         var stepTargetDistanceMeters: Double = 0
+        /// Heart rate (bpm) when the run is recorded on Apple Watch; 0 otherwise.
+        var heartRate: Double = 0
     }
 
     /// Fixed for the life of the activity.

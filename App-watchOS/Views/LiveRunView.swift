@@ -5,7 +5,10 @@ import WatchKit
 /// Live run screen on two vertical pages, moved between with the Digital Crown or
 /// a swipe. The first holds what matters while running (time, heart rate, distance
 /// and pace with their targets) and fits the screen without scrolling, so the
-/// swipe always reaches the second page: Pause/Resume, Finish, auto-pause and GPS.
+/// swipe always reaches the second page: Pause/Resume, Finish and GPS.
+///
+/// Pause/Resume also sits in the top corner on both pages, and a double tap
+/// (pinching twice) presses it, so a run pauses without touching the screen.
 ///
 /// When today's session is a planned workout, the screen shows step-aware targets:
 /// the current step (e.g. "Rep 3/6") with its own target distance and pace, so an
@@ -19,7 +22,6 @@ struct LiveRunView: View {
     /// Paces for the athlete's current fitness. `nil` = free run.
     var zones: PaceZones?
     @Environment(\.dismiss) private var dismiss
-    @AppStorage(WorkoutManager.autoPauseKey) private var autoPause = true
     @State private var page = Page.metrics
     enum Page { case metrics, controls }
 
@@ -39,6 +41,23 @@ struct LiveRunView: View {
         .tabViewStyle(.verticalPage)
         .navigationTitle(workout.isAutoPaused ? "Auto-paused" : workout.isPaused ? "Paused" : "Running")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    togglePause()
+                } label: {
+                    Image(systemName: workout.isPaused ? "play.fill" : "pause.fill")
+                }
+                .tint(workout.isPaused ? .green : .yellow)
+                .accessibilityLabel(workout.isPaused ? "Resume" : "Pause")
+                // Double tap: pinch index finger and thumb twice.
+                .handGestureShortcut(.primaryAction)
+            }
+        }
+        .onChange(of: workout.isRunning) { _, running in
+            // Finished from the iPhone's Live Activity: close like Finish here.
+            if !running { dismiss() }
+        }
         .onChange(of: activeStep?.index) { old, new in
             // A new interval step began (e.g. warm-up -> first rep): a success tap so
             // the athlete feels the transition without looking at the watch.
@@ -47,7 +66,7 @@ struct LiveRunView: View {
             }
         }
         .onChange(of: workout.isAutoPaused) { _, paused in
-            // Felt at the traffic light without looking: stop, then start.
+            // watchOS's Auto-Pause, felt at the traffic light without looking.
             WKInterfaceDevice.current().play(paused ? .stop : .start)
         }
         .demoFlipPages($page)
@@ -60,7 +79,7 @@ struct LiveRunView: View {
                 Text(Format.duration(workout.elapsedSeconds))
                     .font(.system(.title, design: .rounded).weight(.semibold))
                     .monospacedDigit()
-                    .foregroundStyle(workout.isPaused ? .yellow : .primary)
+                    .foregroundStyle(workout.isPaused || workout.isAutoPaused ? .yellow : .primary)
                 Spacer(minLength: 4)
                 heartRate
             }
@@ -88,12 +107,10 @@ struct LiveRunView: View {
         .padding(.horizontal, 4)
     }
 
-    /// Page 2: the controls, the auto-pause switch and GPS.
+    /// Page 2: the controls and GPS.
     private var controlsPage: some View {
         VStack(spacing: 8) {
             controls
-            Toggle("Auto-pause", isOn: $autoPause)
-                .font(.footnote)
             gpsStatus
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -124,8 +141,7 @@ struct LiveRunView: View {
     private var controls: some View {
         VStack(spacing: 8) {
             Button {
-                WKInterfaceDevice.current().play(.click)
-                workout.isPaused ? workout.resume() : workout.pause()
+                togglePause()
             } label: {
                 Label(workout.isPaused ? "Resume" : "Pause",
                       systemImage: workout.isPaused ? "play.fill" : "pause.fill")
@@ -145,6 +161,11 @@ struct LiveRunView: View {
             .buttonStyle(.glass)
             .controlSize(.large)
         }
+    }
+
+    private func togglePause() {
+        WKInterfaceDevice.current().play(.click)
+        workout.isPaused ? workout.resume() : workout.pause()
     }
 
     private var heartRate: some View {

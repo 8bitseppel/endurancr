@@ -202,7 +202,7 @@ struct WatchTodayView: View {
                 runWorkout = nil
                 runZones = nil
             }
-            workout.start()
+            workout.start(plannedWorkout: runWorkout, zones: runZones, goalName: currentPlan?.goal.name ?? "")
             showLiveRun = true
             // Record this week's completed volume *before* the run so the post-run
             // summary has a true prior baseline (the run isn't in HealthKit yet).

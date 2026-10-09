@@ -39,8 +39,6 @@ final class PhoneWorkoutManager: NSObject, @unchecked Sendable {
     /// Rolling (timestamp, cumulative distance) samples used for current pace.
     private var paceWindow: [(t: TimeInterval, d: Double)] = []
     private let paceWindowSeconds: TimeInterval = 30
-    /// Pauses the run while the runner stands still and resumes it when they move.
-    private var autoPause = AutoPauseDetector()
 
     // Fixed for this run (shown on the Live Activity).
     private var goalName = ""
@@ -54,9 +52,6 @@ final class PhoneWorkoutManager: NSObject, @unchecked Sendable {
     // Live, observable metrics.
     var isRunning = false
     var isPaused = false
-    /// The pause came from standing still, not from the Pause button, so moving
-    /// again resumes it.
-    var isAutoPaused = false
     var distanceMeters: Double = 0
     var elapsedSeconds: TimeInterval = 0
     /// Rolling pace over roughly the last 30s (sec/km).
@@ -144,8 +139,6 @@ final class PhoneWorkoutManager: NSObject, @unchecked Sendable {
         routePointCount = 0
         lastError = nil
         isPaused = false
-        isAutoPaused = false
-        autoPause.reset()
 
         builder.beginCollection(withStart: start) { [weak self] _, error in
             if let error { DispatchQueue.main.async { self?.lastError = error.localizedDescription } }
@@ -187,56 +180,35 @@ final class PhoneWorkoutManager: NSObject, @unchecked Sendable {
     /// is excluded from both moving time and distance, and a `.pause` event is added
     /// to the workout so Health reflects the split.
     func pause() {
-        guard isRunning, !isPaused else { return }
-        holdRun(since: Date())
-        locationManager.stopUpdatingLocation()
-    }
-
-    /// Resumes timing, distance, and GPS after a `pause()` or an auto-pause.
-    func resume() {
-        guard isRunning, isPaused else { return }
-        autoPause.reset()
-        continueRun(since: Date())
-        locationManager.startUpdatingLocation()
-    }
-
-    /// Whether the run pauses itself while the runner stands still. On unless the
-    /// runner turned it off in Progress.
-    static var isAutoPauseOn: Bool {
-        UserDefaults.standard.object(forKey: autoPauseKey) as? Bool ?? true
-    }
-    static let autoPauseKey = "autoPause"
-
-    /// Stops the clock and distance from `since`. GPS keeps running for an auto-pause
-    /// so moving again can resume it.
-    private func holdRun(since: Date, auto: Bool = false) {
-        guard let seg = segmentStart else { return }
-        accumulatedSeconds += max(0, since.timeIntervalSince(seg))
+        guard isRunning, !isPaused, let seg = segmentStart else { return }
+        accumulatedSeconds += Date().timeIntervalSince(seg)
         elapsedSeconds = accumulatedSeconds
         segmentStart = nil
         isPaused = true
-        isAutoPaused = auto
         timer?.invalidate(); timer = nil
+        locationManager.stopUpdatingLocation()
         lastLocation = nil          // so the distance across the paused gap isn't counted
         paceWindow = []
         currentPaceSecPerKm = 0
-        addWorkoutEvent(.pause, at: since)
+        addWorkoutEvent(.pause)
         updateLiveActivity()
     }
 
-    private func continueRun(since: Date) {
-        segmentStart = since
+    /// Resumes timing, distance, and GPS after a `pause()`.
+    func resume() {
+        guard isRunning, isPaused else { return }
+        segmentStart = Date()
         isPaused = false
-        isAutoPaused = false
-        addWorkoutEvent(.resume, at: since)
+        addWorkoutEvent(.resume)
+        locationManager.startUpdatingLocation()
         startTimer()
         updateLiveActivity()
     }
 
-    private func addWorkoutEvent(_ type: HKWorkoutEventType, at date: Date) {
+    private func addWorkoutEvent(_ type: HKWorkoutEventType) {
         guard let builder else { return }
         let event = HKWorkoutEvent(
-            type: type, dateInterval: DateInterval(start: date, duration: 0), metadata: nil
+            type: type, dateInterval: DateInterval(start: Date(), duration: 0), metadata: nil
         )
         builder.addWorkoutEvents([event]) { [weak self] _, error in
             if let error { DispatchQueue.main.async { self?.lastError = error.localizedDescription } }
@@ -248,7 +220,6 @@ final class PhoneWorkoutManager: NSObject, @unchecked Sendable {
         timer?.invalidate()
         timer = nil
         isPaused = false
-        isAutoPaused = false
         segmentStart = nil
         locationManager.stopUpdatingLocation()
         removeLiveActivityControls()
@@ -414,28 +385,17 @@ final class PhoneWorkoutManager: NSObject, @unchecked Sendable {
 
 extension PhoneWorkoutManager: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        // Ignore any fixes buffered around a pause by hand so the gap isn't counted.
-        // During an auto-pause they only tell whether the runner is moving again.
-        guard !isPaused || isAutoPaused else { return }
+        // Ignore any fixes buffered around a pause so the gap isn't counted.
+        guard !isPaused else { return }
         // Keep only accurate fixes so distance/route aren't polluted by noise. 20 m
         // is a converged outdoor fix; the old 50 m let early scatter through and a run
         // begun sitting still immediately showed ~40 m of phantom distance.
-        let accurate = locations.filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 20 }
-        var filtered: [CLLocation] = []
+        let filtered = locations.filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 20 }
+        guard !filtered.isEmpty else { return }
 
-        for location in accurate {
+        for location in filtered {
             // Drop stale/cached fixes CoreLocation replays at startup.
             if -location.timestamp.timeIntervalSinceNow > 5 { continue }
-
-            if Self.isAutoPauseOn {
-                switch autoPause.update(speed: location.speed, at: location.timestamp) {
-                case .pause(let since): holdRun(since: since, auto: true)
-                case .resume(let since): continueRun(since: since)
-                case nil: break
-                }
-            }
-            if isPaused { continue }
-            filtered.append(location)
 
             if let previous = lastLocation {
                 let step = location.distance(from: previous)
@@ -464,7 +424,6 @@ extension PhoneWorkoutManager: CLLocationManagerDelegate {
             }
         }
 
-        guard !filtered.isEmpty else { return }
         recomputeCurrentPace(now: Date().timeIntervalSince1970)
         routePointCount += filtered.count
 
