@@ -41,8 +41,9 @@ for devices in json.load(sys.stdin)["devices"].values():
 echo "==> Booting Simulators"
 PHONE=$(device "$PHONE_TYPE")
 WATCH=$(device "$WATCH_TYPE")
-# 9:41, full bars and battery, like Apple's own screenshots.
-xcrun simctl status_bar "$PHONE" override --time 9:41 --dataNetwork 5g \
+# 10:09, full bars and battery. The watch Simulator has no fixed time, so its
+# clock is set to 10:09 afterwards (scripts/watch-clock.py).
+xcrun simctl status_bar "$PHONE" override --time 10:09 --dataNetwork 5g \
   --cellularBars 4 --wifiBars 3 --batteryState charged --batteryLevel 100
 xcrun simctl ui "$PHONE" appearance dark
 xcrun simctl ui "$WATCH" appearance dark 2>/dev/null || true
@@ -104,5 +105,6 @@ echo "==> Apple Watch"
 rec "$WATCH" app.endurancr.watchkitapp - watch-1-today 312 25
 rec "$WATCH" app.endurancr.watchkitapp run watch-2-run 312 25
 rec "$WATCH" app.endurancr.watchkitapp summary watch-3-summary 312 25
+python3 scripts/watch-clock.py
 
 echo "==> Done"
