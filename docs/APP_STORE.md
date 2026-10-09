@@ -156,7 +156,7 @@ Pause with a double tap on Apple Watch and follow your watch run on the iPhone L
 
 ### What's New (4000)
 
-Use build 19.
+Use build 20.
 
 Apple Watch
 - Your watch run now shows on your iPhone's Lock Screen as a Live Activity, with heart rate, distance and pace. Pause and Finish there act on the watch.
