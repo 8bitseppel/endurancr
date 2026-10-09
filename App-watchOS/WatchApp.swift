@@ -1,9 +1,11 @@
 import SwiftUI
 import SwiftData
 import TrainingCore
+import WatchKit
 
 @main
 struct EndurancrWatchApp: App {
+    @WKApplicationDelegateAdaptor private var appDelegate: WatchAppDelegate
     @State private var health = HealthKitService()
     let container: ModelContainer
 
@@ -44,11 +46,19 @@ struct EndurancrWatchApp: App {
     }
 }
 
+/// watchOS relaunches the app when a run was going and the app crashed; this
+/// hands the still-running workout back to the recorder.
+final class WatchAppDelegate: NSObject, WKApplicationDelegate {
+    func handleActiveWorkoutRecovery() {
+        WorkoutManager.shared.recoverActiveRun()
+    }
+}
+
 #if DEBUG
 private extension WorkoutManager {
     /// A run in progress for Simulator screenshots (see `DemoMode`).
     static var demo: WorkoutManager {
-        let workout = WorkoutManager()
+        let workout = WorkoutManager()  // not `shared`: a demo run never records
         // Two thirds into today's run, right on its target pace.
         let planned = DemoMode.todaysWorkout
         let pace = planned?.targetPaceSecPerKm.map { ($0.lowerBound + $0.upperBound) / 2 } ?? 363

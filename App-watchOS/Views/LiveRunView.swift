@@ -72,14 +72,12 @@ struct LiveRunView: View {
         .demoFlipPages($page, to: .controls)
     }
 
-    /// Page 1: everything needed while running, sized to fit without scrolling.
+    /// Page 1: everything needed while running, on one screen. It never scrolls,
+    /// so the Crown always reaches page 2; large text sizes shrink the numbers.
     private var metricsPage: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
-                Text(Format.duration(workout.elapsedSeconds))
-                    .font(.system(.title, design: .rounded).weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(workout.isPaused || workout.isAutoPaused ? .yellow : .primary)
+                clock
                 Spacer(minLength: 4)
                 heartRate
             }
@@ -101,10 +99,24 @@ struct LiveRunView: View {
                 metric("Pace", Format.pace(workout.paceSecPerKm), tint: .primary)
             }
         }
+        // Numbers shrink a little before the page has to scroll.
         .lineLimit(1)
         .minimumScaleFactor(0.6)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.horizontal, 4)
+    }
+
+    /// The run's time, ticking every second from HealthKit's own count (paused
+    /// time excluded), also in Always On.
+    private var clock: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let seconds = workout.elapsedTime(at: context.date)
+            Text(Format.duration(seconds))
+                .font(.system(.title, design: .rounded).weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(workout.isPaused || workout.isAutoPaused ? .yellow : .primary)
+                .accessibilityLabel("Time \(Duration.seconds(seconds.rounded()).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .wide)))")
+        }
     }
 
     /// Page 2: the controls and GPS.
@@ -187,6 +199,8 @@ struct LiveRunView: View {
                 .monospacedDigit()
                 .foregroundStyle(tint)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label) \(value)")
     }
 
     /// A live value alongside its target, so pace/target and distance/target sit
@@ -211,6 +225,9 @@ struct LiveRunView: View {
                     .monospacedDigit().foregroundStyle(.secondary)
             }
         }
+        // One VoiceOver stop: "Pace 6:42/km, target 6:42/km".
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label) \(value), \(targetLabel.lowercased()) \(targetValue)")
     }
 
     private var gpsStatus: some View {

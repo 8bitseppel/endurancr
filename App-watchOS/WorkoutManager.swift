@@ -21,6 +21,10 @@ import TrainingCore
 @MainActor
 @Observable
 final class WorkoutManager: NSObject {
+    /// The one recorder, so a run can be picked up again after the app crashed
+    /// (`recoverActiveRun`).
+    static let shared = WorkoutManager()
+
     private let store = HKHealthStore()
     private var session: HKWorkoutSession?
     private var builder: HKLiveWorkoutBuilder?
@@ -52,6 +56,12 @@ final class WorkoutManager: NSObject {
     /// for a zero-distance run.
     var didFinish = false
 
+    /// The run's time at `date`, for a clock that ticks every second rather than
+    /// only when HealthKit delivers new data. Paused time doesn't count.
+    func elapsedTime(at date: Date) -> TimeInterval {
+        builder?.elapsedTime(at: date) ?? elapsedSeconds
+    }
+
     /// Current pace (sec/km) derived from distance and elapsed time.
     var paceSecPerKm: Double {
         guard distanceMeters > 0 else { return 0 }
@@ -70,15 +80,7 @@ final class WorkoutManager: NSObject {
 
         do {
             let session = try HKWorkoutSession(healthStore: store, configuration: config)
-            let builder = session.associatedWorkoutBuilder()
-            builder.dataSource = HKLiveWorkoutDataSource(healthStore: store, workoutConfiguration: config)
-            session.delegate = self
-            builder.delegate = self
-            self.session = session
-            self.builder = builder
-            self.routeBuilder = HKWorkoutRouteBuilder(healthStore: store, device: nil)
-
-            beginLocationUpdates()
+            let builder = attach(session)
 
             let startDate = Date()
             session.startActivity(with: startDate)
@@ -91,6 +93,37 @@ final class WorkoutManager: NSObject {
             isRunning = true
         } catch {
             lastError = error.localizedDescription
+        }
+    }
+
+    /// Connects a new or recovered session: its live builder, a route builder and GPS.
+    @discardableResult
+    private func attach(_ session: HKWorkoutSession) -> HKLiveWorkoutBuilder {
+        let builder = session.associatedWorkoutBuilder()
+        builder.dataSource = HKLiveWorkoutDataSource(healthStore: store, workoutConfiguration: session.workoutConfiguration)
+        session.delegate = self
+        builder.delegate = self
+        self.session = session
+        self.builder = builder
+        self.routeBuilder = HKWorkoutRouteBuilder(healthStore: store, device: nil)
+        beginLocationUpdates()
+        return builder
+    }
+
+    /// Picks up a run that was still going when the app crashed or was closed by
+    /// the system. watchOS keeps the workout session alive and relaunches the app;
+    /// HealthKit hands the session back here. GPS points from before the crash
+    /// aren't part of the route, the time, distance and heart rate are.
+    func recoverActiveRun() {
+        store.recoverActiveWorkoutSession { [weak self] session, _ in
+            guard let session else { return }
+            Self.onMain {
+                guard let self, self.session == nil else { return }
+                self.didFinish = false
+                self.attach(session)
+                self.isPaused = session.state == .paused
+                self.isRunning = true
+            }
         }
     }
 
@@ -112,7 +145,7 @@ final class WorkoutManager: NSObject {
             targetPaceLower: plannedWorkout?.targetPaceSecPerKm?.lowerBound,
             targetPaceUpper: plannedWorkout?.targetPaceSecPerKm?.upperBound,
             targetDistanceMeters: plannedWorkout?.distanceMeters ?? 0,
-            elapsedSeconds: elapsedSeconds,
+            elapsedSeconds: elapsedTime(at: .now),
             distanceMeters: distanceMeters,
             heartRate: heartRate,
             paceSecPerKm: paceSecPerKm,

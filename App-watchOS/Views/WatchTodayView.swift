@@ -15,7 +15,7 @@ struct WatchTodayView: View {
     @Environment(HealthKitService.self) private var health
     // Observes the store so a plan synced from the iPhone refreshes the view live.
     @Query(sort: \StoredPlan.updatedAt, order: .reverse) private var storedPlans: [StoredPlan]
-    @State private var workout = WorkoutManager()
+    @State private var workout = WorkoutManager.shared
     @State private var showLiveRun = false
     // Captured at start so the live run screen can show step-aware targets. Nil for
     // a free run (no goal / rest day / nothing scheduled).
@@ -61,6 +61,10 @@ struct WatchTodayView: View {
                         saved: saved, priorWeekCompleted: prior
                     )
                 }
+            }
+            .onChange(of: workout.isRunning, initial: true) { _, running in
+                // A run recovered after a crash: back to its run screen.
+                if running, !showLiveRun { captureToday(); showLiveRun = true }
             }
             .sheet(item: $runSummary, onDismiss: { Task { await loadWeekProgress() } }) { summary in
                 NavigationStack { WatchRunSummaryView(summary: summary) }
@@ -191,17 +195,21 @@ struct WatchTodayView: View {
         weekProgress = PlanProgress.make(plan: plan, completedRuns: runs, asOf: .now)
     }
 
+    /// Captures today's session and its paces so the run screen can show step-aware
+    /// targets; nil for a free run.
+    private func captureToday() {
+        if case .workout(let planned) = state, let plan = currentPlan {
+            runWorkout = planned
+            runZones = plan.paceZones
+        } else {
+            runWorkout = nil
+            runZones = nil
+        }
+    }
+
     private var startButton: some View {
         Button {
-            // Capture today's session and its paces so the run screen can show
-            // step-aware targets; leave nil for a free run.
-            if case .workout(let planned) = state, let plan = currentPlan {
-                runWorkout = planned
-                runZones = plan.paceZones
-            } else {
-                runWorkout = nil
-                runZones = nil
-            }
+            captureToday()
             workout.start(plannedWorkout: runWorkout, zones: runZones, goalName: currentPlan?.goal.name ?? "")
             showLiveRun = true
             // Record this week's completed volume *before* the run so the post-run

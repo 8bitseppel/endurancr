@@ -54,8 +54,16 @@ struct WatchRunSummaryView: View {
         .demoFlipPages($page, to: .week)
     }
 
-    /// Page 1: what the run did, sized to fit without scrolling.
+    /// Page 1: what the run did. It fits without scrolling at the usual text sizes;
+    /// only the largest accessibility sizes fall back to a scroll.
     private var runPage: some View {
+        ViewThatFits(in: .vertical) {
+            runStats
+            ScrollView { runStats }
+        }
+    }
+
+    private var runStats: some View {
         VStack(spacing: 10) {
             saveStatus
 
@@ -74,9 +82,10 @@ struct WatchRunSummaryView: View {
                 stat("PACE", Format.pace(summary.averagePaceSecPerKm), tint: .green)
             }
         }
+        // Numbers shrink a little before the page has to scroll.
         .lineLimit(1)
         .minimumScaleFactor(0.6)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, alignment: .top)
         .padding(.horizontal, 4)
     }
 
