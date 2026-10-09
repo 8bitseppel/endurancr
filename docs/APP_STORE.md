@@ -156,11 +156,20 @@ Pause with a double tap on Apple Watch and follow your watch run on the iPhone L
 
 ### What's New (4000)
 
+Use build 19.
+
 Apple Watch
-- Your run on the watch now shows on your iPhone's Lock Screen as a Live Activity, with heart rate, distance and pace. Pause and Finish there act on the watch.
+- Your watch run now shows on your iPhone's Lock Screen as a Live Activity, with heart rate, distance and pace. Pause and Finish there act on the watch.
 - Double tap (pinch twice) to pause or resume without touching the screen.
-- A clearer run screen: the first page shows only what you need while running, time, heart rate, distance and pace with their targets, with no scrolling. Turn the Digital Crown or swipe up for Pause and Finish.
+- A clearer run screen: the first page shows only what you need while running, time, heart rate, distance and pace with their targets. Turn the Digital Crown or swipe up for Pause and Finish.
+- The run clock now ticks every second, also in Always On.
+- The summary after a run has two pages too: distance, time and pace first, then what's left this week.
 - Auto-Pause from your watch's Workout settings now shows on the run screen, with a tap on your wrist when the run pauses and resumes.
+- If the app closes during a run, your run picks up where it was when it opens again.
+
+Also
+- Better VoiceOver on the watch run screen: each number is read with its label and target.
+- Smaller fixes for steadier recording and saving of runs.
 
 ### Screenshots (refreshed for 1.0.3)
 
