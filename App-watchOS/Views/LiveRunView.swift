@@ -303,6 +303,22 @@ private struct DemoCrownScroll<First: View, Second: View>: View {
             .offset(y: onSecond ? -geometry.size.height : 0)
         }
         .clipped()
+        .overlay {
+            // The page dots the real vertical pages show, measured on a 46 mm
+            // screenshot (points from the screen's top left); the lit one follows
+            // the scroll.
+            Color.clear
+                .ignoresSafeArea()
+                .overlay(alignment: .topLeading) {
+                    VStack(spacing: 2) {
+                        Circle().fill(.white.opacity(onSecond ? 0.36 : 1)).frame(width: 6, height: 6)
+                        Circle().fill(.white.opacity(onSecond ? 1 : 0.36)).frame(width: 6, height: 6)
+                    }
+                    .offset(x: 199.75, y: 60.75)
+                    .ignoresSafeArea()
+                }
+                .allowsHitTesting(false)
+        }
         .task {
             try? await Task.sleep(for: .seconds(4))
             withAnimation(.easeInOut(duration: 1.6)) { onSecond = true }
