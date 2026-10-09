@@ -12,10 +12,11 @@ import UIKit
 ///
 /// A Live Activity can only be started while the app is in the foreground, so if
 /// the run began with the app closed, it appears the next time endurancr is opened
-/// during the run. Delegate callbacks arrive off the main thread, so state is
-/// changed on the main queue, as in `PhoneWorkoutManager`.
+/// during the run. The class lives on the main actor; HealthKit's callbacks arrive
+/// on its own queues and hop over with `onMain`, as in `PhoneWorkoutManager`.
+@MainActor
 @Observable
-final class MirroredRunManager: NSObject, @unchecked Sendable {
+final class MirroredRunManager: NSObject {
     static let shared = MirroredRunManager()
 
     private let store = HKHealthStore()
@@ -30,15 +31,17 @@ final class MirroredRunManager: NSObject, @unchecked Sendable {
     /// as soon as the app launches, so it's called from the app's `init`.
     func listen() {
         store.workoutSessionMirroringStartHandler = { [weak self] session in
-            DispatchQueue.main.async { self?.attach(session) }
+            Self.onMain { self?.attach(session) }
         }
         // A run that began with the app in the background gets its Live Activity
         // once the app comes forward.
         NotificationCenter.default.addObserver(
             forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            guard let self, self.activity == nil, let latest = self.latest else { return }
-            self.startLiveActivity(latest)
+            MainActor.assumeIsolated {
+                guard let self, self.activity == nil, let latest = self.latest else { return }
+                self.startLiveActivity(latest)
+            }
         }
     }
 
@@ -62,13 +65,13 @@ final class MirroredRunManager: NSObject, @unchecked Sendable {
         let center = NotificationCenter.default
         observers = [
             center.addObserver(forName: .runPauseRequested, object: nil, queue: .main) { [weak self] _ in
-                self?.session?.pause()
+                MainActor.assumeIsolated { self?.session?.pause() }
             },
             center.addObserver(forName: .runResumeRequested, object: nil, queue: .main) { [weak self] _ in
-                self?.session?.resume()
+                MainActor.assumeIsolated { self?.session?.resume() }
             },
             center.addObserver(forName: .runFinishRequested, object: nil, queue: .main) { [weak self] _ in
-                self?.session?.end()
+                MainActor.assumeIsolated { self?.session?.end() }
             },
         ]
     }
@@ -79,16 +82,16 @@ final class MirroredRunManager: NSObject, @unchecked Sendable {
             startLiveActivity(update)
         } else if let activity {
             let state = Self.contentState(update)
-            Task { await activity.update(ActivityContent(state: state, staleDate: nil)) }
+            let id = activity.id
+        Task { await Self.liveActivity(id)?.update(ActivityContent(state: state, staleDate: nil)) }
         }
     }
 
     // MARK: Live Activity
 
     private func startLiveActivity(_ update: RunMirrorUpdate) {
-        // Always called on the main queue.
-        let inForeground = MainActor.assumeIsolated { UIApplication.shared.applicationState != .background }
-        guard ActivityAuthorizationInfo().areActivitiesEnabled, inForeground else { return }
+        guard ActivityAuthorizationInfo().areActivitiesEnabled,
+              UIApplication.shared.applicationState != .background else { return }
         let attributes = RunActivityAttributes(
             goalName: update.goalName,
             workoutTitle: update.workoutTitle,
@@ -102,14 +105,26 @@ final class MirroredRunManager: NSObject, @unchecked Sendable {
         )
     }
 
+    /// The running Live Activity with this id. Looked up inside each task rather
+    /// than sent into it, since `Activity` isn't `Sendable`.
+    nonisolated private static func liveActivity(_ id: String) -> Activity<RunActivityAttributes>? {
+        Activity<RunActivityAttributes>.activities.first { $0.id == id }
+    }
+
     private func endLiveActivity() {
         guard let activity else { return }
         let final = latest.map(Self.contentState)
+        let id = activity.id
         Task {
-            await activity.end(final.map { ActivityContent(state: $0, staleDate: nil) },
-                               dismissalPolicy: .after(.now + 5))
+            await Self.liveActivity(id)?.end(final.map { ActivityContent(state: $0, staleDate: nil) },
+                                             dismissalPolicy: .after(.now + 5))
         }
         self.activity = nil
+    }
+
+    /// Runs `work` on the main actor, after anything queued before it.
+    nonisolated private static func onMain(_ work: @escaping @MainActor @Sendable () -> Void) {
+        DispatchQueue.main.async { MainActor.assumeIsolated(work) }
     }
 
     private static func contentState(_ update: RunMirrorUpdate) -> RunActivityAttributes.ContentState {
@@ -132,24 +147,24 @@ final class MirroredRunManager: NSObject, @unchecked Sendable {
 // MARK: - HKWorkoutSessionDelegate
 
 extension MirroredRunManager: HKWorkoutSessionDelegate {
-    func workoutSession(
+    nonisolated func workoutSession(
         _ workoutSession: HKWorkoutSession,
         didChangeTo toState: HKWorkoutSessionState,
         from fromState: HKWorkoutSessionState,
         date: Date
     ) {
         guard toState == .ended || toState == .stopped else { return }
-        DispatchQueue.main.async { self.detach() }
+        Self.onMain { [weak self] in self?.detach() }
     }
 
-    func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {}
+    nonisolated func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {}
 
-    func workoutSession(_ workoutSession: HKWorkoutSession, didReceiveDataFromRemoteWorkoutSession data: [Data]) {
+    nonisolated func workoutSession(_ workoutSession: HKWorkoutSession, didReceiveDataFromRemoteWorkoutSession data: [Data]) {
         guard let update = data.last.flatMap(RunMirrorUpdate.decode) else { return }
-        DispatchQueue.main.async { self.receive(update) }
+        Self.onMain { [weak self] in self?.receive(update) }
     }
 
-    func workoutSession(_ workoutSession: HKWorkoutSession, didDisconnectFromRemoteDeviceWithError error: Error?) {
-        DispatchQueue.main.async { self.detach() }
+    nonisolated func workoutSession(_ workoutSession: HKWorkoutSession, didDisconnectFromRemoteDeviceWithError error: Error?) {
+        Self.onMain { [weak self] in self?.detach() }
     }
 }

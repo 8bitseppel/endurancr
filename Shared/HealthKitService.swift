@@ -124,15 +124,15 @@ final class HealthKitService {
     /// for drawing in-app with MapKit. Returns `[]` if the run has no route.
     func routeCoordinates(for workout: HKWorkout) async -> [CLLocationCoordinate2D] {
         guard let route = await routeSample(for: workout) else { return [] }
-        return await withCheckedContinuation { continuation in
-            var coords: [CLLocationCoordinate2D] = []
-            let query = HKWorkoutRouteQuery(route: route) { _, locations, done, error in
-                if error != nil { continuation.resume(returning: coords); return }
-                if let locations { coords.append(contentsOf: locations.map(\.coordinate)) }
-                if done { continuation.resume(returning: coords) }
+        // The async query hands the points over in order, so nothing is shared
+        // across HealthKit's queue. A failure keeps what arrived before it.
+        var coords: [CLLocationCoordinate2D] = []
+        do {
+            for try await location in HKWorkoutRouteQueryDescriptor(route).results(for: store) {
+                coords.append(location.coordinate)
             }
-            store.execute(query)
-        }
+        } catch {}
+        return coords
     }
 
     private func routeSample(for workout: HKWorkout) async -> HKWorkoutRoute? {

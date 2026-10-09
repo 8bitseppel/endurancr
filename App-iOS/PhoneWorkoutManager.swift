@@ -13,11 +13,12 @@ import TrainingCore
 /// Unlike watchOS there is no `HKWorkoutSession`/`HKLiveWorkoutBuilder` on iOS, so
 /// distance is derived from GPS fixes and elapsed time from a wall-clock timer
 /// (which keeps counting while the app is suspended). Heart rate isn't available
-/// without a watch, so it's omitted. `CLLocationManager` is created on the main
-/// run loop, so its delegate callbacks arrive on the main thread and observable
-/// state is mutated there directly.
+/// without a watch, so it's omitted. The class lives on the main actor:
+/// `CLLocationManager` is created there and calls back there, and HealthKit's
+/// completion handlers hop back with `onMain`.
+@MainActor
 @Observable
-final class PhoneWorkoutManager: NSObject, @unchecked Sendable {
+final class PhoneWorkoutManager: NSObject {
     private let store = HKHealthStore()
     private var builder: HKWorkoutBuilder?
     private var routeBuilder: HKWorkoutRouteBuilder?
@@ -141,7 +142,8 @@ final class PhoneWorkoutManager: NSObject, @unchecked Sendable {
         isPaused = false
 
         builder.beginCollection(withStart: start) { [weak self] _, error in
-            if let error { DispatchQueue.main.async { self?.lastError = error.localizedDescription } }
+            let message = error?.localizedDescription
+            Self.onMain { if let message { self?.lastError = message } }
         }
 
         beginLocationUpdates()
@@ -160,13 +162,13 @@ final class PhoneWorkoutManager: NSObject, @unchecked Sendable {
         let center = NotificationCenter.default
         controlObservers = [
             center.addObserver(forName: .runPauseRequested, object: nil, queue: .main) { [weak self] _ in
-                self?.pause()
+                MainActor.assumeIsolated { self?.pause() }
             },
             center.addObserver(forName: .runResumeRequested, object: nil, queue: .main) { [weak self] _ in
-                self?.resume()
+                MainActor.assumeIsolated { self?.resume() }
             },
             center.addObserver(forName: .runFinishRequested, object: nil, queue: .main) { [weak self] _ in
-                self?.end()
+                MainActor.assumeIsolated { self?.end() }
             },
         ]
     }
@@ -211,7 +213,8 @@ final class PhoneWorkoutManager: NSObject, @unchecked Sendable {
             type: type, dateInterval: DateInterval(start: Date(), duration: 0), metadata: nil
         )
         builder.addWorkoutEvents([event]) { [weak self] _, error in
-            if let error { DispatchQueue.main.async { self?.lastError = error.localizedDescription } }
+            let message = error?.localizedDescription
+            Self.onMain { if let message { self?.lastError = message } }
         }
     }
 
@@ -242,43 +245,37 @@ final class PhoneWorkoutManager: NSObject, @unchecked Sendable {
             ))
         }
 
-        let finalize: () -> Void = { [weak self] in
-            builder.endCollection(withEnd: end) { _, _ in
-                builder.finishWorkout { workout, error in
-                    if let error { DispatchQueue.main.async { self?.lastError = error.localizedDescription } }
-                    guard let self, let workout, let routeBuilder = self.routeBuilder else {
-                        DispatchQueue.main.async { self?.isRunning = false }
-                        return
-                    }
-                    routeBuilder.finishRoute(with: workout, metadata: nil) { _, routeError in
-                        if let routeError {
-                            DispatchQueue.main.async { self.lastError = routeError.localizedDescription }
-                        }
-                        DispatchQueue.main.async {
-                            self.routeBuilder = nil
-                            self.isRunning = false
-                        }
-                    }
-                }
-            }
-        }
+        Task { await saveWorkout(builder: builder, samples: samples, end: end) }
+    }
 
-        if samples.isEmpty {
-            finalize()
-        } else {
-            builder.add(samples) { [weak self] _, error in
-                if let error { DispatchQueue.main.async { self?.lastError = error.localizedDescription } }
-                finalize()
+    /// Saves the finished run with its distance, then attaches the GPS route.
+    private func saveWorkout(builder: HKWorkoutBuilder, samples: [HKSample], end: Date) async {
+        let routeBuilder = self.routeBuilder
+        self.routeBuilder = nil
+        do {
+            if !samples.isEmpty { try await builder.addSamples(samples) }
+            try await builder.endCollection(at: end)
+            if let workout = try await builder.finishWorkout() {
+                try await routeBuilder?.finishRoute(with: workout, metadata: nil)
             }
+        } catch {
+            lastError = error.localizedDescription
         }
+        isRunning = false
+    }
+
+    /// Runs `work` on the main actor, after anything queued before it.
+    nonisolated private static func onMain(_ work: @escaping @MainActor @Sendable () -> Void) {
+        DispatchQueue.main.async { MainActor.assumeIsolated(work) }
     }
 
     // MARK: Timer / location
 
     private func startTimer() {
-        DispatchQueue.main.async {
-            self.timer?.invalidate()
-            self.timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+        timer?.invalidate()
+        // A main run loop timer, so it fires on the main actor.
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
                 guard let self, !self.isPaused, let seg = self.segmentStart else { return }
                 self.elapsedSeconds = self.accumulatedSeconds + Date().timeIntervalSince(seg)
                 self.updateLiveActivity()
@@ -365,14 +362,22 @@ final class PhoneWorkoutManager: NSObject, @unchecked Sendable {
     private func updateLiveActivity() {
         guard let activity else { return }
         let state = currentContentState()
-        Task { await activity.update(ActivityContent(state: state, staleDate: nil)) }
+        let id = activity.id
+        Task { await Self.liveActivity(id)?.update(ActivityContent(state: state, staleDate: nil)) }
+    }
+
+    /// The running Live Activity with this id. Looked up inside each task rather
+    /// than sent into it, since `Activity` isn't `Sendable`.
+    nonisolated private static func liveActivity(_ id: String) -> Activity<RunActivityAttributes>? {
+        Activity<RunActivityAttributes>.activities.first { $0.id == id }
     }
 
     private func endLiveActivity() {
         guard let activity else { return }
         let final = currentContentState()
+        let id = activity.id
         Task {
-            await activity.end(
+            await Self.liveActivity(id)?.end(
                 ActivityContent(state: final, staleDate: nil),
                 dismissalPolicy: .after(.now + 5)
             )
@@ -383,7 +388,9 @@ final class PhoneWorkoutManager: NSObject, @unchecked Sendable {
 
 // MARK: - CLLocationManagerDelegate
 
-extension PhoneWorkoutManager: CLLocationManagerDelegate {
+// Created on the main thread, so CoreLocation calls back there; `@preconcurrency`
+// checks that at run time.
+extension PhoneWorkoutManager: @preconcurrency CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         // Ignore any fixes buffered around a pause so the gap isn't counted.
         guard !isPaused else { return }
@@ -429,13 +436,14 @@ extension PhoneWorkoutManager: CLLocationManagerDelegate {
 
         if let routeBuilder {
             routeBuilder.insertRouteData(filtered) { [weak self] _, error in
-                if let error { DispatchQueue.main.async { self?.lastError = error.localizedDescription } }
+                let message = error?.localizedDescription
+                Self.onMain { if let message { self?.lastError = message } }
             }
         }
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // A transient location failure shouldn't kill the run; just note it.
-        DispatchQueue.main.async { self.lastError = error.localizedDescription }
+        lastError = error.localizedDescription
     }
 }

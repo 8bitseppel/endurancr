@@ -7,15 +7,20 @@ import TrainingCore
 /// `HKLiveWorkoutBuilder`, streaming live metrics and saving the finished
 /// `HKWorkout` to HealthKit. GPS points from CoreLocation are accumulated into an
 /// `HKWorkoutRouteBuilder` and attached to the workout, so the route shows up in the
-/// Fitness/Health apps (and can be drawn in-app via MapKit). Delegate callbacks
-/// arrive off the main thread, so UI state is updated on the main queue.
+/// Fitness/Health apps (and can be drawn in-app via MapKit).
+///
+/// The class lives on the main actor. HealthKit calls its delegates on its own
+/// queues, so those callbacks are `nonisolated`, read what they need there, and hop
+/// to the main actor in order (`onMain`). CoreLocation calls back on the thread
+/// that created the manager, which is the main thread here.
 ///
 /// The session is mirrored to the iPhone, which shows the run as a Live Activity
 /// (see `MirroredRunManager` and `RunMirrorUpdate`). Auto-pause is the watch's own:
 /// with Settings > Workout > Auto-Pause on, watchOS reports when the runner stops
 /// and moves again, and the run screen shows it.
+@MainActor
 @Observable
-final class WorkoutManager: NSObject, @unchecked Sendable {
+final class WorkoutManager: NSObject {
     private let store = HKHealthStore()
     private var session: HKWorkoutSession?
     private var builder: HKLiveWorkoutBuilder?
@@ -78,11 +83,12 @@ final class WorkoutManager: NSObject, @unchecked Sendable {
             let startDate = Date()
             session.startActivity(with: startDate)
             builder.beginCollection(withStart: startDate) { [weak self] _, error in
-                if let error { DispatchQueue.main.async { self?.lastError = error.localizedDescription } }
+                let message = error?.localizedDescription
+                Self.onMain { if let message { self?.lastError = message } }
             }
             // Show the run on the iPhone too. Without it nearby the run just records here.
             session.startMirroringToCompanionDevice { _, _ in }
-            DispatchQueue.main.async { self.isRunning = true }
+            isRunning = true
         } catch {
             lastError = error.localizedDescription
         }
@@ -125,7 +131,13 @@ final class WorkoutManager: NSObject, @unchecked Sendable {
         didFinish = true
         locationManager.stopUpdatingLocation()
         session?.end()
-        DispatchQueue.main.async { self.isRunning = false }
+        isRunning = false
+    }
+
+    /// Runs `work` on the main actor, after anything queued before it, so session
+    /// state changes arrive in the order HealthKit reported them.
+    nonisolated private static func onMain(_ work: @escaping @MainActor @Sendable () -> Void) {
+        DispatchQueue.main.async { MainActor.assumeIsolated(work) }
     }
 
     // MARK: Location / route
@@ -137,20 +149,40 @@ final class WorkoutManager: NSObject, @unchecked Sendable {
         locationManager.startUpdatingLocation()
     }
 
-    private func updateMetrics(from statistics: HKStatistics?) {
-        guard let statistics else { return }
-        DispatchQueue.main.async {
-            switch statistics.quantityType {
-            case HKQuantityType(.heartRate):
-                let unit = HKUnit.count().unitDivided(by: .minute())
-                self.heartRate = statistics.mostRecentQuantity()?.doubleValue(for: unit) ?? self.heartRate
-            case HKQuantityType(.activeEnergyBurned):
-                self.activeEnergyKcal = statistics.sumQuantity()?.doubleValue(for: .kilocalorie()) ?? self.activeEnergyKcal
-            case HKQuantityType(.distanceWalkingRunning):
-                self.distanceMeters = statistics.sumQuantity()?.doubleValue(for: .meter()) ?? self.distanceMeters
-            default:
-                break
-            }
+    /// Saves the finished workout and attaches the recorded route to it. HealthKit
+    /// leaves paused intervals out of the saved workout's duration by itself.
+    private func saveWorkout(endingAt date: Date) async {
+        guard let builder else { return }
+        let routeBuilder = self.routeBuilder
+        self.routeBuilder = nil   // no more GPS points go in once the run is over
+        do {
+            try await builder.endCollection(at: date)
+            guard let workout = try await builder.finishWorkout() else { return }
+            try await routeBuilder?.finishRoute(with: workout, metadata: nil)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+}
+
+/// One statistic the live builder collected, read where HealthKit delivered it.
+private enum LiveMetric: Sendable {
+    case heartRate(Double), energy(Double), distance(Double)
+
+    init?(_ statistics: HKStatistics?) {
+        guard let statistics else { return nil }
+        switch statistics.quantityType {
+        case HKQuantityType(.heartRate):
+            guard let bpm = statistics.mostRecentQuantity()?.doubleValue(for: .count().unitDivided(by: .minute())) else { return nil }
+            self = .heartRate(bpm)
+        case HKQuantityType(.activeEnergyBurned):
+            guard let kcal = statistics.sumQuantity()?.doubleValue(for: .kilocalorie()) else { return nil }
+            self = .energy(kcal)
+        case HKQuantityType(.distanceWalkingRunning):
+            guard let meters = statistics.sumQuantity()?.doubleValue(for: .meter()) else { return nil }
+            self = .distance(meters)
+        default:
+            return nil
         }
     }
 }
@@ -158,91 +190,97 @@ final class WorkoutManager: NSObject, @unchecked Sendable {
 // MARK: - HKWorkoutSessionDelegate
 
 extension WorkoutManager: HKWorkoutSessionDelegate {
-    func workoutSession(
+    nonisolated func workoutSession(
         _ workoutSession: HKWorkoutSession,
         didChangeTo toState: HKWorkoutSessionState,
         from fromState: HKWorkoutSessionState,
         date: Date
     ) {
-        // Mirror the session's paused/running state to the UI.
-        switch toState {
-        case .running: DispatchQueue.main.async { self.isPaused = false; self.sendToPhone(force: true) }
-        case .paused: DispatchQueue.main.async { self.isPaused = true; self.sendToPhone(force: true) }
-        case .ended:
-            // Finished here, or with Finish on the iPhone's Live Activity.
-            DispatchQueue.main.async {
-                self.didFinish = true
-                self.isRunning = false
-                self.locationManager.stopUpdatingLocation()
-            }
-        default: break
-        }
-
-        // When the session ends, finalize collection, save the workout, and attach
-        // the recorded GPS route to it. HealthKit excludes paused intervals from the
-        // saved workout's duration automatically.
-        guard toState == .ended, let builder else { return }
-        builder.endCollection(withEnd: date) { [weak self] _, _ in
-            builder.finishWorkout { workout, error in
-                if let error { DispatchQueue.main.async { self?.lastError = error.localizedDescription } }
-                guard let self, let workout, let routeBuilder = self.routeBuilder else { return }
-                routeBuilder.finishRoute(with: workout, metadata: nil) { _, routeError in
-                    if let routeError { DispatchQueue.main.async { self.lastError = routeError.localizedDescription } }
-                    self.routeBuilder = nil
-                }
+        Self.onMain { [weak self] in
+            guard let self else { return }
+            switch toState {
+            case .running:
+                isPaused = false
+                sendToPhone(force: true)
+            case .paused:
+                isPaused = true
+                sendToPhone(force: true)
+            case .ended:
+                // Finished here, or with Finish on the iPhone's Live Activity.
+                didFinish = true
+                isRunning = false
+                locationManager.stopUpdatingLocation()
+                Task { await self.saveWorkout(endingAt: date) }
+            default:
+                break
             }
         }
     }
 
-    func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
-        DispatchQueue.main.async { self.lastError = error.localizedDescription }
+    nonisolated func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
+        let message = error.localizedDescription
+        Self.onMain { [weak self] in self?.lastError = message }
     }
 
     /// watchOS's Auto-Pause: it reports when the runner stops and moves again,
     /// only if Auto-Pause is on in the watch's Workout settings.
-    func workoutSession(_ workoutSession: HKWorkoutSession, didGenerate event: HKWorkoutEvent) {
-        switch event.type {
-        case .motionPaused: DispatchQueue.main.async { self.isAutoPaused = true; self.sendToPhone(force: true) }
-        case .motionResumed: DispatchQueue.main.async { self.isAutoPaused = false; self.sendToPhone(force: true) }
-        default: break
+    nonisolated func workoutSession(_ workoutSession: HKWorkoutSession, didGenerate event: HKWorkoutEvent) {
+        let type = event.type
+        guard type == .motionPaused || type == .motionResumed else { return }
+        Self.onMain { [weak self] in
+            self?.isAutoPaused = type == .motionPaused
+            self?.sendToPhone(force: true)
         }
     }
 
-    func workoutSession(_ workoutSession: HKWorkoutSession, didReceiveDataFromRemoteWorkoutSession data: [Data]) {}
+    nonisolated func workoutSession(_ workoutSession: HKWorkoutSession, didReceiveDataFromRemoteWorkoutSession data: [Data]) {}
 }
 
 // MARK: - CLLocationManagerDelegate
 
 extension WorkoutManager: CLLocationManagerDelegate {
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        // Keep only reasonably accurate fixes so the route isn't polluted by noise.
-        let filtered = locations.filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 50 }
-        guard !filtered.isEmpty, let routeBuilder else { return }
-        routeBuilder.insertRouteData(filtered) { [weak self] _, error in
-            if let error { DispatchQueue.main.async { self?.lastError = error.localizedDescription } }
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        // The manager was created on the main thread, so it calls back there.
+        MainActor.assumeIsolated {
+            // Keep only reasonably accurate fixes so the route isn't polluted by noise.
+            let filtered = locations.filter { $0.horizontalAccuracy >= 0 && $0.horizontalAccuracy <= 50 }
+            guard !filtered.isEmpty, let routeBuilder else { return }
+            routeBuilder.insertRouteData(filtered) { [weak self] _, error in
+                let message = error?.localizedDescription
+                Self.onMain { if let message { self?.lastError = message } }
+            }
+            routePointCount += filtered.count
         }
-        DispatchQueue.main.async { self.routePointCount += filtered.count }
     }
 
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // A transient location failure shouldn't kill the run; just note it.
-        DispatchQueue.main.async { self.lastError = error.localizedDescription }
+        let message = error.localizedDescription
+        MainActor.assumeIsolated { lastError = message }
     }
 }
 
 // MARK: - HKLiveWorkoutBuilderDelegate
 
 extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
-    func workoutBuilder(_ builder: HKLiveWorkoutBuilder, didCollectDataOf collectedTypes: Set<HKSampleType>) {
-        for type in collectedTypes {
-            guard let quantityType = type as? HKQuantityType else { continue }
-            updateMetrics(from: builder.statistics(for: quantityType))
+    nonisolated func workoutBuilder(_ builder: HKLiveWorkoutBuilder, didCollectDataOf collectedTypes: Set<HKSampleType>) {
+        let metrics = collectedTypes.compactMap { type in
+            (type as? HKQuantityType).flatMap { LiveMetric(builder.statistics(for: $0)) }
         }
-        DispatchQueue.main.async {
-            self.elapsedSeconds = builder.elapsedTime
-            self.sendToPhone()
+        let elapsed = builder.elapsedTime
+        Self.onMain { [weak self] in
+            guard let self else { return }
+            for metric in metrics {
+                switch metric {
+                case .heartRate(let bpm): heartRate = bpm
+                case .energy(let kcal): activeEnergyKcal = kcal
+                case .distance(let meters): distanceMeters = meters
+                }
+            }
+            elapsedSeconds = elapsed
+            sendToPhone()
         }
     }
 
-    func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {}
+    nonisolated func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {}
 }
