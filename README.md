@@ -52,7 +52,7 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   kilometres onto later days:
   - 90% or more of the planned distance over two weeks keeps it building
     (Pfitzinger's benchmark). 75 to 90% holds the week. Below that it rebuilds from
-    what you ran, at most 10% more a week, and the next hard session becomes easy.
+    what you ran, at most 10% more a week, and one hard session that week becomes easy.
   - After more than 5 days off, paces ease by Daniels' table and easy-only weeks
     bring you back at a share of your volume before the break.
   - No run is planned more than 10% longer than your longest of the last 30 days

@@ -13,6 +13,10 @@ struct WatchTodayView: View {
     static let plumInk = Color(red: 0x24 / 255, green: 0x10 / 255, blue: 0x30 / 255)
 
     @Environment(HealthKitService.self) private var health
+    @Environment(\.scenePhase) private var scenePhase
+    /// Today, refreshed when the app comes back, so a watch app kept in memory
+    /// overnight shows this morning's session, not yesterday's.
+    @State private var today = Calendar.current.startOfDay(for: .now)
     // Observes the store so a plan synced from the iPhone refreshes the view live.
     @Query(sort: \StoredPlan.updatedAt, order: .reverse) private var storedPlans: [StoredPlan]
     @State private var workout = WorkoutManager.shared
@@ -41,7 +45,12 @@ struct WatchTodayView: View {
                 ScrollView { home(compact: false) }
             }
             .containerBackground(Color.accentColor.opacity(0.45).gradient, for: .navigation)
-            .task(id: storedPlans.first?.updatedAt) { await loadWeekProgress() }
+            .task(id: "\(storedPlans.first?.updatedAt.timeIntervalSince1970 ?? 0)-\(today.timeIntervalSince1970)") {
+                await loadWeekProgress()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { today = Calendar.current.startOfDay(for: .now) }
+            }
             .navigationDestination(isPresented: $showLiveRun) {
                 LiveRunView(workout: workout, plannedWorkout: runWorkout, zones: runZones)
             }
@@ -133,13 +142,21 @@ struct WatchTodayView: View {
                 Text(Format.paceRange(planned.targetPaceSecPerKm))
                     .font(.footnote).monospacedDigit()
                     .foregroundStyle(.secondary)
+                // Why the plan changed today, from the iPhone (e.g. shorter while
+                // easing back in after a break).
+                if let note = Self.adaptationNote(planned), !compact {
+                    Text(note)
+                        .font(.caption2).foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Today, \(Format.workoutTitle(planned.type)), \(Format.distance(planned.distanceMeters))")
+            .accessibilityLabel("Today, \(Format.workoutTitle(planned.type)), \(Format.distance(planned.distanceMeters))"
+                                + (Self.adaptationNote(planned).map { ", \($0)" } ?? ""))
             .frame(maxWidth: .infinity, alignment: .leading)
             weekRing(compact: compact)
-        case .rest:
-            message("Rest day", "Recover well.", systemImage: "moon.zzz.fill")
+        case .rest(let note):
+            message("Rest day", note.isEmpty ? "Recover well." : note, systemImage: "moon.zzz.fill")
             weekRing(compact: compact)
         case .noSessionToday:
             message("Nothing scheduled", "Start a free run anytime.", systemImage: "calendar")
@@ -251,17 +268,27 @@ struct WatchTodayView: View {
 
     private enum TodayState {
         case workout(PlannedWorkout)
-        case rest
+        /// A rest day, with the plan's reason (e.g. the iPhone made it an easier week).
+        case rest(note: String)
         case noSessionToday
         case noGoal
+    }
+
+    /// The workout's note when the plan adapted it, not the plan's standard
+    /// description of the session type.
+    static func adaptationNote(_ workout: PlannedWorkout) -> String? {
+        let standard = ["", "Easy run", "Long run, easy and conversational",
+                        "Long run, finish last third at marathon pace"]
+        guard !standard.contains(workout.notes), workout.structure == nil || workout.type == .easy else { return nil }
+        return workout.notes
     }
 
     private var state: TodayState {
         guard let plan = currentPlan else { return .noGoal }
         guard let planned = plan.allWorkouts.first(where: {
-            Calendar.current.isDate($0.date, inSameDayAs: .now)
+            Calendar.current.isDate($0.date, inSameDayAs: today)
         }) else { return .noSessionToday }
-        return planned.type == .rest ? .rest : .workout(planned)
+        return planned.type == .rest ? .rest(note: planned.notes) : .workout(planned)
     }
 
     private var currentPlan: TrainingPlan? {

@@ -26,8 +26,11 @@ final class PlanCoordinator {
     /// Every change is pushed to the watch, so a swap, a vacation or a fresh
     /// adaptation shows there too.
     private(set) var currentPlan: TrainingPlan? {
-        didSet { syncToWatch() }
+        didSet { if !isLoading { syncToWatch() } }
     }
+    /// Set while loading the stored inputs at launch: that plan isn't adapted yet,
+    /// so it isn't pushed to the watch (which keeps the last adapted one).
+    private var isLoading = false
     private(set) var recentRuns: [CompletedRun] = []
     private(set) var restingHeartRates: [RestingHeartRateSample] = []
     private(set) var fatigue: FatigueAssessment?
@@ -42,6 +45,8 @@ final class PlanCoordinator {
     }
 
     private func loadLatest() {
+        isLoading = true
+        defer { isLoading = false }
         inputs = storedEntity?.inputs
         currentPlan = regeneratedBasePlan()
     }
@@ -80,7 +85,9 @@ final class PlanCoordinator {
     /// A fresh progress snapshot for the dashboard.
     /// The honest look at the goal: finish-time ranges and how likely the target is.
     var outlook: GoalOutlook? {
-        guard let plan = currentPlan, let buddy else { return nil }
+        guard let plan = currentPlan, let buddy,
+              Calendar.current.startOfDay(for: plan.goal.raceDate) >= Calendar.current.startOfDay(for: .now)
+        else { return nil }   // after race day there's nothing left to predict
         return GoalOutlook.make(plan: plan, buddy: buddy, completedRuns: recentRuns, asOf: .now, calendar: .current)
     }
 
@@ -90,6 +97,7 @@ final class PlanCoordinator {
         guard let inputs else { return }
         var goal = inputs.goal
         goal.targetTimeSeconds = seconds
+        buddy = nil   // no outlook from the old status for the new plan
         try update(goal: goal, fitness: inputs.fitness)
         await refreshAdaptation()
     }

@@ -79,6 +79,7 @@ final class MirroredRunManager: NSObject {
     }
 
     private func receive(_ update: RunMirrorUpdate) {
+        guard session != nil else { return }   // the run already ended here
         let pauseChanged = latest?.isPaused != update.isPaused
         latest = update
         if activity == nil {

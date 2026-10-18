@@ -29,14 +29,21 @@ final class PlanDragUITests: XCTestCase {
         _ = app.navigationBars.firstMatch.waitForExistence(timeout: 10)
         // Scroll until tomorrow and two days later are both on screen.
         let window = app.windows.firstMatch
+        // Slow swipes: a fast one can fling the rows past the screen, and rows
+        // off screen aren't in the list at all.
         for _ in 0..<30 {
             let t = element(app, startingWith: day(3))
             if t.exists, t.isHittable, t.frame.maxY < window.frame.maxY - 200 { break }
-            app.swipeUp(velocity: .fast)
+            app.swipeUp(velocity: .slow)
         }
         let fromRow = element(app, startingWith: day(4))
-        let toRow = element(app, startingWith: day(3))
-        XCTAssertTrue(toRow.waitForExistence(timeout: 5), "row two days later")
+        // A nearby day with a different session, so the swap shows (two identical
+        // easy runs would look the same swapped).
+        func content(_ e: XCUIElement) -> String { e.label.components(separatedBy: ", ").dropFirst().joined(separator: ", ") }
+        let toOffset = [3, 5, 2, 6].first { element(app, startingWith: day($0)).exists
+            && content(element(app, startingWith: day($0))) != content(fromRow) } ?? 3
+        let toRow = element(app, startingWith: day(toOffset))
+        XCTAssertTrue(toRow.waitForExistence(timeout: 5), "a nearby row with a different session")
         let before = (fromRow.label, toRow.label)
         save("1-before")
 
@@ -48,7 +55,7 @@ final class PlanDragUITests: XCTestCase {
         sleep(1)
         save("2-after")
 
-        let after = (element(app, startingWith: day(4)).label, element(app, startingWith: day(3)).label)
+        let after = (element(app, startingWith: day(4)).label, element(app, startingWith: day(toOffset)).label)
         print("DRAG before: \(before)\nDRAG after: \(after)")
         XCTAssertNotEqual(before.0, after.0, "the dragged day changed")
     }

@@ -74,7 +74,8 @@ public struct TrainingBuddy: Sendable {
             .sorted { $0.date < $1.date }
         let planRuns = runs.filter { calendar.startOfDay(for: $0.date) >= planStart }
 
-        let longest = Self.longestRun(in: runs, days: 30, before: today, calendar: calendar)
+        let longest = Self.longestRun(in: runs.filter { calendar.startOfDay(for: $0.date) < today },
+                                      days: 30, before: today, calendar: calendar)
         let recentWeekly = Self.distance(of: runs, from: day(-14, today, calendar), to: today, calendar: calendar) / 2
         let completion = completionRatio(plan: plan, runs: runs, planStart: planStart, today: today, calendar: calendar)
         let breakDays = Self.longestBreak(planRuns: planRuns, planStart: planStart, today: today,
@@ -86,6 +87,15 @@ public struct TrainingBuddy: Sendable {
             vdotFactor: 1, message: ""
         )
 
+        // No runs in the plan yet: nothing to judge (and no Health access looks the
+        // same), so the plan stays as it is.
+        if planRuns.isEmpty {
+            status.message = completion == nil
+                ? "Every run you do shapes the weeks ahead."
+                : "No runs from Apple Health yet. If you've been running, check that endurancr may read your workouts in the Health app."
+            status.completion = nil
+            return status
+        }
         if let ret = returnFromBreak(planRuns: planRuns, planStart: planStart, today: today, calendar: calendar) {
             status.phase = .easingBack(daysOff: ret.daysOff, until: ret.until)
             status.vdotFactor = Self.vdotFactor(daysOff: ret.daysOff)
@@ -124,13 +134,22 @@ public struct TrainingBuddy: Sendable {
         let today = calendar.startOfDay(for: asOf)
         var updated = plan
         applyWeeklyCaps(&updated, status: status, completedRuns: completedRuns, today: today, calendar: calendar)
-        if status.isEasingBack {
-            easeQuality(&updated, from: today, onlyFirst: false, note: "Easy for now while we ease back in", calendar: calendar)
-        } else if status.phase == .rebuilding || missedQuality(plan: plan, runs: completedRuns, today: today, calendar: calendar) {
-            easeQuality(&updated, from: today, onlyFirst: true,
+        let off = plan.effectiveUnavailablePeriods(calendar: calendar)
+        // Today keeps the plan it had this morning, run or not, so finishing a run
+        // never reshapes the week; only runs before today count.
+        let firstOpen = today
+        if case .easingBack(_, let until) = status.phase {
+            // Easy-only for the return period, not beyond it.
+            easeQuality(&updated, from: firstOpen, before: until, onlyFirst: false,
+                        note: "Easy for now while we ease back in", calendar: calendar)
+        } else if status.phase == .rebuilding
+                    || (status.phase != .starting && missedQuality(plan: plan, runs: completedRuns, today: today, calendar: calendar)) {
+            // One hard session this week, not every one from now on.
+            let weekEnd = plan.weeks.first { contains($0, today, calendar) }.map { day(7, $0.startDate, calendar) } ?? day(7, today, calendar)
+            easeQuality(&updated, from: firstOpen, before: weekEnd, onlyFirst: true,
                         note: "Easy instead of a hard session, the last days were lighter than planned", calendar: calendar)
         }
-        capSingleRuns(&updated, longestRecent: status.longestRecentMeters, from: today, calendar: calendar)
+        capSingleRuns(&updated, longestRecent: status.longestRecentMeters, from: firstOpen, skipping: off, calendar: calendar)
         return updated
     }
 
@@ -250,7 +269,9 @@ public struct TrainingBuddy: Sendable {
                 cap = reference * ret.share(today)
             }
         case .holding:
-            cap = current > 0 ? plan.weeks[current - 1].plannedVolumeMeters : nil
+            // Last week's planned level, but never more than 10% over what was run.
+            let last = current > 0 ? plan.weeks[current - 1].plannedVolumeMeters : plan.weeks[current].plannedVolumeMeters
+            cap = min(last, max(status.recentWeeklyMeters * 1.10, 0.5 * plan.weeks[current].plannedVolumeMeters))
         case .rebuilding:
             cap = max(status.recentWeeklyMeters * 1.10, 0.5 * plan.weeks[current].plannedVolumeMeters)
         case .onTrack, .starting:
@@ -282,7 +303,8 @@ public struct TrainingBuddy: Sendable {
                 if w > current { break }   // met the plan again: the rest stays as planned
                 continue
             }
-            scaleWeek(&plan.weeks[w], to: weekCap, completedRuns: completedRuns, today: today, note: note, calendar: calendar)
+            scaleWeek(&plan.weeks[w], to: weekCap, completedRuns: completedRuns, today: today,
+                      off: plan.effectiveUnavailablePeriods(calendar: calendar), note: note, calendar: calendar)
         }
     }
 
@@ -291,16 +313,17 @@ public struct TrainingBuddy: Sendable {
     /// stays the longest; a run that would end up under 2 km becomes rest.
     private func scaleWeek(
         _ week: inout TrainingWeek, to cap: Double, completedRuns: [CompletedRun], today: Date,
-        note: String, calendar: Calendar
+        off: [UnavailablePeriod], note: String, calendar: Calendar
     ) {
         let start = calendar.startOfDay(for: week.startDate)
         let end = day(7, start, calendar)
+        // Runs done this week before today; today's session is still part of the plan.
         let done = Self.distance(of: completedRuns, from: start, to: min(end, today), calendar: calendar)
-        let ranToday = completedRuns.contains { calendar.isDate($0.date, inSameDayAs: today) }
         let future = week.workouts.indices.filter {
             let w = week.workouts[$0]
             let d = calendar.startOfDay(for: w.date)
-            return w.type.isRunning && w.type != .raceDay && (d > today || (d == today && !ranToday))
+            return w.type.isRunning && w.type != .raceDay && d >= today
+                && !off.contains { $0.contains(d, calendar: calendar) }   // time off is blanked anyway
         }
         let remaining = future.reduce(0.0) { $0 + week.workouts[$1].distanceMeters }
         guard remaining > 0 else { return }
@@ -326,13 +349,20 @@ public struct TrainingBuddy: Sendable {
 
     /// Turns hard sessions from `from` on into easy runs: all of them, or only the
     /// next one.
-    private func easeQuality(_ plan: inout TrainingPlan, from today: Date, onlyFirst: Bool, note: String, calendar: Calendar) {
+    private func easeQuality(
+        _ plan: inout TrainingPlan, from today: Date, before end: Date, onlyFirst: Bool, note: String, calendar: Calendar
+    ) {
         let easy = plan.paceZones.easySecPerKm
+        // A session already eased for fatigue counts as this week's easier one.
+        if onlyFirst, plan.allWorkouts.contains(where: {
+            let d = calendar.startOfDay(for: $0.date)
+            return d >= today && d < end && $0.notes.hasPrefix("Eased to easy")
+        }) { return }
         for w in plan.weeks.indices {
             for i in plan.weeks[w].workouts.indices {
                 let workout = plan.weeks[w].workouts[i]
-                guard AdaptationEngine.qualityTypes.contains(workout.type),
-                      calendar.startOfDay(for: workout.date) >= today else { continue }
+                let d = calendar.startOfDay(for: workout.date)
+                guard AdaptationEngine.qualityTypes.contains(workout.type), d >= today, d < end else { continue }
                 plan.weeks[w].workouts[i].type = .easy
                 plan.weeks[w].workouts[i].targetPaceSecPerKm = (easy * 0.97)...(easy * 1.03)
                 plan.weeks[w].workouts[i].structure = nil
@@ -360,13 +390,20 @@ public struct TrainingBuddy: Sendable {
     private func hardSessionsSlower(plan: TrainingPlan, runs: [CompletedRun], today: Date, calendar: Calendar) -> Bool {
         let from = day(-28, today, calendar)
         var slow = 0, total = 0
+        let easyPace = plan.paceZones.easySecPerKm
         for w in plan.allWorkouts where [.threshold, .interval, .marathonPace].contains(w.type) {
             let d = calendar.startOfDay(for: w.date)
-            guard d >= from, d < today, let target = w.targetPaceSecPerKm,
-                  let run = runs.first(where: { calendar.startOfDay(for: $0.date) == d && $0.distanceMeters > 0 })
+            guard d >= from, d < today, let target = w.targetPaceSecPerKm, w.distanceMeters > 0,
+                  let run = runs.first(where: { calendar.startOfDay(for: $0.date) == d && $0.distanceMeters > 0 }),
+                  run.averagePaceSecPerKm < easyPace   // run hard at all, not as an easy day
             else { continue }
+            // The pace the whole session should average: work at the slow end of
+            // its target, warm-up, cool-down and recoveries at easy pace.
+            let work = w.structure.map { Double($0.reps) * $0.workMeters } ?? w.distanceMeters
+            let rest = max(0, w.distanceMeters - work)
+            let expected = (work * target.upperBound + rest * easyPace * 1.03) / w.distanceMeters
             total += 1
-            if run.averagePaceSecPerKm > target.upperBound * 1.03 { slow += 1 }
+            if run.averagePaceSecPerKm > expected * 1.03 { slow += 1 }
         }
         return slow >= 2 && Double(slow) >= Double(total) * 2 / 3
     }
@@ -376,15 +413,19 @@ public struct TrainingBuddy: Sendable {
     /// No upcoming run more than 10% longer than the longest run so far, counting
     /// the runs planned before it as done (Frandsen et al. 2025). Without a run in
     /// the last 30 days there's nothing to measure against, so nothing changes.
-    private func capSingleRuns(_ plan: inout TrainingPlan, longestRecent: Double, from today: Date, calendar: Calendar) {
+    private func capSingleRuns(
+        _ plan: inout TrainingPlan, longestRecent: Double, from today: Date, skipping off: [UnavailablePeriod], calendar: Calendar
+    ) {
         guard longestRecent >= 3_000 else { return }
         var longest = longestRecent
         let order = plan.weeks.indices.flatMap { w in plan.weeks[w].workouts.indices.map { (w, $0) } }
             .sorted { plan.weeks[$0.0].workouts[$0.1].date < plan.weeks[$1.0].workouts[$1.1].date }
         for (w, i) in order {
             let workout = plan.weeks[w].workouts[i]
-            guard workout.type.isRunning, workout.type != .raceDay,
-                  calendar.startOfDay(for: workout.date) >= today else { continue }
+            let d = calendar.startOfDay(for: workout.date)
+            // Days off won't be run, so they don't count as done either.
+            guard workout.type.isRunning, workout.type != .raceDay, d >= today,
+                  !off.contains(where: { $0.contains(d, calendar: calendar) }) else { continue }
             let cap = (longest * 1.10 / 100).rounded(.down) * 100
             if workout.distanceMeters > cap {
                 plan.weeks[w].workouts[i].distanceMeters = cap

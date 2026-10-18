@@ -64,9 +64,13 @@ public struct GoalOutlook: Sendable, Equatable {
         let trainingWeeks = max(0, weeksLeft - 2)   // the taper doesn't add fitness
         let gain = plan.isMaintenance ? 0 : trainingWeeks / 8 * consistency
 
+        // Weekly distance over the last 4 weeks, or the plan so far if it's younger.
+        let planStart = TrainingBuddy.firstRunDay(of: plan, calendar: calendar) ?? today
+        let windowStart = max(planStart, calendar.date(byAdding: .day, value: -28, to: today) ?? today)
+        let windowWeeks = max(1, Double((calendar.dateComponents([.day], from: windowStart, to: today).day ?? 0) + 1) / 7)
         let recentKmPerWeek = TrainingBuddy.distance(
-            of: completedRuns, from: calendar.date(byAdding: .day, value: -28, to: today) ?? today,
-            to: calendar.date(byAdding: .day, value: 1, to: today) ?? today, calendar: calendar) / 4 / 1_000
+            of: completedRuns, from: windowStart,
+            to: calendar.date(byAdding: .day, value: 1, to: today) ?? today, calendar: calendar) / min(4, windowWeeks) / 1_000
         // The plan's last 6 build weeks, at the share of the plan being run lately.
         let buildWeeks = plan.weeks.filter { $0.phase != .taper && $0.phase != .raceWeek }.suffix(6)
         let buildMeters: Double = buildWeeks.map(\.plannedVolumeMeters).reduce(0, +)
@@ -119,8 +123,10 @@ public struct GoalOutlook: Sendable, Equatable {
         let planDays = TrainingBuddy.firstRunDay(of: plan, calendar: calendar)
             .map { calendar.dateComponents([.day], from: $0, to: today).day ?? 0 } ?? 0
         let totalWeeks = weeksLeft + Double(planDays) / 7
+        var lacksBase = false
         if goal.race == .marathon, totalWeeks < 18, planDays < 28, recentKmPerWeek < 40 || longest28 < 16_000 {
             verdict = .unlikely
+            lacksBase = true
             reasons.append("Marathon plans usually start from about 40 km a week and a long run near 16 km; the last 4 weeks were \(Int(recentKmPerWeek.rounded())) km a week.")
         }
         outlook.verdict = verdict
@@ -132,19 +138,27 @@ public struct GoalOutlook: Sendable, Equatable {
         case .withinReach:
             reasons.insert("\(targetText) is within reach if the coming weeks go about as planned.", at: 0)
         case .stretch, .unlikely:
+            // Only ever a slower time than the target; without the base, a later race.
             let realistic = Self.rounded(raceTime, race: goal.race)
-            outlook.suggestedTargetSeconds = realistic
+            outlook.suggestedTargetSeconds = realistic > target ? realistic : nil
             // Weeks more it would take at 1 VDOT per 8 weeks, if training keeps up.
-            if gap > 0, gap <= 3 {
+            if lacksBase {
+                outlook.suggestedRaceDate = calendar.date(byAdding: .day, value: 18 * 7, to: today)
+            } else if gap > 0, gap <= 3 {
                 let extraWeeks = Int((gap * 8).rounded(.up))
                 outlook.suggestedRaceDate = calendar.date(byAdding: .day, value: extraWeeks * 7, to: race)
             }
             let start = verdict == .stretch
                 ? "\(targetText) is a stretch for this race: it needs most weeks to go to plan."
                 : "At this rate, \(targetText) is unlikely for this race."
-            var line = "\(start) \(Self.format(realistic)) looks realistic"
-            if let later = outlook.suggestedRaceDate {
-                line += ", or keep \(targetText) for a race around \(later.formatted(.dateTime.month(.wide).year()))"
+            var line = start
+            if let realistic = outlook.suggestedTargetSeconds {
+                line += " \(Self.format(realistic)) looks realistic"
+                if let later = outlook.suggestedRaceDate {
+                    line += ", or keep \(targetText) for a race around \(later.formatted(.dateTime.month(.wide).year()))"
+                }
+            } else if let later = outlook.suggestedRaceDate {
+                line += " A race around \(later.formatted(.dateTime.month(.wide).year())) leaves time to build the base"
             }
             reasons.insert(line + ".", at: 0)
         }

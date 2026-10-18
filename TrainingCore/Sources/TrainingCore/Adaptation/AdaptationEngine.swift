@@ -405,7 +405,7 @@ public struct AdaptationEngine: Sendable {
                                        completedRuns: completedRuns, asOf: asOf, calendar: calendar)
         let credited = creditingEndurance(plan: plan, completedRuns: completedRuns, asOf: asOf, calendar: calendar)
         let repacedPlan = repaced(plan: credited, withVDOT: newVDOT, asOf: asOf, calendar: calendar)
-        let keepsUp = status.phase == .onTrack || status.phase == .holding || status.phase == .starting
+        let keepsUp = status.phase == .onTrack || status.phase == .holding
         let rescheduled = keepsUp
             ? rescheduleMissedLongRun(plan: repacedPlan, completedRuns: completedRuns, asOf: asOf, withinDays: 3, calendar: calendar)
             : repacedPlan

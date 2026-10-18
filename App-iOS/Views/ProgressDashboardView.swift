@@ -221,9 +221,13 @@ struct ProgressDashboardView: View {
         if let outlook = coordinator.outlook, let plan = coordinator.currentPlan {
             Section {
                 if let verdict = outlook.verdict {
-                    Label(verdict.title, systemImage: verdictIcon(verdict))
-                        .font(.headline)
-                        .foregroundStyle(verdictColor(verdict))
+                    // The title says it; the icon carries the colour (yellow text
+                    // would be too faint on a light background).
+                    Label {
+                        Text(verdict.title).font(.headline)
+                    } icon: {
+                        Image(systemName: verdictIcon(verdict)).foregroundStyle(verdictColor(verdict))
+                    }
                 }
                 LabeledContent("If the race were today", value: rangeText(outlook.today))
                 LabeledContent("Race day, at this rate", value: rangeText(outlook.raceDay))
@@ -240,7 +244,7 @@ struct ProgressDashboardView: View {
             } header: {
                 Text("\(plan.goal.race.displayName) outlook")
             } footer: {
-                Text("A range, because predictions are never exact: for the marathon, about half of recreational runners finish 10 minutes or more slower than a formula from a shorter race says (Vickers & Vertosick 2016). Race day assumes training goes on like the last two weeks.")
+                Text("An estimate from your training, not a guarantee. A range, because predictions are never exact: for the marathon, about half of recreational runners finish 10 minutes or more slower than a formula from a shorter race says (Vickers & Vertosick 2016). Race day assumes training goes on like the last two weeks.")
             }
             .confirmationDialog(
                 "Change your target time?",

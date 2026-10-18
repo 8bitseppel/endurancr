@@ -21,6 +21,17 @@
                 <string>C617.1</string>
             </array>
         </dict>
+        <!-- UserDefaults in Shared/DemoMode.swift (Debug-only sample data, compiled
+             out of Release today) and any app-only settings. Read and written
+             only by this app. -->
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
     </array>
 </dict>
 </plist>

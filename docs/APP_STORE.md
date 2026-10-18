@@ -205,20 +205,20 @@ best practices:
 - No prices, URLs, awards or other platforms. The text is in English only, like the listing.
 - No alpha channel.
 
-## Version 1.0.4
+## Version 1.1.0
 
 ### Promotional text (170)
 
-A plan that runs with you: it eases back in after a break, builds from the weeks you really ran, and tells you honestly if your target time fits.
+Your running buddy: the plan follows the weeks you really run, eases you back in after a break, and tells you honestly whether your target time fits.
 
 ### What's New (4000)
 
 A plan that adapts like a running buddy
 - Missed or shorter runs are never piled onto the days after.
-- Ran less than planned? The coming weeks build from what you actually ran, at most 10% more each week, and the next hard session becomes an easy run.
+- Ran less than planned? The coming weeks build from what you actually ran, at most 10% more each week, and one hard session that week becomes an easy run.
 - Back from a break of more than 5 days? Your paces ease a little and you start with easy runs at part of your usual week, following the steps in Daniels' Running Formula.
-- No run is planned more than 10% longer than your longest run of the last 30 days, based on a 2025 study of over 5,000 runners.
-- Paces rise by at most 1 VDOT point every 3 weeks, and come down a little when hard sessions keep coming in slower than their target.
+- Long runs grow step by step: each one at most 10% longer than your longest recent run, based on a 2025 study of over 5,000 runners.
+- Paces rise by at most 1 VDOT point for every 3 weeks of the plan, and come down a little when hard sessions keep coming in slower than their target.
 
 An honest outlook on your goal
 - Progress shows a finish-time range for today and for race day, instead of a single number.

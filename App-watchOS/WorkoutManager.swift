@@ -89,7 +89,11 @@ final class WorkoutManager: NSObject {
     /// refuses, e.g. without Health access, so no empty run screen opens.
     @discardableResult
     func start(plannedWorkout: PlannedWorkout? = nil, zones: PaceZones? = nil, goalName: String = "") -> Bool {
-        guard session == nil else { return true }   // already running: keep it
+        if isRunning { return true }                 // already running: keep it
+        guard session == nil, saveState != .saving else {
+            lastError = "The last run is still being saved. Try again in a moment."
+            return false
+        }
         resetLiveState()
         self.plannedWorkout = plannedWorkout
         self.zones = zones
@@ -169,6 +173,8 @@ final class WorkoutManager: NSObject {
                 self.zones = context?.zones
                 self.goalName = context?.goalName ?? ""
                 self.attach(session)
+                // Show the recovered run on the iPhone again.
+                session.startMirroringToCompanionDevice { _, _ in }
                 self.isPaused = session.state == .paused
                 self.isRunning = true
             }
@@ -180,7 +186,7 @@ final class WorkoutManager: NSObject {
 
     /// Sends the current numbers to the iPhone, at most about once a second.
     private func sendToPhone(force: Bool = false) {
-        guard let session, force || Date().timeIntervalSince(lastMirrorSent) >= 1 else { return }
+        guard isRunning, let session, force || Date().timeIntervalSince(lastMirrorSent) >= 1 else { return }
         lastMirrorSent = Date()
         var step: WorkoutStep?
         if let plannedWorkout, let zones {
@@ -240,6 +246,10 @@ final class WorkoutManager: NSObject {
         self.routeBuilder = nil   // no more GPS points go in once the run is over
         saveState = .saving
         RunContext.clear()
+        defer {
+            session = nil
+            self.builder = nil
+        }
         do {
             try await builder.endCollection(at: date)
             guard let workout = try await builder.finishWorkout() else {
@@ -256,8 +266,6 @@ final class WorkoutManager: NSObject {
             lastError = error.localizedDescription
             saveState = .failed
         }
-        session = nil
-        self.builder = nil
     }
 }
 
@@ -318,6 +326,7 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
             switch toState {
             case .running:
                 isPaused = false
+                isAutoPaused = false
                 sendToPhone(force: true)
             case .paused:
                 isPaused = true
@@ -326,6 +335,7 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
                 // Finished here, or with Finish on the iPhone's Live Activity.
                 didFinish = true
                 isRunning = false
+                isAutoPaused = false
                 locationManager.stopUpdatingLocation()
                 Task { await self.saveWorkout(endingAt: date) }
             default:
@@ -336,7 +346,19 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
 
     nonisolated func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
         let message = error.localizedDescription
-        Self.onMain { [weak self] in self?.lastError = message }
+        Self.onMain { [weak self] in
+            guard let self else { return }
+            lastError = message
+            // HealthKit stopped the session (e.g. no Health access): end the run
+            // instead of leaving an empty run screen up.
+            if isRunning, session?.state != .running, session?.state != .paused {
+                isRunning = false
+                locationManager.stopUpdatingLocation()
+                RunContext.clear()
+                session = nil
+                builder = nil
+            }
+        }
     }
 
     /// watchOS's Auto-Pause: it reports when the runner stops and moves again,

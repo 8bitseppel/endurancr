@@ -56,7 +56,7 @@ struct HowItWorksView: View {
                 topic(
                     "When you run less than planned",
                     icon: "figure.walk",
-                    detail: "The plan compares the kilometres you ran with the kilometres planned over the last two weeks (time off you added is left out). 90% or more is going really well (Pete Pfitzinger's benchmark), and the plan keeps building. 75 to 90%: this week stays at last week's level instead of growing. Under 75%: the coming week is about 10% more than you actually ran each week lately (at least half the plan), the next hard session becomes an easy run, and from there each week grows by at most 10% until it meets the plan again. Runners who added more than 30% in two weeks had more injuries (Nielsen et al. 2014)."
+                    detail: "The plan compares the kilometres you ran with the kilometres planned over the last two weeks (time off you added is left out). 90% or more is going really well (Pete Pfitzinger's benchmark), and the plan keeps building. 75 to 90%: this week stays at last week's level instead of growing. Under 75%: the coming week is about 10% more than you actually ran each week lately (at least half the plan), one hard session that week becomes an easy run, and from there each week grows by at most 10% until it meets the plan again. Runners who added more than 30% in two weeks had more injuries (Nielsen et al. 2014)."
                 )
 
                 topic(
@@ -74,7 +74,7 @@ struct HowItWorksView: View {
                 topic(
                     "Paces that follow your form",
                     icon: "speedometer",
-                    detail: "A strong run (a race or a fast effort of 3 km or more) moves your VDOT halfway to what it shows, by at most 1 point for every 3 weeks of the plan, as Daniels advises not to raise it more often. When at least two of your hard sessions in the last 4 weeks, and most of them, come in more than 3% slower than their target, your VDOT drops by 1 so the paces fit again. Running easy days slower than easy pace is never counted against you."
+                    detail: "A strong run (a race or a fast effort of 3 km or more) moves your VDOT halfway to what it shows, by at most 1 point for every 3 weeks of the plan, as Daniels advises not to raise it more often. When at least two of your hard sessions in the last 4 weeks, and most of them, come in more than 3% slower than planned (counting warm-up, cool-down and recoveries at easy pace), your VDOT drops by 1 so the paces fit again. Without any runs from Apple Health, the plan stays as it is. Running easy days slower than easy pace is never counted against you."
                 )
 
                 topic(
@@ -203,8 +203,8 @@ struct HowItWorksView: View {
                     detail: "Single runs more than 10% longer than the longest of the last 30 days and injury risk."
                 )
                 source(
-                    title: "A better formula for calculating marathon race times (2016)",
-                    author: "Vickers & Vertosick, BMC Sports Science",
+                    title: "An empirical study of race times in recreational endurance runners (2016)",
+                    author: "Vickers & Vertosick, BMC Sports Science, Medicine and Rehabilitation",
                     detail: "Why predictions from shorter races run too fast for recreational marathoners, and how weekly distance matters."
                 )
                 source(
