@@ -204,3 +204,33 @@ best practices:
 - The real interface, one short phrase and a centered focal point.
 - No prices, URLs, awards or other platforms. The text is in English only, like the listing.
 - No alpha channel.
+
+## Version 1.0.4
+
+### Promotional text (170)
+
+A plan that runs with you: it eases back in after a break, builds from the weeks you really ran, and tells you honestly if your target time fits.
+
+### What's New (4000)
+
+A plan that adapts like a running buddy
+- Missed or shorter runs are never piled onto the days after.
+- Ran less than planned? The coming weeks build from what you actually ran, at most 10% more each week, and the next hard session becomes an easy run.
+- Back from a break of more than 5 days? Your paces ease a little and you start with easy runs at part of your usual week, following the steps in Daniels' Running Formula.
+- No run is planned more than 10% longer than your longest run of the last 30 days, based on a 2025 study of over 5,000 runners.
+- Paces rise by at most 1 VDOT point every 3 weeks, and come down a little when hard sessions keep coming in slower than their target.
+
+An honest outlook on your goal
+- Progress shows a finish-time range for today and for race day, instead of a single number.
+- It tells you whether your target is on track, within reach, a stretch or unlikely, and why.
+- If your target looks out of reach, it suggests a realistic time or a later race. It only changes your target if you tap it.
+
+Also
+- How it works explains every new rule and lists the books and studies behind it.
+
+### Screenshots
+
+Re-take them with `./scripts/screenshots.sh`, then `./scripts/publish-screenshots.sh`.
+The iPhone Progress screenshot (`iphone-2-progress.png`) now shows the outlook. The
+header and search images in `screenshots/appstore/creative/` are rebuilt from the
+new screens.

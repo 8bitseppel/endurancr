@@ -1,11 +1,15 @@
 import Foundation
 
 /// Adjusts a plan from recorded runs. Deterministic, rule-based:
-///  1. Re-rate VDOT from recent strong runs (damped, so paces don't whipsaw),
-///     and earn back held-back marathon endurance from long runs.
-///  2. Re-pace all *future* workouts from the updated VDOT.
-///  3. Reschedule a missed long run onto the next upcoming rest day.
+///  1. Read how training is going (`TrainingBuddy`): breaks, lighter weeks.
+///  2. Re-rate VDOT (strong runs, slower hard sessions, time off) and earn back
+///     held-back marathon endurance from long runs; re-pace future workouts.
+///  3. Move a missed long run to a free day in the next few days, only while
+///     training is going about as planned.
 ///  4. Ease the next quality session to easy when fatigue signals fire.
+///  5. Pace the coming weeks to the training actually done (`TrainingBuddy`).
+///  6. Shorten this week's easy runs once its distance is done. Missed distance is
+///     never made up.
 ///
 /// Past workouts are never rewritten — they're history.
 public struct AdaptationEngine: Sendable {
@@ -138,6 +142,7 @@ public struct AdaptationEngine: Sendable {
         plan: TrainingPlan,
         completedRuns: [CompletedRun],
         asOf: Date,
+        withinDays: Int? = nil,
         calendar: Calendar = .current
     ) -> TrainingPlan {
         let asOfDay = calendar.startOfDay(for: asOf)
@@ -156,6 +161,10 @@ public struct AdaptationEngine: Sendable {
             for workoutIndex in updated.weeks[weekIndex].workouts.indices {
                 let w = updated.weeks[weekIndex].workouts[workoutIndex]
                 guard w.type == .rest, calendar.startOfDay(for: w.date) >= asOfDay else { continue }
+                // Only soon after the missed day; later it's gone, not made up.
+                if let withinDays,
+                   let latest = calendar.date(byAdding: .day, value: withinDays, to: calendar.startOfDay(for: missed.date)),
+                   calendar.startOfDay(for: w.date) > latest { break outer }
                 updated.weeks[weekIndex].workouts[workoutIndex].type = .longRun
                 updated.weeks[weekIndex].workouts[workoutIndex].distanceMeters = missed.distanceMeters
                 updated.weeks[weekIndex].workouts[workoutIndex].targetPaceSecPerKm = missed.targetPaceSecPerKm
@@ -257,23 +266,18 @@ public struct AdaptationEngine: Sendable {
 
     // MARK: Weekly volume redistribution
 
-    /// Keeps the *current* week on its planned volume by absorbing any gap into the
-    /// remaining EASY runs. Long runs and quality sessions are protected — their
-    /// prescribed distance is never changed — so the training stimulus survives; only
-    /// easy days flex. Each easy run grows by at most `maxEasyGrowth`× its original so
-    /// no recovery day balloons, and never beyond the week's long run, so the long
-    /// run stays the longest run of the week. An easy run the week no longer needs (volume
-    /// already banked) collapses to a rest day.
-    ///
-    /// Example: a 42 km week with a Saturday 17 km long run. The athlete can only run
-    /// 5 km, records it, and this redistributes the 12 km shortfall onto the week's
-    /// remaining easy runs (capped) while the long run and any threshold/interval day
-    /// keep their distance.
+    /// Fits the *current* week's remaining EASY runs to what the week still needs.
+    /// Long runs and quality sessions keep their distance. With the default
+    /// `maxEasyGrowth` of 1, easy runs only ever get shorter: when the week's distance
+    /// is already run they shrink or become rest, and a short or missed day is never
+    /// made up on the days after (Pfitzinger, Hansons, Hal Higdon all advise against
+    /// cramming missed mileage). A larger `maxEasyGrowth` lets easy runs absorb a
+    /// shortfall, never past the week's long run.
     public func redistributedWithinWeek(
         plan: TrainingPlan,
         completedRuns: [CompletedRun],
         asOf: Date,
-        maxEasyGrowth: Double = 1.5,
+        maxEasyGrowth: Double = 1.0,
         calendar: Calendar = .current
     ) -> TrainingPlan {
         let asOfDay = calendar.startOfDay(for: asOf)
@@ -362,7 +366,9 @@ public struct AdaptationEngine: Sendable {
                 week.workouts[i].notes = "Rest, the week's distance is already done"
             } else if abs(newDistance - original) >= 100 {
                 week.workouts[i].distanceMeters = newDistance
-                week.workouts[i].notes = "Adjusted to keep the week on target"
+                week.workouts[i].notes = newDistance < original
+                    ? "Shorter, the week's distance is nearly done"
+                    : "Adjusted to keep the week on target"
             }
         }
 
@@ -373,24 +379,36 @@ public struct AdaptationEngine: Sendable {
 
     // MARK: Convenience
 
-    /// Full adaptation pass: re-rate → re-pace → reschedule → ease-for-fatigue →
-    /// apply the goal's unavailable periods → redistribute the current week's volume.
-    ///
-    /// `restingHeartRates` defaults to empty; with no resting-HR history and no
-    /// heart-rate-carrying runs, the fatigue step is a no-op, so existing callers
-    /// keep their prior behavior.
-    public func adapt(
+    /// What a full adaptation pass found, besides the plan.
+    public struct Result: Sendable {
+        public var plan: TrainingPlan
+        public var buddy: TrainingBuddy.Status
+        public var fatigue: FatigueAssessment
+    }
+
+    /// Full adaptation pass: read the training (buddy) → re-rate and re-pace →
+    /// reschedule a just-missed long run → ease for fatigue → pace the coming weeks
+    /// to the training done → apply the goal's unavailable periods (unless the caller
+    /// does that at display time) → fit this week's easy runs.
+    public func adaptWithStatus(
         plan: TrainingPlan,
         completedRuns: [CompletedRun],
         asOf: Date,
         restingHeartRates: [RestingHeartRateSample] = [],
         analyzer: FatigueAnalyzer = FatigueAnalyzer(),
+        applyUnavailability: Bool = true,
         calendar: Calendar = .current
-    ) -> TrainingPlan {
-        let newVDOT = reRatedVDOT(current: plan.vdot, completedRuns: completedRuns, asOf: asOf, calendar: calendar)
+    ) -> Result {
+        let buddy = TrainingBuddy()
+        let status = buddy.status(plan: plan, completedRuns: completedRuns, asOf: asOf, calendar: calendar)
+        let newVDOT = buddy.pacingVDOT(base: plan.vdot, plan: plan, status: status,
+                                       completedRuns: completedRuns, asOf: asOf, calendar: calendar)
         let credited = creditingEndurance(plan: plan, completedRuns: completedRuns, asOf: asOf, calendar: calendar)
         let repacedPlan = repaced(plan: credited, withVDOT: newVDOT, asOf: asOf, calendar: calendar)
-        let rescheduled = rescheduleMissedLongRun(plan: repacedPlan, completedRuns: completedRuns, asOf: asOf, calendar: calendar)
+        let keepsUp = status.phase == .onTrack || status.phase == .holding || status.phase == .starting
+        let rescheduled = keepsUp
+            ? rescheduleMissedLongRun(plan: repacedPlan, completedRuns: completedRuns, asOf: asOf, withinDays: 3, calendar: calendar)
+            : repacedPlan
         let assessment = assessFatigue(
             restingHeartRates: restingHeartRates,
             completedRuns: completedRuns,
@@ -399,10 +417,27 @@ public struct AdaptationEngine: Sendable {
             calendar: calendar
         )
         let eased = easedForFatigue(plan: rescheduled, assessment: assessment, asOf: asOf, calendar: calendar)
-        let available = applyingUnavailability(plan: eased, periods: eased.effectiveUnavailablePeriods(calendar: calendar), asOf: asOf, calendar: calendar)
-        // Last: rebalance the current week's easy runs so completed + remaining lands
-        // on the week's target, after any rescheduling/easing/unavailability reshaped it.
-        return redistributedWithinWeek(plan: available, completedRuns: completedRuns, asOf: asOf, calendar: calendar)
+        let paced = buddy.adjusted(plan: eased, status: status, completedRuns: completedRuns, asOf: asOf, calendar: calendar)
+        let available = applyUnavailability
+            ? applyingUnavailability(plan: paced, periods: paced.effectiveUnavailablePeriods(calendar: calendar), asOf: asOf, calendar: calendar)
+            : paced
+        // Last: fit the current week's easy runs to what it still needs, after any
+        // rescheduling/easing/pacing/unavailability reshaped it.
+        let fitted = redistributedWithinWeek(plan: available, completedRuns: completedRuns, asOf: asOf, calendar: calendar)
+        return Result(plan: fitted, buddy: status, fatigue: assessment)
+    }
+
+    /// `adaptWithStatus`, for callers that only need the plan.
+    public func adapt(
+        plan: TrainingPlan,
+        completedRuns: [CompletedRun],
+        asOf: Date,
+        restingHeartRates: [RestingHeartRateSample] = [],
+        analyzer: FatigueAnalyzer = FatigueAnalyzer(),
+        calendar: Calendar = .current
+    ) -> TrainingPlan {
+        adaptWithStatus(plan: plan, completedRuns: completedRuns, asOf: asOf,
+                        restingHeartRates: restingHeartRates, analyzer: analyzer, calendar: calendar).plan
     }
 
     private func shortDate(_ date: Date, calendar: Calendar) -> String {

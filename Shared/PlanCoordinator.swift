@@ -31,6 +31,8 @@ final class PlanCoordinator {
     private(set) var recentRuns: [CompletedRun] = []
     private(set) var restingHeartRates: [RestingHeartRateSample] = []
     private(set) var fatigue: FatigueAssessment?
+    /// How training is going and what the plan does about it (`TrainingBuddy`).
+    private(set) var buddy: TrainingBuddy.Status?
     var isWorking = false
 
     init(context: ModelContext, health: HealthKitService) {
@@ -76,6 +78,22 @@ final class PlanCoordinator {
     }
 
     /// A fresh progress snapshot for the dashboard.
+    /// The honest look at the goal: finish-time ranges and how likely the target is.
+    var outlook: GoalOutlook? {
+        guard let plan = currentPlan, let buddy else { return nil }
+        return GoalOutlook.make(plan: plan, buddy: buddy, completedRuns: recentRuns, asOf: .now, calendar: .current)
+    }
+
+    /// Takes the outlook's suggestion as the new target time and rebuilds the plan.
+    /// Only ever called when the athlete taps it; the plan never changes the goal by itself.
+    func adoptTarget(seconds: Double) async throws {
+        guard let inputs else { return }
+        var goal = inputs.goal
+        goal.targetTimeSeconds = seconds
+        try update(goal: goal, fitness: inputs.fitness)
+        await refreshAdaptation()
+    }
+
     var progress: PlanProgress? {
         guard let plan = displayPlan else { return nil }
         return PlanProgress.make(plan: plan, completedRuns: recentRuns, asOf: .now, calendar: .current)
@@ -246,23 +264,15 @@ final class PlanCoordinator {
         recentRuns = runs
         restingHeartRates = resting
 
-        // Layer the adaptation steps ourselves so the canonical plan stays free of
-        // vacation blanking (that is applied at display time from the goal).
-        let now = Date.now
-        let cal = Calendar.current
-        let newVDOT = adaptation.reRatedVDOT(current: base.vdot, completedRuns: runs, asOf: now, calendar: cal)
-        let credited = adaptation.creditingEndurance(plan: base, completedRuns: runs, asOf: now, calendar: cal)
-        let repaced = adaptation.repaced(plan: credited, withVDOT: newVDOT, asOf: now, calendar: cal)
-        let rescheduled = adaptation.rescheduleMissedLongRun(plan: repaced, completedRuns: runs, asOf: now, calendar: cal)
-        let assessment = adaptation.assessFatigue(restingHeartRates: resting, completedRuns: runs, asOf: now, calendar: cal)
-        let eased = adaptation.easedForFatigue(plan: rescheduled, assessment: assessment, asOf: now, calendar: cal)
-        // Rebalance the current week's easy runs so completed + remaining lands on the
-        // week's target: a short or spontaneous run flows onto the remaining easy days
-        // (capped), while the long run and quality sessions keep their prescription.
-        let redistributed = adaptation.redistributedWithinWeek(plan: eased, completedRuns: runs, asOf: now, calendar: cal)
-        fatigue = assessment
-
-        currentPlan = redistributed
+        // The canonical plan stays free of vacation blanking (applied at display
+        // time from the goal), so unavailability is left out here.
+        let result = adaptation.adaptWithStatus(
+            plan: base, completedRuns: runs, asOf: .now, restingHeartRates: resting,
+            applyUnavailability: false, calendar: Calendar.current
+        )
+        fatigue = result.fatigue
+        buddy = result.buddy
+        currentPlan = result.plan
     }
 
     // MARK: Moving days

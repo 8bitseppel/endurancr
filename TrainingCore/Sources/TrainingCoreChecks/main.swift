@@ -363,9 +363,14 @@ h.suite("Weekly volume redistribution") {
 
     // Athlete bails on Monday's long run, records only 5 km.
     let short = CompletedRun(date: date(2026, 3, 2), distanceMeters: 5_000, durationSeconds: 25 * 60)
-    let out = engine.redistributedWithinWeek(plan: base, completedRuns: [short], asOf: date(2026, 3, 2), calendar: cal)
-    let w = out.weeks[0].workouts
     func find(_ id: UUID, in list: [PlannedWorkout]) -> PlannedWorkout { list.first { $0.id == id }! }
+    // By default a short day is never made up: the easy runs keep their distance.
+    let kept = engine.redistributedWithinWeek(plan: base, completedRuns: [short], asOf: date(2026, 3, 2), calendar: cal).weeks[0].workouts
+    h.check(find(tue.id, in: kept).distanceMeters == 8_000 && find(thu.id, in: kept).distanceMeters == 7_000,
+            "a short day isn't made up on the easy runs after it")
+    // Asked to (maxEasyGrowth 1.5), easy runs can still absorb a shortfall.
+    let out = engine.redistributedWithinWeek(plan: base, completedRuns: [short], asOf: date(2026, 3, 2), maxEasyGrowth: 1.5, calendar: cal)
+    let w = out.weeks[0].workouts
 
     // The quality session and the (past, partial) long run are left untouched.
     h.check(find(sat.id, in: w).distanceMeters == 10_000 && find(sat.id, in: w).type == .threshold, "threshold session protected")
@@ -392,14 +397,161 @@ h.suite("Weekly volume redistribution") {
     let lateLong = TrainingPlan(goal: goal, vdot: 45, paceZones: zones, weeks: [
         TrainingWeek(index: 0, startDate: date(2026, 3, 2), phase: .build, workouts: [lMon, lTue, lThu, lSat])
     ])
-    let w3 = engine.redistributedWithinWeek(plan: lateLong, completedRuns: [], asOf: date(2026, 3, 3), calendar: cal).weeks[0].workouts
-    h.check(find(lTue.id, in: w3).distanceMeters > 10_000 && find(lThu.id, in: w3).distanceMeters > 9_000, "easy runs still absorb the missed day")
+    let w3 = engine.redistributedWithinWeek(plan: lateLong, completedRuns: [], asOf: date(2026, 3, 3), maxEasyGrowth: 1.5, calendar: cal).weeks[0].workouts
+    h.check(find(lTue.id, in: w3).distanceMeters > 10_000 && find(lThu.id, in: w3).distanceMeters > 9_000, "with growth allowed, easy runs absorb the missed day")
     h.check(w3.filter { $0.type == .easy }.allSatisfy { $0.distanceMeters <= 12_000 }, "no easy run grows past the long run")
     h.check(find(lSat.id, in: w3).distanceMeters == 12_000, "long run keeps its distance")
 
     // A week that isn't the current week is never touched.
     let far = engine.redistributedWithinWeek(plan: base, completedRuns: [short], asOf: date(2026, 5, 1), calendar: cal)
     h.check(far.weeks[0].workouts == base.weeks[0].workouts, "non-current week left unchanged")
+}
+
+// MARK: Training buddy
+
+h.suite("Training buddy: paces the plan to the training actually done") {
+    let engine = AdaptationEngine()
+    let buddy = TrainingBuddy()
+    let goal = Goal(race: .marathon, raceDate: date(2026, 11, 1), targetTimeSeconds: 4 * 3600, daysPerWeek: 5)
+    let fitness = FitnessSnapshot(distanceMeters: 10_000, timeSeconds: 52 * 60, date: date(2026, 5, 1))
+    let plan = try VDOTPlanGenerator().makePlan(goal: goal, fitness: fitness, startDate: date(2026, 5, 4), calendar: cal)
+
+    /// Runs on the plan's running days before `until`, at `share` of the distance,
+    /// skipping the days in `skip`.
+    func ran(_ share: Double, until: Date, skip: ClosedRange<Date>? = nil, pace: Double = 380) -> [CompletedRun] {
+        plan.allWorkouts.filter { $0.type.isRunning && $0.date < until && !(skip?.contains($0.date) ?? false) }
+            .map { CompletedRun(date: $0.date, distanceMeters: $0.distanceMeters * share,
+                                durationSeconds: $0.distanceMeters * share / 1_000 * pace) }
+    }
+    func week(_ p: TrainingPlan, containing d: Date) -> TrainingWeek {
+        p.weeks.first { $0.startDate <= d && cal.date(byAdding: .day, value: 7, to: $0.startDate)! > d }!
+    }
+    func future(_ p: TrainingPlan, from d: Date) -> [PlannedWorkout] { p.allWorkouts.filter { $0.date >= d && $0.type.isRunning } }
+
+    // Following the plan: on track, nothing shrinks.
+    let asOf = date(2026, 6, 15)
+    let full = ran(1, until: asOf)
+    let onTrack = engine.adaptWithStatus(plan: plan, completedRuns: full, asOf: asOf, calendar: cal)
+    h.check(onTrack.buddy.phase == .onTrack, "running the plan reads as on track")
+    h.check(abs(week(onTrack.plan, containing: asOf).plannedVolumeMeters - week(plan, containing: asOf).plannedVolumeMeters) < 1_000,
+            "on track, the week keeps its planned distance")
+
+    // 80% of the plan: holding, this week stays at last week's planned level.
+    let some = ran(0.8, until: asOf)
+    let hold = engine.adaptWithStatus(plan: plan, completedRuns: some, asOf: asOf, calendar: cal)
+    h.check(hold.buddy.phase == .holding, "80% of the plan reads as holding (got \(hold.buddy.phase))")
+    let lastWeek = plan.weeks[week(plan, containing: asOf).index - 1].plannedVolumeMeters
+    h.check(week(hold.plan, containing: asOf).plannedVolumeMeters <= max(lastWeek, week(plan, containing: asOf).plannedVolumeMeters) + 1_000,
+            "holding, this week doesn't grow past last week's level")
+
+    // Half the plan: rebuilding from what was run, at most 10% more a week.
+    let half = ran(0.5, until: asOf)
+    let rebuild = engine.adaptWithStatus(plan: plan, completedRuns: half, asOf: asOf, calendar: cal)
+    h.check(rebuild.buddy.phase == .rebuilding, "half the plan reads as rebuilding")
+    let thisWeek = week(rebuild.plan, containing: asOf)
+    let recent = rebuild.buddy.recentWeeklyMeters
+    h.check(thisWeek.plannedVolumeMeters <= max(recent * 1.1, 0.5 * week(plan, containing: asOf).plannedVolumeMeters) + 1_000,
+            "rebuilding, this week is about 10% over the recent average (\(Int(thisWeek.plannedVolumeMeters)) vs \(Int(recent)))")
+    let next = rebuild.plan.weeks[thisWeek.index + 1].plannedVolumeMeters
+    h.check(next <= thisWeek.plannedVolumeMeters * 1.1 + 1_000, "and the week after grows by at most 10%")
+    h.check(future(rebuild.plan, from: asOf).contains { $0.type == .easy && !$0.notes.isEmpty }, "the shorter runs say why")
+    h.check(future(rebuild.plan, from: asOf).filter { AdaptationEngine.qualityTypes.contains($0.type) }.count
+            < future(plan, from: asOf).filter { AdaptationEngine.qualityTypes.contains($0.type) }.count,
+            "rebuilding, the next hard session becomes an easy run")
+
+    // A 10-day break: easing back, Daniels' pace factor, easy-only, half the volume.
+    let breakStart = date(2026, 6, 3), back = date(2026, 6, 14)
+    let withBreak = ran(1, until: breakStart) + [CompletedRun(date: back, distanceMeters: 5_000, durationSeconds: 5 * 400)]
+    let easing = engine.adaptWithStatus(plan: plan, completedRuns: withBreak, asOf: date(2026, 6, 15), calendar: cal)
+    let lastBefore = withBreak.map(\.date).filter { $0 < breakStart }.max()!
+    let expectedOff = cal.dateComponents([.day], from: lastBefore, to: back).day! - 1
+    if case .easingBack(let days, _) = easing.buddy.phase {
+        h.check(days == expectedOff, "the break counts the days between the runs (\(days) days off)")
+    } else { h.check(false, "a break of over 5 days eases back (got \(easing.buddy.phase))") }
+    h.check(abs(easing.buddy.vdotFactor - TrainingBuddy.vdotFactor(daysOff: expectedOff)) < 0.0001
+            && easing.buddy.vdotFactor < 0.99, "Daniels' factor for the days off lowers the VDOT")
+    h.check(easing.plan.vdot < onTrack.plan.vdot, "paces are a bit easier after the break")
+    let soon = future(easing.plan, from: date(2026, 6, 15)).filter { $0.date < date(2026, 6, 24) }
+    h.check(!soon.isEmpty && soon.allSatisfy { !AdaptationEngine.qualityTypes.contains($0.type) }, "easy runs only while easing back")
+    h.check(easing.buddy.message.contains("Welcome back"), "and the buddy says welcome back")
+    let preBreak = TrainingBuddy.distance(of: withBreak, from: date(2026, 5, 6), to: date(2026, 6, 3), calendar: cal) / 4
+    h.check(week(easing.plan, containing: date(2026, 6, 15)).plannedVolumeMeters <= preBreak * 0.5 + 6_000,
+            "the first week back is about half the volume before the break")
+    // 4 days off changes nothing.
+    let shortGap = ran(1, until: date(2026, 6, 10)) + ran(1, until: asOf).filter { $0.date >= date(2026, 6, 14) }
+    h.check(buddy.status(plan: plan, completedRuns: shortGap, asOf: asOf, calendar: cal).isEasingBack == false,
+            "a few days off don't count as a break")
+
+    // Daniels' table.
+    h.check(TrainingBuddy.vdotFactor(daysOff: 3) == 1 && abs(TrainingBuddy.vdotFactor(daysOff: 21) - 0.952) < 0.0001
+            && TrainingBuddy.vdotFactor(daysOff: 120) == 0.8, "VDOT factors follow Daniels' table")
+
+    // Single runs: no more than 10% past the longest of the last 30 days.
+    let little = plan.allWorkouts.filter { $0.type.isRunning && $0.date < asOf && $0.date >= date(2026, 5, 18) }
+        .map { CompletedRun(date: $0.date, distanceMeters: min($0.distanceMeters, 8_000), durationSeconds: min($0.distanceMeters, 8_000) / 1_000 * 380) }
+    let capped = engine.adaptWithStatus(plan: plan, completedRuns: little, asOf: asOf, calendar: cal).plan
+    let firstLong = future(capped, from: asOf).first { $0.type == .longRun }!
+    h.check(firstLong.distanceMeters <= 8_800 + 1, "the next long run is at most 10% past the longest recent run (got \(Int(firstLong.distanceMeters)))")
+
+    // Paces: at most +1 VDOT per 3 weeks, from strong runs.
+    let fast = [CompletedRun(date: date(2026, 5, 9), distanceMeters: 10_000, durationSeconds: 45 * 60)]
+    let st = buddy.status(plan: plan, completedRuns: fast, asOf: date(2026, 5, 10), calendar: cal)
+    h.check(buddy.pacingVDOT(base: plan.vdot, plan: plan, status: st, completedRuns: fast, asOf: date(2026, 5, 10), calendar: cal) == (plan.vdot * 10).rounded() / 10,
+            "no pace increase in the first 3 weeks")
+    let st2 = buddy.status(plan: plan, completedRuns: full + fast, asOf: asOf, calendar: cal)
+    let raised = buddy.pacingVDOT(base: plan.vdot, plan: plan, status: st2, completedRuns: full + fast, asOf: asOf, calendar: cal)
+    h.check(raised > plan.vdot && raised <= plan.vdot + 2.05, "after 6 weeks at most +2 VDOT (got \(raised - plan.vdot))")
+
+    // Hard sessions run clearly slower than their target: paces come down 1 VDOT.
+    // (In the build weeks, which have hard sessions.)
+    let buildDay = date(2026, 8, 10)
+    let slowQuality = ran(1, until: buildDay).map { run -> CompletedRun in
+        guard let w = plan.allWorkouts.first(where: { cal.isDate($0.date, inSameDayAs: run.date) }),
+              [.threshold, .interval, .marathonPace].contains(w.type), let target = w.targetPaceSecPerKm else { return run }
+        var r = run; r.durationSeconds = run.distanceMeters / 1_000 * target.upperBound * 1.08; return r
+    }
+    let st3 = buddy.status(plan: plan, completedRuns: slowQuality, asOf: buildDay, calendar: cal)
+    let lowered = buddy.pacingVDOT(base: plan.vdot, plan: plan, status: st3, completedRuns: slowQuality, asOf: buildDay, calendar: cal)
+    h.check(abs(lowered - (plan.vdot - 1)) < 0.11, "slower hard sessions lower the paces by 1 VDOT (got \(lowered - plan.vdot))")
+
+    // A missed long run moves only within 3 days; later, it's not made up.
+    let missedLongDay = plan.allWorkouts.first { $0.type == .longRun && $0.date >= date(2026, 6, 1) }!.date
+    let skipLong = ran(1, until: asOf).filter { !cal.isDate($0.date, inSameDayAs: missedLongDay) }
+    let latePlan = engine.adaptWithStatus(plan: plan, completedRuns: skipLong, asOf: cal.date(byAdding: .day, value: 6, to: missedLongDay)!, calendar: cal).plan
+    h.check(!latePlan.allWorkouts.contains { $0.notes.hasPrefix("Rescheduled long run") }, "a long run missed 6 days ago isn't made up")
+}
+
+// MARK: Goal outlook
+
+h.suite("Goal outlook: an honest range and verdict") {
+    let engine = AdaptationEngine()
+    let fitness = FitnessSnapshot(distanceMeters: 12_200, timeSeconds: 68 * 60 + 19, date: date(2026, 10, 3))
+    let goal = Goal(race: .marathon, raceDate: date(2027, 4, 25), targetTimeSeconds: 4.5 * 3600, daysPerWeek: 5, restWeekdays: [2])
+    let plan = try VDOTPlanGenerator().makePlan(goal: goal, fitness: fitness, startDate: date(2026, 10, 5), calendar: cal)
+    func ran(_ share: Double, until: Date) -> [CompletedRun] {
+        plan.allWorkouts.filter { $0.type.isRunning && $0.date < until }
+            .map { CompletedRun(date: $0.date, distanceMeters: $0.distanceMeters * share, durationSeconds: $0.distanceMeters * share / 1_000 * 400) }
+    }
+    func outlook(_ share: Double, _ asOf: Date) -> GoalOutlook {
+        let runs = ran(share, until: asOf)
+        let r = engine.adaptWithStatus(plan: plan, completedRuns: runs, asOf: asOf, calendar: cal)
+        return GoalOutlook.make(plan: r.plan, buddy: r.buddy, completedRuns: runs, asOf: asOf, calendar: cal)
+    }
+    let full = outlook(1, date(2026, 11, 30))
+    let lighter = outlook(0.8, date(2026, 11, 30))
+    let half = outlook(0.5, date(2026, 11, 30))
+    h.check(full.raceDay.upperBound - full.raceDay.lowerBound > 15 * 60, "race day is a range, not one time")
+    h.check(full.raceDay.lowerBound < full.today.lowerBound, "training to plan points to a faster race day than today")
+    h.check(full.verdict == .onTrack, "following the plan, 4:30 is on track (got \(String(describing: full.verdict)))")
+    h.check((lighter.verdict ?? .onTrack) > .onTrack && lighter.raceDay.lowerBound > full.raceDay.lowerBound,
+            "80% of the plan gives a slower outlook")
+    h.check(half.verdict == .unlikely && half.suggestedTargetSeconds != nil && half.suggestedTargetSeconds! > goal.targetTimeSeconds!,
+            "half the plan: unlikely, with a slower realistic target")
+    h.check(half.reason.contains("looks realistic") && half.reason.contains("50%"), "and it says why, kindly")
+    let noTarget = GoalOutlook.make(plan: { var p = plan; p.goal.targetTimeSeconds = nil; return p }(),
+                                    buddy: TrainingBuddy().status(plan: plan, completedRuns: [], asOf: date(2026, 10, 5), calendar: cal),
+                                    completedRuns: [], asOf: date(2026, 10, 5), calendar: cal)
+    h.check(noTarget.verdict == nil, "no target, no verdict, still a range")
 }
 
 // MARK: Peak long run

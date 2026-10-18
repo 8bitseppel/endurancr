@@ -10,6 +10,8 @@ struct ProgressDashboardView: View {
     private let calculator = VDOTCalculator()
     @State private var showingGoalEditor = false
     @State private var showingDataManagement = false
+    /// A target time the athlete is asked to confirm, from the outlook.
+    @State private var pendingTarget: Double?
     @State private var recorder = PhoneWorkoutManager.shared
     @State private var showLiveRun = false
     @State private var showCompleteConfirm = false
@@ -22,6 +24,8 @@ struct ProgressDashboardView: View {
                     goalReachedSection(plan: plan)
                     readinessSection(plan: plan, progress: progress)
                     todayRunSection
+                    buddySection
+                    outlookSection
                     fatigueSection
                     nextWorkoutSection(progress)
                     thisWeekSection(progress)
@@ -182,6 +186,101 @@ struct ProgressDashboardView: View {
     }
 
     // MARK: Fatigue
+
+    // MARK: Buddy and outlook
+
+    /// One friendly line on how training is going and what the plan does about it.
+    @ViewBuilder private var buddySection: some View {
+        if let buddy = coordinator.buddy, !buddy.message.isEmpty {
+            Section {
+                Label {
+                    Text(buddy.message).font(.subheadline)
+                } icon: {
+                    Image(systemName: buddyIcon(buddy.phase))
+                        .foregroundStyle(.tint)
+                }
+            } header: {
+                Text("How it's going")
+            }
+        }
+    }
+
+    private func buddyIcon(_ phase: TrainingBuddy.Status.Phase) -> String {
+        switch phase {
+        case .onTrack: "figure.run"
+        case .holding: "equal.circle"
+        case .rebuilding: "arrow.up.right.circle"
+        case .easingBack: "leaf"
+        case .starting: "sparkles"
+        }
+    }
+
+    /// The honest look at the goal: what today's fitness would run, what race day
+    /// should look like at this rate, and how likely the target is.
+    @ViewBuilder private var outlookSection: some View {
+        if let outlook = coordinator.outlook, let plan = coordinator.currentPlan {
+            Section {
+                if let verdict = outlook.verdict {
+                    Label(verdict.title, systemImage: verdictIcon(verdict))
+                        .font(.headline)
+                        .foregroundStyle(verdictColor(verdict))
+                }
+                LabeledContent("If the race were today", value: rangeText(outlook.today))
+                LabeledContent("Race day, at this rate", value: rangeText(outlook.raceDay))
+                if let target = plan.goal.targetTimeSeconds {
+                    LabeledContent("Your target", value: GoalOutlook.format(target))
+                }
+                if !outlook.reason.isEmpty {
+                    Text(outlook.reason)
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                if let suggested = outlook.suggestedTargetSeconds {
+                    Button("Make \(GoalOutlook.format(suggested)) my target") { pendingTarget = suggested }
+                }
+            } header: {
+                Text("\(plan.goal.race.displayName) outlook")
+            } footer: {
+                Text("A range, because predictions are never exact: for the marathon, about half of recreational runners finish 10 minutes or more slower than a formula from a shorter race says (Vickers & Vertosick 2016). Race day assumes training goes on like the last two weeks.")
+            }
+            .confirmationDialog(
+                "Change your target time?",
+                isPresented: Binding(get: { pendingTarget != nil }, set: { if !$0 { pendingTarget = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button("Make \(GoalOutlook.format(pendingTarget ?? 0)) my target") {
+                    if let seconds = pendingTarget {
+                        Task { try? await coordinator.adoptTarget(seconds: seconds) }
+                    }
+                    pendingTarget = nil
+                }
+                Button("Keep my target", role: .cancel) { pendingTarget = nil }
+            } message: {
+                Text("The plan is rebuilt for the new target. Your runs stay in Health, and you can change it back anytime in Edit goal.")
+            }
+        }
+    }
+
+    private func rangeText(_ range: ClosedRange<Double>) -> String {
+        "\(GoalOutlook.format(range.lowerBound)) to \(GoalOutlook.format(range.upperBound))"
+    }
+
+    private func verdictIcon(_ verdict: GoalOutlook.Verdict) -> String {
+        switch verdict {
+        case .onTrack: "checkmark.circle.fill"
+        case .withinReach: "arrow.up.right.circle.fill"
+        case .stretch: "exclamationmark.circle.fill"
+        case .unlikely: "arrow.uturn.down.circle.fill"
+        }
+    }
+
+    private func verdictColor(_ verdict: GoalOutlook.Verdict) -> Color {
+        switch verdict {
+        case .onTrack: .green
+        case .withinReach: .accentColor
+        case .stretch: .yellow
+        case .unlikely: .secondary
+        }
+    }
 
     @ViewBuilder private var fatigueSection: some View {
         if let fatigue = coordinator.fatigue, fatigue.isFatigued {
@@ -351,23 +450,11 @@ struct ProgressDashboardView: View {
                 LabeledContent("For the \(plan.goal.race.displayName.lowercased())",
                                value: String(format: "%.1f", plan.raceVDOT))
             }
-            LabeledContent("Projected \(plan.goal.race.displayName)", value: projectedTime(plan))
-            if let target = plan.goal.targetTimeSeconds {
-                LabeledContent("Target", value: Format.duration(target))
-            }
             if let required = progress.requiredVDOT {
                 LabeledContent("VDOT for target", value: String(format: "%.1f", required))
                 if progress.isReadyForGoal {
                     Label("You can already run this", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
-                        .font(.subheadline)
-                } else if let gap = progress.vdotToGoal, gap <= 0 {
-                    Label("On pace, long runs still to prove the endurance", systemImage: "arrow.up.forward")
-                        .foregroundStyle(.secondary)
-                        .font(.subheadline)
-                } else if let gap = progress.vdotToGoal {
-                    Label("About \(String(format: "%.1f", gap)) VDOT to go", systemImage: "arrow.up.forward")
-                        .foregroundStyle(.secondary)
                         .font(.subheadline)
                 }
             }
@@ -379,7 +466,7 @@ struct ProgressDashboardView: View {
     }
 
     private func fitnessFooter(_ plan: TrainingPlan) -> String {
-        var text = "Your recent effort is converted to a VDOT (Jack Tupper Daniels' single number for aerobic fitness) using the Daniels and Gilbert formula. Every training pace below and your projected finish time are derived from it. Strong recorded runs nudge the VDOT up a little at a time."
+        var text = "Your recent effort is converted to a VDOT (Jack Tupper Daniels' single number for aerobic fitness) using the Daniels and Gilbert formula. Every training pace below is derived from it. Strong recorded runs raise it by at most 1 point every 3 weeks, hard sessions that keep coming in slower lower it by 1, and time off lowers it by Daniels' table."
         if plan.enduranceHoldbackBase > 0 {
             let full = Format.distance(EnduranceAdjustment.fullCreditMeters(goalMeters: plan.goal.race.meters))
             text += " Your effort was much shorter than a \(plan.goal.race.displayName.lowercased()), and it shows speed, not the endurance to go that far. So marathon pace and the projection use \(String(format: "%.1f", plan.enduranceHoldback)) VDOT less for now. Long runs earn it back, fully once you've run \(full)."
@@ -477,11 +564,6 @@ struct ProgressDashboardView: View {
                 Label("Backup & restore", systemImage: "arrow.up.arrow.down.circle")
             }
         }
-    }
-
-    private func projectedTime(_ plan: TrainingPlan) -> String {
-        let seconds = calculator.predictedTimeSeconds(distanceMeters: plan.goal.race.meters, vdot: plan.raceVDOT)
-        return Format.duration(seconds)
     }
 
     private func percent(_ fraction: Double) -> String {

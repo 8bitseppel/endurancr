@@ -4,8 +4,8 @@ import TrainingCore
 /// What a just-finished run did, shown as a sheet after Finish. Confirms the run
 /// was saved and, crucially, where it leaves the athlete for the week: "5.0 km of
 /// week 6 done", with what remains. The weekly numbers come from the plan's
-/// progress after adaptation, so a short run's shortfall has already been
-/// redistributed onto the week's remaining easy runs.
+/// progress after adaptation. A short run's shortfall isn't made up on the days
+/// after; lighter weeks shape the coming ones instead (`TrainingBuddy`).
 struct RunSummaryData: Identifiable {
     let id = UUID()
     var distanceMeters: Double
@@ -64,7 +64,7 @@ struct RunSummaryView: View {
                         }
                         .padding(.vertical, 4)
                     } footer: {
-                        Text("A short run spreads onto this week's remaining easy runs; your long run and quality sessions keep their distance.")
+                        Text("A shorter run isn't made up on the days after. If the weeks keep coming in lighter, the plan builds from what you ran.")
                     }
                 }
             }

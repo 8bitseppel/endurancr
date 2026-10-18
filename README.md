@@ -48,9 +48,21 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
 
 - A goal (for example a marathon on a given date) or a target VDOT, and a plan that
   builds towards it week by week.
-- The plan adapts after every run: missed sessions, harder or easier efforts, and
-  weekly distance are redistributed while the key sessions stay protected. An easy
-  run never grows past the week's long run.
+- The plan adapts like a running buddy who isn't pushy, and never piles missed
+  kilometres onto later days:
+  - 90% or more of the planned distance over two weeks keeps it building
+    (Pfitzinger's benchmark). 75 to 90% holds the week. Below that it rebuilds from
+    what you ran, at most 10% more a week, and the next hard session becomes easy.
+  - After more than 5 days off, paces ease by Daniels' table and easy-only weeks
+    bring you back at a share of your volume before the break.
+  - No run is planned more than 10% longer than your longest of the last 30 days
+    (Frandsen et al. 2025).
+  - VDOT goes up by at most 1 point per 3 weeks, and down 1 when hard sessions
+    keep coming in slower than their targets.
+- An honest outlook: finish-time ranges for today and race day, and whether the
+  target is on track, within reach, a stretch or unlikely, with a realistic time
+  to switch to (only if you tap it). Marathon ranges account for weekly distance
+  (Vickers & Vertosick 2016).
 - Honest marathon pace: when your fitness comes from a much shorter race, marathon
   pace and the finish prediction start up to 3 VDOT lower, and long runs earn it
   back (fully at 25 km for a marathon). Until they do, you get a full build, never
@@ -113,12 +125,15 @@ To run it on your own devices, set your own team in `project.yml`
 
 ## Screenshots and releases
 
-`./scripts/screenshots.sh` takes the screenshots in `docs/screenshots/` on the iPhone and
-Apple Watch Simulators, using sample data that only exists in Debug builds
+`./scripts/screenshots.sh` takes the screenshots on the iPhone and Apple Watch
+Simulators, using sample data that only exists in Debug builds
 (`Shared/DemoMode.swift`): a 4:30 marathon plan from a 12.2 km run at 5:36/km, six
-weeks in. Long screens are recorded while they scroll and saved as
-GIFs (needs ffmpeg). `./scripts/release.sh` raises the build number and archives a
-build for the App Store.
+weeks in. Long screens are recorded while they scroll, and the watch's two-page
+screens while they turn to page 2 and back (needs ffmpeg and Pillow). Every clock
+reads 10:09. `./scripts/publish-screenshots.sh` then copies them to the README
+(`docs/screenshots/`), the App Store folders (`screenshots/appstore/`, in three
+iPhone sizes, plus the iOS 27 header and search images) and the website.
+`./scripts/release.sh` raises the build number and archives a build for the App Store.
 
 ## Privacy
 

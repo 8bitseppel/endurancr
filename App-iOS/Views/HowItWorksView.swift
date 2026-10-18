@@ -48,10 +48,40 @@ struct HowItWorksView: View {
                 topic(
                     "Adapting to your runs",
                     icon: "arrow.triangle.2.circlepath",
-                    detail: "Strong recent runs nudge your VDOT up (gently, at most a couple of points at a time) and re-pace only your upcoming workouts. A missed long run is rescheduled onto your next open day; past weeks are never rewritten. If you are behind on the current week, the missing km move onto the week's remaining easy runs: each grows by at most half and never past the long run, and the long run and hard sessions keep their distance. Hold a day in Plan and drag it onto another to swap them. Your Apple Watch shows the same adjusted days as your iPhone."
+                    detail: "The plan works like a running buddy who isn't pushy: it paces the coming weeks to the training you actually do, and past weeks are never rewritten. Missed kilometres are never piled onto later days, as Pete Pfitzinger, the Hansons and Hal Higdon all advise. A long run you missed moves to a free day only within the next 3 days, and only while training goes about as planned. Hold a day in Plan and drag it onto another to swap them. Your Apple Watch shows the same adjusted days as your iPhone. The rules are below, with where they come from."
                 )
 
                 exampleSection
+
+                topic(
+                    "When you run less than planned",
+                    icon: "figure.walk",
+                    detail: "The plan compares the kilometres you ran with the kilometres planned over the last two weeks (time off you added is left out). 90% or more is going really well (Pete Pfitzinger's benchmark), and the plan keeps building. 75 to 90%: this week stays at last week's level instead of growing. Under 75%: the coming week is about 10% more than you actually ran each week lately (at least half the plan), the next hard session becomes an easy run, and from there each week grows by at most 10% until it meets the plan again. Runners who added more than 30% in two weeks had more injuries (Nielsen et al. 2014)."
+                )
+
+                topic(
+                    "After a break",
+                    icon: "leaf",
+                    detail: "Up to 5 days without running changes nothing, as Jack Tupper Daniels writes. After a longer break your paces get a little easier by his table (for example 2% after 10 days, 5% after 3 weeks, 15% after 8 weeks) and you ease back in with easy runs only, at a share of the weekly distance you ran before: after 6 to 28 days off, half of it for the first half of the time you were away, then three quarters; after 4 to 8 weeks, a third, a half, then three quarters; after longer, five 3-week steps up to your full week. The welcome-back note on Today and Progress tells you when you're in this phase."
+                )
+
+                topic(
+                    "No run much longer than your recent longest",
+                    icon: "ruler",
+                    detail: "A run more than 10% longer than your longest run of the last 30 days goes with more injuries, in a study of 5,205 runners (Frandsen et al. 2025). So no upcoming run is planned longer than that, counting the runs before it as done: if your longest recent run was 12 km, the next long run is at most 13.2 km, the one after at most 14.5 km. If you're behind, the 32 km peak comes later, or not before this race."
+                )
+
+                topic(
+                    "Paces that follow your form",
+                    icon: "speedometer",
+                    detail: "A strong run (a race or a fast effort of 3 km or more) moves your VDOT halfway to what it shows, by at most 1 point for every 3 weeks of the plan, as Daniels advises not to raise it more often. When at least two of your hard sessions in the last 4 weeks, and most of them, come in more than 3% slower than their target, your VDOT drops by 1 so the paces fit again. Running easy days slower than easy pace is never counted against you."
+                )
+
+                topic(
+                    "An honest outlook",
+                    icon: "binoculars",
+                    detail: "Progress shows two finish-time ranges: if the race were today, and on race day if training goes on like the last two weeks. Fitness grows by at most 1 VDOT per 8 weeks of training (Daniels), less when fewer runs get done and none below 75% of the plan. Marathon predictions from shorter races run too fast for most recreational runners: about half finish 10 or more minutes slower, a quarter 20 or more, and weekly distance explains much of it (Vickers & Vertosick 2016). So under 80 km a week the marathon range gets slower. The verdict compares your target with race day: on track, within reach (at most 1 VDOT more), a stretch (up to 2) or unlikely. More than 20 days missed, or 10 to 20 with under 8 weeks left, makes it at least a stretch (Pfitzinger). A marathon plan of under 18 weeks started without a base of about 40 km a week and a long run near 16 km is unlikely. When it's a stretch or unlikely, it suggests a realistic time, or a later race for your target, and only changes your target if you tap it."
+                )
 
                 topic(
                     "\"You're good to go\"",
@@ -155,12 +185,32 @@ struct HowItWorksView: View {
                 source(
                     title: "Daniels' Running Formula (4th ed.)",
                     author: "Jack Tupper Daniels, PhD · Human Kinetics, 2021",
-                    detail: "The training system: VDOT, the five pace zones, periodization, and long-run guidance."
+                    detail: "The training system: VDOT, the five pace zones, periodization, and long-run guidance. The steps back after time off follow the 3rd edition (2014) and Daniels' VDOT adjustments for time off (news.vdoto2.com)."
                 )
                 source(
                     title: "Marathon and half marathon training plans",
                     author: "Hal Higdon (halhigdon.com) · Hansons Marathon Method",
                     detail: "When the longest long runs go: 32 km for the marathon and 19 km for the half, the last one about 3 weeks before race day."
+                )
+                source(
+                    title: "Advanced Marathoning and Faster Road Racing",
+                    author: "Pete Pfitzinger and Scott Douglas · Human Kinetics",
+                    detail: "Making up for lost time after missed training, the 90% benchmark, the base before a marathon plan, and not cramming missed mileage."
+                )
+                source(
+                    title: "How much running is too much? (BJSM, 2025)",
+                    author: "Frandsen et al., 5,205 runners",
+                    detail: "Single runs more than 10% longer than the longest of the last 30 days and injury risk."
+                )
+                source(
+                    title: "A better formula for calculating marathon race times (2016)",
+                    author: "Vickers & Vertosick, BMC Sports Science",
+                    detail: "Why predictions from shorter races run too fast for recreational marathoners, and how weekly distance matters."
+                )
+                source(
+                    title: "Excessive progression in weekly running distance (JOSPT, 2014)",
+                    author: "Nielsen et al.",
+                    detail: "More injuries among novice runners who added more than 30% in two weeks."
                 )
                 source(
                     title: "Oxygen Power: Performance Tables for Distance Runners",
