@@ -225,6 +225,24 @@ An honest outlook on your goal
 - It tells you whether your target is on track, within reach, a stretch or unlikely, and why.
 - If your target looks out of reach, it suggests a realistic time or a later race. It only changes your target if you tap it.
 
+Also
+- How it works explains every new rule and lists the books and studies behind it.
+
+### Screenshots
+
+Re-take them with `./scripts/screenshots.sh`, then `./scripts/publish-screenshots.sh`.
+The iPhone Progress screenshot (`iphone-2-progress.png`) now shows the outlook. The
+header and search images in `screenshots/appstore/creative/` are rebuilt from the
+new screens.
+
+## Version 1.2.0
+
+### Promotional text (170)
+
+See what you ran, what changed and why, and what each week is for: the Plan tab now follows your training day by day, up to race day and your outlook.
+
+### What's New (4000)
+
 A Plan tab worth opening
 - Past days show what you actually ran: done, shorter or missed, with distance and pace.
 - A day the plan changed shows what it was, and the week says why.
@@ -233,12 +251,12 @@ A Plan tab worth opening
 - Your 32 km runs and the start of the taper are marked, and the plan ends with your race and its outlook.
 
 Also
-- How it works explains every new rule and lists the books and studies behind it.
+- After an easier cutback week, a lighter stretch now holds you at the level of your last full week, not at the cutback.
+- Race-week rest days show a rest icon instead of the vacation one.
 - The "Skip Christmas & New Year" switch is gone. To keep a day free, drag its run to another day in the calendar.
 
 ### Screenshots
 
-Re-take them with `./scripts/screenshots.sh`, then `./scripts/publish-screenshots.sh`.
-The iPhone Progress screenshot (`iphone-2-progress.png`) now shows the outlook. The
-header and search images in `screenshots/appstore/creative/` are rebuilt from the
-new screens.
+The iPhone Plan screenshot (`iphone-7-plan.png`) now shows what was run, the changed
+days and the overview. Re-take with `./scripts/screenshots.sh`, then
+`./scripts/publish-screenshots.sh`; everything in `screenshots/appstore/` is current.
