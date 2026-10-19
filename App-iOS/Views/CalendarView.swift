@@ -314,6 +314,12 @@ private struct DayCard: View {
     var isExpanded = false
 
     private var isRest: Bool { workout.type == .rest }
+    /// A run on a rest day: shown as a run that counts, not as rest.
+    private var isExtra: Bool { isRest && review?.status == .extra }
+    /// Drawn as a rest day: dashed, no fill.
+    private var looksRest: Bool { isRest && !isExtra }
+    private var isDone: Bool { review?.status == .done || isExtra }
+    private var isMissed: Bool { review?.status == .missed }
     /// The reason for a change, shown on the card rather than only when it's open.
     private var showsNoteInline: Bool {
         review?.isChanged == true && !isRest && !workout.notes.isEmpty && PlanReview.reason(of: workout.notes) != weekNote
@@ -337,10 +343,16 @@ private struct DayCard: View {
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(tag.tint)
                     }
-                    Text(isRest && !workout.notes.isEmpty ? workout.notes : Format.workoutTitle(workout.type))
-                        .font(isRest ? .subheadline : .body.weight(.medium))
-                        .foregroundStyle(isRest ? .secondary : .primary)
+                    Text(title)
+                        .font(looksRest ? .subheadline : .body.weight(.medium))
+                        .foregroundStyle(looksRest ? .secondary : .primary)
+                        .strikethrough(isMissed)
                         .lineLimit(2)
+                    if isExtra, let effort = extraEffortText {
+                        Text(effort)
+                            .font(.subheadline).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     if !isRest, let summary = Format.sessionSummary(workout) {
                         Text(summary)
                             .font(.subheadline).foregroundStyle(.secondary)
@@ -371,7 +383,10 @@ private struct DayCard: View {
 
                 Spacer(minLength: 8)
 
-                if isRest {
+                if isExtra, let review {
+                    Text(Format.distance(review.ranMeters))
+                        .font(.body.weight(.semibold)).monospacedDigit()
+                } else if isRest {
                     Image(systemName: Format.restSymbol(note: workout.notes))
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
@@ -400,30 +415,52 @@ private struct DayCard: View {
                 .transition(.opacity)
             }
         }
-        .padding(.vertical, isRest ? 8 : 10)
+        .padding(.vertical, looksRest ? 8 : 10)
         .padding(.horizontal, 12)
         .background(
-            isRest ? AnyShapeStyle(.clear) : AnyShapeStyle(.fill.tertiary),
+            looksRest ? AnyShapeStyle(.clear) : AnyShapeStyle(.fill.tertiary),
             in: .rect(cornerRadius: 14)
         )
+        // A run done, on its day or extra on a rest day, is lightly highlighted.
+        .background(isDone ? Color.green.opacity(0.10) : .clear, in: .rect(cornerRadius: 14))
         .overlay {
-            if isRest {
+            if looksRest {
                 RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(.quaternary, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            } else if isDone {
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(Color.green.opacity(0.35), lineWidth: 1)
             } else if review?.milestone == .longestRun, !isPast {
                 RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1)
             }
         }
-        // Days behind you are dimmed; what was run says how they went.
-        .opacity(isPast ? 0.6 : 1)
+        // Days behind you step back: a run done a little, a missed one (struck
+        // through) the most.
+        .opacity(!isPast ? 1 : isDone ? 0.9 : isMissed ? 0.5 : 0.65)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
         .accessibilityHint(isPast ? "In the past" : "")
     }
 
+    private var title: String {
+        if isExtra { return "Extra run" }
+        return isRest && !workout.notes.isEmpty ? workout.notes : Format.workoutTitle(workout.type)
+    }
+
+    /// How an extra run was run, from its pace: easy is just what a rest day can take.
+    private var extraEffortText: String? {
+        switch review?.effort {
+        case .easy?: "Easy pace, good for your base"
+        case .marathonPace?: "Steady pace, close to marathon pace"
+        case .threshold?, .interval?, .repetitionSpeed?: "A hard run on a rest day: keep the next easy days easy"
+        default: nil
+        }
+    }
+
     /// A short tag above the title: a change, or a milestone.
     private var tag: (text: String, symbol: String, tint: Color)? {
+        if isExtra { return ("Counts toward this week", "checkmark.seal.fill", .green) }
         // A change the week's line already explains needs no tag; "Was" says enough.
         if review?.isChanged == true, !isPast, weekNote == nil || showsNoteInline {
             return ("Adjusted", "arrow.triangle.2.circlepath", .accentColor)
@@ -453,17 +490,17 @@ private struct DayCard: View {
         case .done: return (ran ?? "Done", "checkmark.circle.fill", .green)
         case .shorter: return (ran ?? "Shorter", "circle.lefthalf.filled", .secondary)
         case .missed: return ("Missed", "xmark.circle", .secondary)
-        case .extra: return ran.map { ($0, "plus.circle", .secondary) }
+        case .extra: return ran.map { ($0, "checkmark.circle.fill", .green) }
         case .upcoming, .today, .rest: return nil
         }
     }
 
     private var accessibilityText: String {
         let date = workout.date.formatted(.dateTime.weekday(.abbreviated).day().month())
-        let title = isRest && !workout.notes.isEmpty ? workout.notes : Format.workoutTitle(workout.type)
         var parts = [date]
         if let tag { parts.append(tag.text) }
-        parts.append(isRest ? title : "\(title), \(Format.distance(workout.distanceMeters))")
+        parts.append(looksRest || isExtra ? title : "\(title), \(Format.distance(workout.distanceMeters))")
+        if isExtra, let extraEffortText { parts.append(extraEffortText) }
         if !isRest, let summary = Format.sessionSummary(workout) { parts.append(summary) }
         if let wasText { parts.append(wasText) }
         if showsNoteInline { parts.append(workout.notes) }

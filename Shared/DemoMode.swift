@@ -111,14 +111,23 @@ enum DemoMode {
     /// Runs that followed the plan up to yesterday, a little off here and there.
     /// A few easy runs are skipped; long runs never are, since the app would
     /// move a missed one into this week. One easy run last week went fast, the
-    /// kind of good day that makes the paces a little faster.
+    /// kind of good day that makes the paces a little faster. Last week one easy
+    /// run was missed and an easy 5 km was run on its rest day instead.
     static var runs: [CompletedRun] {
         if let recent = recentRun { return [recent] }
         guard let plan else { return [] }
-        let today = Calendar.current.startOfDay(for: .now)
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
         let fastDay = plan.allWorkouts.last { $0.type == .easy && $0.date < today.addingTimeInterval(-3 * 86_400) }?.id
-        return plan.allWorkouts.enumerated().compactMap { index, workout in
-            let skipped = workout.type == .easy && index % 9 == 4 && workout.id != fastDay
+        let lastWeek = plan.weeks.last { $0.startDate <= today.addingTimeInterval(-7 * 86_400) }
+        let missedLastWeek = lastWeek?.workouts.filter { $0.type == .easy && $0.id != fastDay }.dropFirst().first?.id
+        let extraDay = lastWeek?.workouts.first { $0.type == .rest && $0.notes == "Rest / cross-train" }
+        let extra = extraDay.map {
+            CompletedRun(date: $0.date.addingTimeInterval(8 * 3600), distanceMeters: 5_020,
+                         durationSeconds: 5.02 * plan.paceZones.easySecPerKm * 1.01, averageHeartRate: 136)
+        }
+        return [extra].compactMap { $0 } + plan.allWorkouts.enumerated().compactMap { index, workout in
+            let skipped = workout.type == .easy && (index % 9 == 4 || workout.id == missedLastWeek) && workout.id != fastDay
             guard workout.type != .rest, workout.date < today, !skipped else { return nil }
             let fast = workout.id == fastDay
                 ? VDOTCalculator().predictedTimeSeconds(distanceMeters: workout.distanceMeters, vdot: plan.vdot + 2) / (workout.distanceMeters / 1_000)

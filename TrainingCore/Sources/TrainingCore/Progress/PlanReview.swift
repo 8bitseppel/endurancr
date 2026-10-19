@@ -36,6 +36,10 @@ public struct PlanReview: Sendable, Equatable {
         /// The pace window before the paces changed; `nil` when within 3 s/km.
         public var originalPace: ClosedRange<Double>?
         public var milestone: Milestone?
+        /// How hard the run was, from its average pace against the plan's zones:
+        /// `.easy`, `.marathonPace` (steady), `.threshold` or `.interval` (hard).
+        /// `nil` without a run.
+        public var effort: WorkoutType?
 
         public var isChanged: Bool { originalType != nil }
         /// Average pace of what was run (sec/km), `nil` without a run.
@@ -106,6 +110,7 @@ public struct PlanReview: Sendable, Equatable {
             }
 
             var day = Day(status: status, ranMeters: meters, ranSeconds: seconds)
+            if meters > 0 { day.effort = Self.effort(paceSecPerKm: seconds / (meters / 1_000), zones: plan.paceZones) }
             if let o = originalByDay[d], o.type != w.type || abs(o.distanceMeters - w.distanceMeters) >= 500 {
                 day.originalType = o.type
                 day.originalMeters = o.distanceMeters
@@ -149,6 +154,15 @@ public struct PlanReview: Sendable, Equatable {
             )
         }
         return PlanReview(days: days, weeks: weeks)
+    }
+
+    /// The zone a run's average pace falls in, with a little room (3%, 2%) so a run
+    /// at the fast end of easy still counts as easy.
+    public static func effort(paceSecPerKm pace: Double, zones: PaceZones) -> WorkoutType {
+        if pace >= zones.easySecPerKm * 0.97 { return .easy }
+        if pace >= zones.marathonSecPerKm * 0.98 { return .marathonPace }
+        if pace >= zones.thresholdSecPerKm * 0.98 { return .threshold }
+        return .interval
     }
 
     /// A changed run's reason without the strides it keeps, so runs changed for the same

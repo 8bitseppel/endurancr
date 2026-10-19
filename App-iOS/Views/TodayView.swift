@@ -21,7 +21,18 @@ struct TodayView: View {
             List {
                 if let workout = coordinator.workout() {
                     Section("Today · \(Format.workoutTitle(workout.type))") {
-                        if workout.type == .rest {
+                        if workout.type == .rest, let day = coordinator.review?.day(.now), day.ranMeters > 0 {
+                            // Ran on a rest day: it's in the plan and counts.
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Extra run, \(Format.distance(day.ranMeters))").fontWeight(.semibold)
+                                    Text("It counts toward this week. \(day.effort == .easy ? "An easy one, good for your base." : "Keep the next easy days easy.")")
+                                        .font(.callout).foregroundStyle(.secondary)
+                                }
+                            } icon: {
+                                Image(systemName: "checkmark.seal.fill").foregroundStyle(.green)
+                            }
+                        } else if workout.type == .rest {
                             Label(
                                 workout.notes.isEmpty ? "Rest day. Recover well." : workout.notes,
                                 systemImage: Format.restSymbol(note: workout.notes)

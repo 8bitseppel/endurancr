@@ -758,6 +758,11 @@ h.suite("A run on the start day, before the first scheduled run") {
     h.check(review.day(evening, calendar: cal)?.status == .extra && review.day(evening, calendar: cal)?.ranMeters == 8_300,
             "Monday shows the run, on a rest day")
     h.check(abs((review.weeks[0]?.doneMeters ?? 0) - 8_300) < 1, "the week header shows 8 km done")
+    h.check(review.day(evening, calendar: cal)?.effort == .easy, "6:39/km is an easy run for this runner")
+    let z = plan.paceZones
+    h.check(PlanReview.effort(paceSecPerKm: z.thresholdSecPerKm, zones: z) == .threshold
+            && PlanReview.effort(paceSecPerKm: z.intervalSecPerKm, zones: z) == .interval
+            && PlanReview.effort(paceSecPerKm: z.marathonSecPerKm, zones: z) == .marathonPace, "efforts follow the zones")
     // The week takes it into account: the easy runs left get shorter, the long run keeps its length.
     let adapted = AdaptationEngine().adapt(plan: plan, completedRuns: runs, asOf: asOf, calendar: cal)
     let left = { (p: TrainingPlan) in p.weeks[0].workouts.filter { $0.date > asOf && $0.type == .easy }.map(\.distanceMeters).reduce(0, +) }

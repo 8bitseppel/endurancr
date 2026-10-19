@@ -244,7 +244,8 @@ Train like the books: marathon-pace runs, strides and a tune-up race, and a Plan
 ### What's New (4000)
 
 A Plan tab worth opening
-- Past days show what you actually ran: done, shorter or missed, with distance and pace.
+- Past days show what you actually ran: done runs are highlighted, missed ones struck through, with distance and pace.
+- A run on a rest day shows up as an extra run that counts toward the week, with how hard it was.
 - A day the plan changed shows what it was, and the week says why.
 - When your paces change, every coming run shows its new pace next to the old one, and this week says why: a run that showed you're fitter, hard sessions that came in slow, or time off.
 - Each week says what it's for, its long run, and how much of it you've run.

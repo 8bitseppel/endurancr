@@ -60,14 +60,16 @@ WATCH_APP="$BUILD/Build/Products/Debug-watchsimulator/Endurancr Watch App.app"
 xcrun simctl install "$PHONE" "$PHONE_APP"
 xcrun simctl install "$WATCH" "$WATCH_APP"
 
-# shot <device> <bundle id> <screen or "-"> <file name>
+# shot <device> <bundle id> <screen or "-"> <file name> [more launch arguments]
 shot() {
-  xcrun simctl terminate "$1" "$2" 2>/dev/null || true
-  if [ "$3" = "-" ]; then
-    xcrun simctl launch "$1" "$2" -demo >/dev/null
+  device=$1; bundle=$2; screen=$3; file=$4; shift 4
+  xcrun simctl terminate "$device" "$bundle" 2>/dev/null || true
+  if [ "$screen" = "-" ]; then
+    xcrun simctl launch "$device" "$bundle" -demo "$@" >/dev/null
   else
-    xcrun simctl launch "$1" "$2" -demo -demoScreen "$3" >/dev/null
+    xcrun simctl launch "$device" "$bundle" -demo -demoScreen "$screen" "$@" >/dev/null
   fi
+  set -- "$device" "$bundle" "$screen" "$file"
   sleep 4
   xcrun simctl io "$1" screenshot --type=png "$OUT/$4.png" >/dev/null 2>&1
   echo "    $OUT/$4.png"
@@ -104,6 +106,8 @@ shot "$PHONE" app.endurancr run iphone-4-run
 shot "$PHONE" app.endurancr summary iphone-5-summary
 rec  "$PHONE" app.endurancr progress iphone-6-progress 360 20
 shot "$PHONE" app.endurancr plan iphone-7-plan
+# Last week: runs done (highlighted), one missed (struck through), an extra run on a rest day.
+shot "$PHONE" app.endurancr plan iphone-8-week -demoPlanWeek 6
 
 echo "==> App Clip"
 xcrun simctl install "$PHONE" "$BUILD/Build/Products/Debug-iphonesimulator/EndurancrClip.app"
