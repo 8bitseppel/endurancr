@@ -36,6 +36,8 @@ final class PlanCoordinator {
     private(set) var fatigue: FatigueAssessment?
     /// How training is going and what the plan does about it (`TrainingBuddy`).
     private(set) var buddy: TrainingBuddy.Status?
+    /// The paces the coming runs follow, and why they changed.
+    private(set) var pacing: TrainingBuddy.Pacing?
     var isWorking = false
 
     init(context: ModelContext, health: HealthKitService) {
@@ -98,6 +100,7 @@ final class PlanCoordinator {
         var goal = inputs.goal
         goal.targetTimeSeconds = seconds
         buddy = nil   // no outlook from the old status for the new plan
+        pacing = nil
         try update(goal: goal, fitness: inputs.fitness)
         await refreshAdaptation()
     }
@@ -287,6 +290,7 @@ final class PlanCoordinator {
         )
         fatigue = result.fatigue
         buddy = result.buddy
+        pacing = result.pacing
         currentPlan = result.plan
     }
 

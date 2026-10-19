@@ -56,7 +56,7 @@ struct HowItWorksView: View {
                 topic(
                     "Reading the plan",
                     icon: "list.bullet.rectangle",
-                    detail: "Plan opens around today. On top: the week you're in, a bar of the phases (base, build, peak, taper, race week) with today marked, and, while the plan is holding back, what it's doing and why. Each week says what it's for, its long run, and how much of it you've run. Past days show what Apple Health recorded: done (at least 80% of the distance), shorter, or missed. A day the plan changed shows what it was, and the week says why once. The plan's longest runs (32 km for a marathon) and the start of the taper are marked, and it ends with your race and the outlook for it."
+                    detail: "Plan opens around today. On top: the week you're in and a bar of the phases (base, build, peak, taper, race week) with today marked. Each week says what it's for, its long run, and how much of it you've run. The current week also says how training is going and, when your paces changed, why: faster after a run that showed you're fitter, slower when hard sessions came in slow, eased after a break. Every coming run then shows its new pace and what it was. Past days show what Apple Health recorded: done (at least 80% of the distance), shorter, or missed. A day the plan changed shows what it was, and the week says why once. The plan's longest runs (32 km for a marathon) and the start of the taper are marked, and it ends with your race and the outlook for it."
                 )
 
                 topic(

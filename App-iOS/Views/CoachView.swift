@@ -159,15 +159,67 @@ struct CoachView: View {
 
     // MARK: Empty state
 
+    /// The first screen, before there's a goal: what the app does, and one clear way in.
+    /// Text styles throughout, so it grows with Dynamic Type (it scrolls when it must).
     private var emptyState: some View {
-        ContentUnavailableView {
-            Label("Ready when you are", systemImage: "flag.checkered")
-        } description: {
-            Text("Pick a race goal and endurancr hands you one training a day, all the way to the start line.")
-        } actions: {
-            Button("Set your goal") { showingGoalEditor = true }
-                .buttonStyle(.borderedProminent)
-            Button("Import a backup") { showingDataManagement = true }
+        ScrollView {
+            VStack(spacing: 28) {
+                Image(systemName: "flag.checkered")
+                    .font(.system(size: 64, weight: .semibold))
+                    .foregroundStyle(.tint)
+                    .padding(26)
+                    .background(Color.accentColor.opacity(0.15), in: .circle)
+                    .accessibilityHidden(true)
+
+                VStack(spacing: 12) {
+                    Text("Ready when you are")
+                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                        .accessibilityAddTraits(.isHeader)
+                    Text("Pick a race goal and endurancr hands you one training a day, all the way to the start line.")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+                .multilineTextAlignment(.center)
+
+                VStack(alignment: .leading, spacing: 16) {
+                    welcomePoint("arrow.triangle.2.circlepath", "Follows the runs you really do, like a running buddy")
+                    welcomePoint("gauge.with.needle", "An honest outlook on your target time")
+                    welcomePoint("applewatch", "Run with your iPhone or Apple Watch")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(spacing: 14) {
+                    Button {
+                        showingGoalEditor = true
+                    } label: {
+                        Text("Set your goal")
+                            .font(.title3.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+
+                    Button("Import a backup") { showingDataManagement = true }
+                        .font(.body.weight(.medium))
+                }
+            }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 32)
+            .frame(maxWidth: 520)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .defaultScrollAnchor(.center)
+    }
+
+    private func welcomePoint(_ symbol: String, _ text: String) -> some View {
+        Label {
+            Text(text).font(.body)
+        } icon: {
+            Image(systemName: symbol)
+                .font(.title3)
+                .foregroundStyle(.tint)
+                .frame(width: 32)
         }
     }
 

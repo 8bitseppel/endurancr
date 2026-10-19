@@ -8,7 +8,8 @@ import Foundation
 ///   matched to the workout, or at least 80% of its distance that day), shorter when
 ///   some running was recorded, and missed otherwise.
 /// - A day counts as changed when the adapted plan has a different session or at
-///   least 0.5 km more or less than the plan built from the goal (`original`).
+///   least 0.5 km more or less than the plan built from the goal (`original`). Its
+///   pace window counts as changed at 3 s/km or more.
 public struct PlanReview: Sendable, Equatable {
     public enum Status: Sendable, Equatable {
         case upcoming, today, done, shorter, missed
@@ -32,6 +33,8 @@ public struct PlanReview: Sendable, Equatable {
         /// The session before the plan changed it; `nil` when unchanged.
         public var originalType: WorkoutType?
         public var originalMeters: Double?
+        /// The pace window before the paces changed; `nil` when within 3 s/km.
+        public var originalPace: ClosedRange<Double>?
         public var milestone: Milestone?
 
         public var isChanged: Bool { originalType != nil }
@@ -106,6 +109,10 @@ public struct PlanReview: Sendable, Equatable {
             if let o = originalByDay[d], o.type != w.type || abs(o.distanceMeters - w.distanceMeters) >= 500 {
                 day.originalType = o.type
                 day.originalMeters = o.distanceMeters
+            }
+            if let o = originalByDay[d], o.type == w.type, let was = o.targetPaceSecPerKm, let now = w.targetPaceSecPerKm,
+               abs(was.lowerBound - now.lowerBound) >= 3 || abs(was.upperBound - now.upperBound) >= 3 {
+                day.originalPace = was
             }
             let originalLong = originalByDay[d] ?? w
             if originalLong.type == .longRun, peakLong > 0, originalLong.distanceMeters >= peakLong - 1 {

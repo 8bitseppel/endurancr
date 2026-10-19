@@ -616,6 +616,19 @@ h.suite("Plan review: what was run, what changed, what each week is for") {
     h.check(review.weeks[plan.weeks.count - 1]!.purpose == "Short and easy until race day.", "race week has its own line")
     h.check(review.weeks[0]!.purpose.contains("Long run"), "a week names its long run")
 
+    // Paces: a fast 10 km lifts them, says why, and the days know their old pace.
+    let fastTime = VDOTCalculator().predictedTimeSeconds(distanceMeters: 10_000, vdot: plan.vdot + 3)
+    let withFast = runs + [CompletedRun(date: date(2026, 11, 28), distanceMeters: 10_000, durationSeconds: fastTime)]
+    let fit = engine.adaptWithStatus(plan: plan, completedRuns: withFast, asOf: asOf, calendar: cal)
+    h.check(fit.pacing.isFaster && fit.pacing.reason?.contains("fitter") == true, "a fast run makes the paces faster, and says why")
+    let fitReview = PlanReview.make(plan: fit.plan, original: plan, completedRuns: withFast, asOf: asOf, calendar: cal)
+    let nextEasy = fit.plan.allWorkouts.first { $0.type == .easy && $0.date > asOf }!
+    let was = fitReview.day(nextEasy.date, calendar: cal)?.originalPace
+    h.check(was != nil && was!.lowerBound > nextEasy.targetPaceSecPerKm!.lowerBound, "a coming easy run shows its slower old pace")
+    h.check(engine.adaptWithStatus(plan: plan, completedRuns: runs, asOf: asOf, calendar: cal).pacing.reason == nil
+            || !(engine.adaptWithStatus(plan: plan, completedRuns: runs, asOf: asOf, calendar: cal).pacing.isFaster),
+            "runs at the planned paces don't make them faster")
+
     // Milestones: the 32 km long runs and the taper.
     let longest = plan.allWorkouts.filter { review.day($0.date, calendar: cal)?.milestone == .longestRun }
     h.check(!longest.isEmpty && longest.allSatisfy { $0.type == .longRun && $0.distanceMeters == 32_000 }, "the 32 km runs are marked")

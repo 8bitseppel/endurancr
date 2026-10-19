@@ -109,15 +109,20 @@ enum DemoMode {
 
     /// Runs that followed the plan up to yesterday, a little off here and there.
     /// A few easy runs are skipped; long runs never are, since the app would
-    /// move a missed one into this week.
+    /// move a missed one into this week. One easy run last week went fast, the
+    /// kind of good day that makes the paces a little faster.
     static var runs: [CompletedRun] {
         if let recent = recentRun { return [recent] }
         guard let plan else { return [] }
         let today = Calendar.current.startOfDay(for: .now)
+        let fastDay = plan.allWorkouts.last { $0.type == .easy && $0.date < today.addingTimeInterval(-3 * 86_400) }?.id
         return plan.allWorkouts.enumerated().compactMap { index, workout in
-            let skipped = workout.type == .easy && index % 9 == 4
+            let skipped = workout.type == .easy && index % 9 == 4 && workout.id != fastDay
             guard workout.type != .rest, workout.date < today, !skipped else { return nil }
-            let pace = workout.targetPaceSecPerKm.map { ($0.lowerBound + $0.upperBound) / 2 } ?? 330
+            let fast = workout.id == fastDay
+                ? VDOTCalculator().predictedTimeSeconds(distanceMeters: workout.distanceMeters, vdot: plan.vdot + 2) / (workout.distanceMeters / 1_000)
+                : nil
+            let pace = fast ?? workout.targetPaceSecPerKm.map { ($0.lowerBound + $0.upperBound) / 2 } ?? 330
             let distance = workout.distanceMeters * (index % 3 == 0 ? 1.02 : 0.99)
             return CompletedRun(
                 date: workout.date.addingTimeInterval(7 * 3600),

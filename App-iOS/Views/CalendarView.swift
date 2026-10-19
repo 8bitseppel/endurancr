@@ -15,6 +15,8 @@ struct CalendarView: View {
     @State private var targetedDay: Date?
     @State private var expandedDay: Date?
     @State private var didScrollToToday = false
+    /// The swap hint shows until the first swap.
+    @AppStorage("plan.hasSwappedDays") private var hasSwappedDays = false
 
     var body: some View {
         NavigationStack {
@@ -33,13 +35,10 @@ struct CalendarView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 6, pinnedViews: .sectionHeaders) {
-                    Text("Hold a day and drag it onto another to swap them.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                        .padding(.bottom, 4)
                     ForEach(plan.weeks, id: \.index) { week in
                         Section {
                             if let summary = review?.weeks[week.index] {
-                                weekIntro(summary)
+                                weekIntro(summary, isCurrent: isCurrent(week))
                             }
                             ForEach(week.workouts) { workout in
                                 card(workout, zones: plan.paceZones, review: review?.day(workout.date),
@@ -59,7 +58,7 @@ struct CalendarView: View {
                 .padding(.bottom)
             }
             .safeAreaInset(edge: .top, spacing: 0) {
-                PlanOverview(plan: plan, progress: coordinator.progress, buddy: coordinator.buddy)
+                PlanOverview(plan: plan, progress: coordinator.progress, showsHint: !hasSwappedDays)
                     .padding(.horizontal)
                     .padding(.bottom, 6)
                     .background(.bar)
@@ -127,6 +126,7 @@ struct CalendarView: View {
                             withAnimation(.snappy) {
                                 expandedDay = nil
                                 coordinator.swapDays(workout.date, other)
+                                hasSwappedDays = true
                             }
                         }
                     }
@@ -145,6 +145,7 @@ struct CalendarView: View {
                     withAnimation(.snappy) {
                         expandedDay = nil
                         coordinator.swapDays(from, workout.date)
+                        hasSwappedDays = true
                     }
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 })
@@ -157,7 +158,7 @@ struct CalendarView: View {
     /// it is done, with a bar for the current week.
     private func weekHeader(_ week: TrainingWeek, summary: PlanReview.Week?) -> some View {
         let started = week.startDate <= .now
-        let isCurrent = started && (Calendar.current.date(byAdding: .day, value: 7, to: week.startDate) ?? .now) > .now
+        let isCurrent = isCurrent(week)
         return VStack(spacing: 6) {
             HStack {
                 Text("Week \(week.index + 1) · \(week.phase.displayName)")
@@ -183,25 +184,67 @@ struct CalendarView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// What the week is for, and how the plan changed its distance.
-    private func weekIntro(_ summary: PlanReview.Week) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(summary.purpose)
-            if let change = changeLine(summary) {
-                Text(change).foregroundStyle(.tint)
+    private func isCurrent(_ week: TrainingWeek) -> Bool {
+        week.startDate <= .now && (Calendar.current.date(byAdding: .day, value: 7, to: week.startDate) ?? .now) > .now
+    }
+
+    /// What the week is for, and how the plan changed its distance. The current week
+    /// also says how training is going and why the paces changed.
+    private func weekIntro(_ summary: PlanReview.Week, isCurrent: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(summary.purpose)
+                // The box below says why for the current week, so only the distance here.
+                if let change = changeLine(summary, withNote: !(isCurrent && showsBuddyPhase)) {
+                    Text(change).foregroundStyle(.tint)
+                }
+            }
+            .font(.footnote).foregroundStyle(.secondary)
+            if isCurrent, !buddyLines.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(buddyLines, id: \.text) { line in
+                        Label {
+                            Text(line.text).font(.subheadline)
+                        } icon: {
+                            Image(systemName: line.symbol).foregroundStyle(.tint)
+                        }
+                    }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.accentColor.opacity(0.12), in: .rect(cornerRadius: 12))
             }
         }
-        .font(.footnote).foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
         .padding(.bottom, 2)
     }
 
+    /// How training is going (when the plan is doing something about it) and why the
+    /// paces changed.
+    private var showsBuddyPhase: Bool {
+        guard let buddy = coordinator.buddy, !buddy.message.isEmpty else { return false }
+        switch buddy.phase {
+        case .holding, .rebuilding, .easingBack: return true
+        case .onTrack, .starting: return false
+        }
+    }
+
+    private var buddyLines: [(text: String, symbol: String)] {
+        var lines: [(text: String, symbol: String)] = []
+        if showsBuddyPhase, let buddy = coordinator.buddy { lines.append((buddy.message, buddy.phase.symbol)) }
+        if let reason = coordinator.pacing?.reason {
+            lines.append((reason, coordinator.pacing?.isFaster == true ? "hare" : "tortoise"))
+        }
+        return lines
+    }
+
     /// "Shortened from 52 km. No step up this time, the last weeks were a little lighter."
-    private func changeLine(_ summary: PlanReview.Week) -> String? {
+    private func changeLine(_ summary: PlanReview.Week, withNote: Bool) -> String? {
+        let note = withNote ? summary.changeNote : nil
         let distance = summary.originalMeters.map { original in
             original > summary.plannedMeters ? "Shortened from \(Self.km(original))" : "Up from \(Self.km(original))"
         }
-        switch (distance, summary.changeNote) {
+        switch (distance, note) {
         case let (d?, note?): return "\(d). \(note)."
         case let (d?, nil): return d + "."
         case let (nil, note?): return note + "."
@@ -298,8 +341,13 @@ private struct DayCard: View {
                             .font(.caption)
                             .foregroundStyle(ran.tint)
                     } else if !isRest, let pace = workout.targetPaceSecPerKm {
-                        Text(Format.paceRange(pace))
-                            .font(.caption).foregroundStyle(.secondary)
+                        if let was = review?.originalPace {
+                            (Text(Format.paceRange(pace)) + Text(", was \(Format.paceRange(was))").foregroundStyle(.tint))
+                                .font(.caption).foregroundStyle(.secondary)
+                        } else {
+                            Text(Format.paceRange(pace))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 }
 
@@ -400,20 +448,21 @@ private struct DayCard: View {
         parts.append(isRest ? title : "\(title), \(Format.distance(workout.distanceMeters))")
         if let wasText { parts.append(wasText) }
         if showsNoteInline { parts.append(workout.notes) }
+        if !isPast, let was = review?.originalPace { parts.append("pace was \(Format.paceRange(was))") }
         if let ranText { parts.append(ranText.text) }
         return parts.joined(separator: ", ")
     }
 }
 
-/// Where the plan stands: the week and phase, a bar of the phases with today marked,
-/// and, while the plan is holding back, what it's doing and until when.
+/// Where the plan stands: the week and phase, and a bar of the phases with today
+/// marked. Kept short, since it stays pinned on top.
 private struct PlanOverview: View {
     let plan: TrainingPlan
     let progress: PlanProgress?
-    let buddy: TrainingBuddy.Status?
+    let showsHint: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 if let progress, let n = progress.currentWeekNumber {
                     Text("Week \(n) of \(progress.totalWeeks)").font(.headline)
@@ -430,16 +479,9 @@ private struct PlanOverview: View {
                 }
             }
             phaseBar
-            if let banner {
-                Label {
-                    Text(banner.text).font(.subheadline)
-                        .fixedSize(horizontal: false, vertical: true)
-                } icon: {
-                    Image(systemName: banner.symbol).foregroundStyle(.tint)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.accentColor.opacity(0.1), in: .rect(cornerRadius: 12))
+            if showsHint {
+                Label("Hold a day and drag it onto another to swap them.", systemImage: "hand.draw")
+                    .font(.footnote).foregroundStyle(.secondary)
             }
         }
         .padding(12)
@@ -486,13 +528,6 @@ private struct PlanOverview: View {
         }.joined(separator: ", ")
     }
 
-    private var banner: (text: String, symbol: String)? {
-        guard let buddy, !buddy.message.isEmpty else { return nil }
-        switch buddy.phase {
-        case .holding, .rebuilding, .easingBack: return (buddy.message, buddy.phase.symbol)
-        case .onTrack, .starting: return nil
-        }
-    }
 }
 
 /// The end of the plan: the race, and what to expect on the day.

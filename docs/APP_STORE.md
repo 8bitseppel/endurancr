@@ -246,12 +246,15 @@ See what you ran, what changed and why, and what each week is for: the Plan tab 
 A Plan tab worth opening
 - Past days show what you actually ran: done, shorter or missed, with distance and pace.
 - A day the plan changed shows what it was, and the week says why.
+- When your paces change, every coming run shows its new pace next to the old one, and this week says why: a run that showed you're fitter, hard sessions that came in slow, or time off.
 - Each week says what it's for, its long run, and how much of it you've run.
-- On top: the week you're in, the phases up to race day, and what the plan is doing while it holds back.
+- On top: the week you're in and the phases up to race day.
 - Your 32 km runs and the start of the taper are marked, and the plan ends with your race and its outlook.
 
 Also
 - After an easier cutback week, a lighter stretch now holds you at the level of your last full week, not at the cutback.
+- A clearer welcome screen with bigger text.
+- The keyboard closes when you open a date in the goal form, and tapping today as the start date moves on to race day.
 - Race-week rest days show a rest icon instead of the vacation one.
 - The "Skip Christmas & New Year" switch is gone. To keep a day free, drag its run to another day in the calendar.
 

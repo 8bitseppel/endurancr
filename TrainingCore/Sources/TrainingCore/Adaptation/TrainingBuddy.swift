@@ -159,6 +159,36 @@ public struct TrainingBuddy: Sendable {
     /// (half the gap, and at most 1 point per 3 weeks in the plan), lowered by 1 when
     /// hard sessions keep coming in slower than their targets, then scaled for any
     /// break (Daniels).
+    /// The VDOT the coming runs are paced at, and why it differs from the plan's.
+    public struct Pacing: Sendable, Equatable {
+        /// The plan's own VDOT, from the run it was built on.
+        public var base: Double
+        /// The VDOT the coming runs are paced at.
+        public var vdot: Double
+        /// One sentence on why the paces changed; `nil` when they didn't.
+        public var reason: String?
+
+        public var isFaster: Bool { vdot > base }
+    }
+
+    public func pacing(
+        base: Double, plan: TrainingPlan, status: Status, completedRuns: [CompletedRun],
+        asOf: Date, calendar: Calendar = .current
+    ) -> Pacing {
+        let vdot = pacingVDOT(base: base, plan: plan, status: status, completedRuns: completedRuns, asOf: asOf, calendar: calendar)
+        let reason: String?
+        if abs(vdot - base) < 0.05 {
+            reason = nil
+        } else if case .easingBack(let daysOff, _) = status.phase, status.vdotFactor < 1 {
+            reason = "Your paces eased a little after \(daysOff) days off, as Jack Tupper Daniels advises, and come back as you do."
+        } else if vdot > base {
+            reason = "Your paces are a little faster: a recent run showed you're fitter than when the plan started."
+        } else {
+            reason = "Your paces are a little slower: the hard sessions lately came in slower than their target."
+        }
+        return Pacing(base: base, vdot: vdot, reason: reason)
+    }
+
     public func pacingVDOT(
         base: Double, plan: TrainingPlan, status: Status, completedRuns: [CompletedRun],
         asOf: Date, calendar: Calendar = .current

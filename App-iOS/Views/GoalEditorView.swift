@@ -45,6 +45,7 @@ struct GoalEditorView: View {
 
     /// Focus for the goal-name field, so a keyboard "Done" button can dismiss it.
     @FocusState private var nameFocused: Bool
+    @State private var startPickerHeight: CGFloat = 0
 
     enum RaceKind: String, CaseIterable, Identifiable {
         case fiveK = "5K", tenK = "10K", half = "Half", marathon = "Marathon"
@@ -224,6 +225,17 @@ struct GoalEditorView: View {
                         // A day was tapped — collapse and jump straight to race day.
                         withAnimation { editingDate = .race }
                     }
+                    // Tapping the day that's already selected (often today) changes
+                    // nothing, so onChange stays quiet: a tap on the day grid moves
+                    // on as well. The month header and its arrows (the top part) don't.
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { startPickerHeight = $0 }
+                    .simultaneousGesture(SpatialTapGesture().onEnded { tap in
+                        guard tap.location.y > startPickerHeight * 0.2 else { return }
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(250))
+                            if editingDate == .start { withAnimation { editingDate = .race } }
+                        }
+                    })
             }
             dateRow("Race day", date: raceDate, field: .race)
             if editingDate == .race {
@@ -371,6 +383,7 @@ struct GoalEditorView: View {
     /// row toggles editing for that field (and closes any other open calendar).
     private func dateRow(_ label: String, date: Date, field: DateField) -> some View {
         Button {
+            nameFocused = false   // the calendar opens without the keyboard over it
             withAnimation { editingDate = (editingDate == field) ? nil : field }
         } label: {
             HStack {
@@ -593,6 +606,7 @@ private struct AddDraftVacationView: View {
 
     private func dateRow(_ label: String, date: Date, field: EditingDate) -> some View {
         Button {
+            reasonFocused = false   // the calendar opens without the keyboard over it
             withAnimation { editingDate = (editingDate == field) ? nil : field }
         } label: {
             HStack {

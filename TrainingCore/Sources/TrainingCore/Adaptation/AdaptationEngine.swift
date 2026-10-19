@@ -384,6 +384,8 @@ public struct AdaptationEngine: Sendable {
         public var plan: TrainingPlan
         public var buddy: TrainingBuddy.Status
         public var fatigue: FatigueAssessment
+        /// The paces the coming runs follow, and why they changed.
+        public var pacing: TrainingBuddy.Pacing
     }
 
     /// Full adaptation pass: read the training (buddy) → re-rate and re-pace →
@@ -401,8 +403,9 @@ public struct AdaptationEngine: Sendable {
     ) -> Result {
         let buddy = TrainingBuddy()
         let status = buddy.status(plan: plan, completedRuns: completedRuns, asOf: asOf, calendar: calendar)
-        let newVDOT = buddy.pacingVDOT(base: plan.vdot, plan: plan, status: status,
-                                       completedRuns: completedRuns, asOf: asOf, calendar: calendar)
+        let pacing = buddy.pacing(base: plan.vdot, plan: plan, status: status,
+                                  completedRuns: completedRuns, asOf: asOf, calendar: calendar)
+        let newVDOT = pacing.vdot
         let credited = creditingEndurance(plan: plan, completedRuns: completedRuns, asOf: asOf, calendar: calendar)
         let repacedPlan = repaced(plan: credited, withVDOT: newVDOT, asOf: asOf, calendar: calendar)
         let keepsUp = status.phase == .onTrack || status.phase == .holding
@@ -424,7 +427,7 @@ public struct AdaptationEngine: Sendable {
         // Last: fit the current week's easy runs to what it still needs, after any
         // rescheduling/easing/pacing/unavailability reshaped it.
         let fitted = redistributedWithinWeek(plan: available, completedRuns: completedRuns, asOf: asOf, calendar: calendar)
-        return Result(plan: fitted, buddy: status, fatigue: assessment)
+        return Result(plan: fitted, buddy: status, fatigue: assessment, pacing: pacing)
     }
 
     /// `adaptWithStatus`, for callers that only need the plan.
