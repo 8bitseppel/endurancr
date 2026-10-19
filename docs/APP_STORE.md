@@ -254,6 +254,7 @@ A Plan tab worth opening
 Also
 - After an easier cutback week, a lighter stretch now holds you at the level of your last full week, not at the cutback.
 - A clearer welcome screen with bigger text.
+- The goal form and How it works now say clearly that training paces come from your current fitness, not your target time.
 - The keyboard closes when you open a date in the goal form, and tapping today as the start date moves on to race day.
 - Race-week rest days show a rest icon instead of the vacation one.
 - The "Skip Christmas & New Year" switch is gone. To keep a day free, drag its run to another day in the calendar.

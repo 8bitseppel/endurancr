@@ -635,6 +635,19 @@ h.suite("Plan review: what was run, what changed, what each week is for") {
     h.check(plan.allWorkouts.filter { review.day($0.date, calendar: cal)?.milestone == .taperBegins }.count == 1, "the taper's first long run is marked")
 }
 
+h.suite("Target time: race-day pace, not training paces") {
+    let fitness = FitnessSnapshot(distanceMeters: 12_200, timeSeconds: 68 * 60 + 19, date: date(2026, 10, 3))
+    func plan(_ target: Double?) throws -> TrainingPlan {
+        try VDOTPlanGenerator().makePlan(
+            goal: Goal(race: .marathon, raceDate: date(2027, 4, 25), targetTimeSeconds: target, daysPerWeek: 5),
+            fitness: fitness, startDate: date(2026, 10, 5), calendar: cal)
+    }
+    let none = try plan(nil), four = try plan(4 * 3600), fast = try plan(3.5 * 3600)
+    h.check(none.paceZones == four.paceZones && four.paceZones == fast.paceZones, "training paces are the same for no target, 4:00 and 3:30")
+    let race = { (p: TrainingPlan) in p.allWorkouts.first { $0.type == .raceDay }!.targetPaceSecPerKm!.lowerBound }
+    h.check(race(fast) < race(four), "a faster target gives a faster race-day pace")
+}
+
 h.suite("Goal outlook: an honest range and verdict") {
     let engine = AdaptationEngine()
     let fitness = FitnessSnapshot(distanceMeters: 12_200, timeSeconds: 68 * 60 + 19, date: date(2026, 10, 3))

@@ -90,6 +90,12 @@ struct HowItWorksView: View {
                 )
 
                 topic(
+                    "Your target time and your paces",
+                    icon: "speedometer",
+                    detail: "Your training paces always come from your current fitness, never from your target time. Jack Tupper Daniels' rule is to train at the fitness you have: hard sessions at the pace of a goal you haven't reached yet are how runners get hurt. So changing the target doesn't change the training paces; your runs do, as they show you're fitter. The target sets the race-day pace, the outlook in Progress, and whether you get a maintenance plan."
+                )
+
+                topic(
                     "\"You're good to go\"",
                     icon: "checkmark.seal",
                     detail: "Every goal time implies a target VDOT, the fitness you'd need to run it. If your VDOT already meets that target, endurancr tells you you're good to go and switches to a maintenance plan that holds your fitness (steady volume, one weekly quality session and a long run) so you arrive at race day sharp instead of over-trained. When race day passes you can mark the goal achieved and keep a summary of what you did."

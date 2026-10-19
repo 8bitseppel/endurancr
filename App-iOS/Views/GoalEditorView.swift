@@ -307,7 +307,7 @@ struct GoalEditorView: View {
         } header: {
             Text("Target time (optional)")
         } footer: {
-            Text("Nudges race-day pace toward your goal. Leave off to pace purely from current fitness.")
+            Text("Your training paces come from your current fitness, not from this time, and get faster as your runs show you're fitter. The target sets your race-day pace and the outlook in Progress tells you honestly how likely it is.")
         }
     }
 

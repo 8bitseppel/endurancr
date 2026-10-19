@@ -72,6 +72,7 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   marathon 19 km, then shorter long runs in the two taper weeks.
 - Runs are spread over the repeating week: a rest day after the Sunday long run when
   there's one to spare, and no threshold or intervals right next to the long run.
+- Training paces come from your current fitness, never from your target time (Daniels); the target sets race-day pace and the outlook.
 - Swap days by dragging them in the plan; the watch shows the same adjusted days.
 - The plan shows what you ran on each past day (done, shorter or missed), what a changed day was and why, new paces next to the old ones with the reason, what each week is for, how far the week is, the 32 km runs and the taper, and ends with the race outlook.
 - A run on Apple Watch shows on the iPhone's Lock Screen too, through HealthKit workout
