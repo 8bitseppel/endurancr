@@ -51,7 +51,7 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
 - The plan adapts like a running buddy who isn't pushy, and never piles missed
   kilometres onto later days:
   - 90% or more of the planned distance over two weeks keeps it building
-    (Pfitzinger's benchmark). 75 to 90% holds the week. Below that it rebuilds from
+    (Pfitzinger's benchmark). 75 to 90% holds the week at your last full week. Below that it rebuilds from
     what you ran, at most 10% more a week, and one hard session that week becomes easy.
   - After more than 5 days off, paces ease by Daniels' table and easy-only weeks
     bring you back at a share of your volume before the break.
@@ -73,6 +73,7 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
 - Runs are spread over the repeating week: a rest day after the Sunday long run when
   there's one to spare, and no threshold or intervals right next to the long run.
 - Swap days by dragging them in the plan; the watch shows the same adjusted days.
+- The plan shows what you ran on each past day (done, shorter or missed), what a changed day was and why, what each week is for, how far the week is, the 32 km runs and the taper, and ends with the race outlook.
 - A run on Apple Watch shows on the iPhone's Lock Screen too, through HealthKit workout
   mirroring, with Pause and Finish. Auto-pause comes from watchOS (Auto-Pause in the
   watch's Workout settings), and a double tap pauses or resumes.

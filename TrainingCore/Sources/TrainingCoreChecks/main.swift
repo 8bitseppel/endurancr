@@ -444,6 +444,18 @@ h.suite("Training buddy: paces the plan to the training actually done") {
     h.check(week(hold.plan, containing: asOf).plannedVolumeMeters <= max(lastWeek, week(plan, containing: asOf).plannedVolumeMeters) + 1_000,
             "holding, this week doesn't grow past last week's level")
 
+    // Holding right after a cutback week: the cap is the last full week, not the cutback.
+    let vols = plan.weeks.map(\.plannedVolumeMeters)
+    if let w = (2..<plan.weeks.count).first(where: { plan.weeks[$0].phase == .build && vols[$0 - 1] < 0.85 * vols[$0 - 2] && vols[$0] > vols[$0 - 1] + 2_000 }) {
+        let after = plan.weeks[w].startDate
+        let r = engine.adaptWithStatus(plan: plan, completedRuns: ran(0.85, until: after), asOf: after, calendar: cal)
+        h.check(r.buddy.phase == .holding, "85% of the plan reads as holding after a cutback (got \(r.buddy.phase))")
+        h.check(r.plan.weeks[w].plannedVolumeMeters > vols[w - 1] + 1_000,
+                "holding after a cutback week doesn't stay at the cutback level (\(Int(r.plan.weeks[w].plannedVolumeMeters)) vs \(Int(vols[w - 1])))")
+    } else {
+        h.check(false, "the test plan has a build week after a cutback")
+    }
+
     // Half the plan: rebuilding from what was run, at most 10% more a week.
     let half = ran(0.5, until: asOf)
     let rebuild = engine.adaptWithStatus(plan: plan, completedRuns: half, asOf: asOf, calendar: cal)
@@ -562,6 +574,53 @@ h.suite("Training buddy: paces the plan to the training actually done") {
 }
 
 // MARK: Goal outlook
+
+h.suite("Plan review: what was run, what changed, what each week is for") {
+    let engine = AdaptationEngine()
+    let fitness = FitnessSnapshot(distanceMeters: 12_200, timeSeconds: 68 * 60 + 19, date: date(2026, 10, 3))
+    let goal = Goal(race: .marathon, raceDate: date(2027, 4, 25), targetTimeSeconds: 4.5 * 3600, daysPerWeek: 5, restWeekdays: [2])
+    let plan = try VDOTPlanGenerator().makePlan(goal: goal, fitness: fitness, startDate: date(2026, 10, 5), calendar: cal)
+    let asOf = date(2026, 11, 30)
+    let past = plan.allWorkouts.filter { $0.type.isRunning && $0.date < asOf }
+    // Every run as planned, except the last one missed and the one before it at half.
+    var runs = past.dropLast(2).map { CompletedRun(date: $0.date, distanceMeters: $0.distanceMeters, durationSeconds: $0.distanceMeters / 1_000 * 400) }
+    let short = past[past.count - 2], missed = past[past.count - 1]
+    runs.append(CompletedRun(date: short.date, distanceMeters: short.distanceMeters / 2, durationSeconds: short.distanceMeters / 2_000 * 400))
+    let adapted = engine.adapt(plan: plan, completedRuns: runs, asOf: asOf, calendar: cal)
+    let review = PlanReview.make(plan: adapted, original: plan, completedRuns: runs, asOf: asOf, calendar: cal)
+
+    h.check(review.day(past[0].date, calendar: cal)?.status == .done, "a run done as planned is done")
+    h.check(review.day(short.date, calendar: cal)?.status == .shorter, "half the distance is shorter")
+    h.check(review.day(missed.date, calendar: cal)?.status == .missed, "no run is missed")
+    h.check(abs((review.day(past[0].date, calendar: cal)?.ranPaceSecPerKm ?? 0) - 400) < 0.5, "the run's pace is shown")
+    let future = adapted.allWorkouts.first { $0.type.isRunning && $0.date > asOf }!
+    h.check(review.day(future.date, calendar: cal)?.status == .upcoming, "later days are upcoming")
+
+    // Changed days carry what they were.
+    let changed = adapted.allWorkouts.filter { review.day($0.date, calendar: cal)?.isChanged == true }
+    h.check(changed.allSatisfy { w in
+        let o = plan.allWorkouts.first { cal.isDate($0.date, inSameDayAs: w.date) }!
+        let d = review.day(w.date, calendar: cal)!
+        return d.originalType == o.type && d.originalMeters == o.distanceMeters
+    }, "a changed day knows its original session")
+    let unchanged = PlanReview.make(plan: plan, original: plan, completedRuns: [], asOf: asOf, calendar: cal)
+    h.check(unchanged.days.values.allSatisfy { !$0.isChanged } && unchanged.weeks.values.allSatisfy { $0.originalMeters == nil },
+            "the plan itself has no changes")
+
+    // Weeks: done so far, purpose, cutbacks.
+    let first = review.weeks[0]!
+    let firstDone = runs.filter { $0.date < cal.date(byAdding: .day, value: 7, to: plan.weeks[0].startDate)! }.reduce(0) { $0 + $1.distanceMeters }
+    h.check(abs(first.doneMeters - firstDone) < 1, "week 1 counts what was run in it")
+    h.check(review.weeks.values.contains { $0.isCutback } && review.weeks.values.filter(\.isCutback).allSatisfy { $0.purpose.hasPrefix("An easier week") },
+            "cutback weeks say they're easier")
+    h.check(review.weeks[plan.weeks.count - 1]!.purpose == "Short and easy until race day.", "race week has its own line")
+    h.check(review.weeks[0]!.purpose.contains("Long run"), "a week names its long run")
+
+    // Milestones: the 32 km long runs and the taper.
+    let longest = plan.allWorkouts.filter { review.day($0.date, calendar: cal)?.milestone == .longestRun }
+    h.check(!longest.isEmpty && longest.allSatisfy { $0.type == .longRun && $0.distanceMeters == 32_000 }, "the 32 km runs are marked")
+    h.check(plan.allWorkouts.filter { review.day($0.date, calendar: cal)?.milestone == .taperBegins }.count == 1, "the taper's first long run is marked")
+}
 
 h.suite("Goal outlook: an honest range and verdict") {
     let engine = AdaptationEngine()

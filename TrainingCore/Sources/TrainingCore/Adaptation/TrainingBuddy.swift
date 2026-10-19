@@ -114,7 +114,7 @@ public struct TrainingBuddy: Sendable {
             status.message = "You're running the plan, so it keeps building step by step."
         case 0.75..<0.9:
             status.phase = .holding
-            status.message = "The last two weeks were a little lighter, so this week stays at the same level instead of growing."
+            status.message = "The last two weeks were a little lighter, so this week stays at your last full week instead of growing."
         default:
             status.phase = .rebuilding
             status.message = "The last two weeks were lighter, so the coming weeks build from what you ran, a little more each week."
@@ -269,8 +269,10 @@ public struct TrainingBuddy: Sendable {
                 cap = reference * ret.share(today)
             }
         case .holding:
-            // Last week's planned level, but never more than 10% over what was run.
-            let last = current > 0 ? plan.weeks[current - 1].plannedVolumeMeters : plan.weeks[current].plannedVolumeMeters
+            // The last full week's planned level (a cutback week the week before
+            // doesn't count), but never more than 10% over what was run.
+            let last = plan.weeks[max(0, current - 2)..<max(1, current)].map(\.plannedVolumeMeters).max()
+                ?? plan.weeks[current].plannedVolumeMeters
             cap = min(last, max(status.recentWeeklyMeters * 1.10, 0.5 * plan.weeks[current].plannedVolumeMeters))
         case .rebuilding:
             cap = max(status.recentWeeklyMeters * 1.10, 0.5 * plan.weeks[current].plannedVolumeMeters)
@@ -282,7 +284,7 @@ public struct TrainingBuddy: Sendable {
         let note: String
         switch status.phase {
         case .easingBack: note = "Shorter while we ease back in after the break"
-        case .holding: note = "Same level as last week, no extra this time"
+        case .holding: note = "No step up this time, the last weeks were a little lighter"
         default: note = "Shorter, building back from what you ran lately"
         }
 

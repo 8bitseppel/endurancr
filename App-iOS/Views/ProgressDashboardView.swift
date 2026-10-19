@@ -196,22 +196,12 @@ struct ProgressDashboardView: View {
                 Label {
                     Text(buddy.message).font(.subheadline)
                 } icon: {
-                    Image(systemName: buddyIcon(buddy.phase))
+                    Image(systemName: buddy.phase.symbol)
                         .foregroundStyle(.tint)
                 }
             } header: {
                 Text("How it's going")
             }
-        }
-    }
-
-    private func buddyIcon(_ phase: TrainingBuddy.Status.Phase) -> String {
-        switch phase {
-        case .onTrack: "figure.run"
-        case .holding: "equal.circle"
-        case .rebuilding: "arrow.up.right.circle"
-        case .easingBack: "leaf"
-        case .starting: "sparkles"
         }
     }
 
@@ -226,11 +216,11 @@ struct ProgressDashboardView: View {
                     Label {
                         Text(verdict.title).font(.headline)
                     } icon: {
-                        Image(systemName: verdictIcon(verdict)).foregroundStyle(verdictColor(verdict))
+                        Image(systemName: verdict.symbol).foregroundStyle(verdict.tint)
                     }
                 }
-                LabeledContent("If the race were today", value: rangeText(outlook.today))
-                LabeledContent("Race day, at this rate", value: rangeText(outlook.raceDay))
+                LabeledContent("If the race were today", value: GoalOutlook.rangeText(outlook.today))
+                LabeledContent("Race day, at this rate", value: GoalOutlook.rangeText(outlook.raceDay))
                 if let target = plan.goal.targetTimeSeconds {
                     LabeledContent("Your target", value: GoalOutlook.format(target))
                 }
@@ -261,28 +251,6 @@ struct ProgressDashboardView: View {
             } message: {
                 Text("The plan is rebuilt for the new target. Your runs stay in Health, and you can change it back anytime in Edit goal.")
             }
-        }
-    }
-
-    private func rangeText(_ range: ClosedRange<Double>) -> String {
-        "\(GoalOutlook.format(range.lowerBound)) to \(GoalOutlook.format(range.upperBound))"
-    }
-
-    private func verdictIcon(_ verdict: GoalOutlook.Verdict) -> String {
-        switch verdict {
-        case .onTrack: "checkmark.circle.fill"
-        case .withinReach: "arrow.up.right.circle.fill"
-        case .stretch: "exclamationmark.circle.fill"
-        case .unlikely: "arrow.uturn.down.circle.fill"
-        }
-    }
-
-    private func verdictColor(_ verdict: GoalOutlook.Verdict) -> Color {
-        switch verdict {
-        case .onTrack: .green
-        case .withinReach: .accentColor
-        case .stretch: .yellow
-        case .unlikely: .secondary
         }
     }
 
@@ -495,8 +463,7 @@ struct ProgressDashboardView: View {
                 )
                 .foregroundStyle(by: .value("Phase", week.phase.displayName))
             }
-            // Fixed colours: the default palette puts race week in orange.
-            .chartForegroundStyleScale(domain: phaseDomain(plan), range: phaseDomain(plan).map { phaseColor[$0] ?? .blue })
+            .chartForegroundStyleScale(domain: phaseDomain(plan), range: phaseDomain(plan).map { name in plan.weeks.first { $0.phase.displayName == name }?.phase.tint ?? .blue })
             .frame(height: 200)
         } header: {
             Text("Weekly volume")
@@ -505,11 +472,6 @@ struct ProgressDashboardView: View {
         }
     }
 
-    private let phaseColor: [String: Color] = [
-        TrainingPhase.base.displayName: .teal, TrainingPhase.build.displayName: .blue,
-        TrainingPhase.peak.displayName: .indigo, TrainingPhase.taper.displayName: .green,
-        TrainingPhase.raceWeek.displayName: .purple, TrainingPhase.maintenance.displayName: .blue,
-    ]
 
     /// The phases this plan has, in order, so the legend lists only those.
     private func phaseDomain(_ plan: TrainingPlan) -> [String] {

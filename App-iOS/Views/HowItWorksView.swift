@@ -54,9 +54,15 @@ struct HowItWorksView: View {
                 exampleSection
 
                 topic(
+                    "Reading the plan",
+                    icon: "list.bullet.rectangle",
+                    detail: "Plan opens around today. On top: the week you're in, a bar of the phases (base, build, peak, taper, race week) with today marked, and, while the plan is holding back, what it's doing and why. Each week says what it's for, its long run, and how much of it you've run. Past days show what Apple Health recorded: done (at least 80% of the distance), shorter, or missed. A day the plan changed shows what it was, and the week says why once. The plan's longest runs (32 km for a marathon) and the start of the taper are marked, and it ends with your race and the outlook for it."
+                )
+
+                topic(
                     "When you run less than planned",
                     icon: "figure.walk",
-                    detail: "The plan compares the kilometres you ran with the kilometres planned over the last two weeks (time off you added is left out). 90% or more is going really well (Pete Pfitzinger's benchmark), and the plan keeps building. 75 to 90%: this week stays at last week's level instead of growing. Under 75%: the coming week is about 10% more than you actually ran each week lately (at least half the plan), one hard session that week becomes an easy run, and from there each week grows by at most 10% until it meets the plan again. Runners who added more than 30% in two weeks had more injuries (Nielsen et al. 2014)."
+                    detail: "The plan compares the kilometres you ran with the kilometres planned over the last two weeks (time off you added is left out). 90% or more is going really well (Pete Pfitzinger's benchmark), and the plan keeps building. 75 to 90%: this week stays at the level of your last full week (an easier cutback week doesn't count) instead of growing, and never more than 10% over what you ran. Under 75%: the coming week is about 10% more than you actually ran each week lately (at least half the plan), one hard session that week becomes an easy run, and from there each week grows by at most 10% until it meets the plan again. Runners who added more than 30% in two weeks had more injuries (Nielsen et al. 2014)."
                 )
 
                 topic(

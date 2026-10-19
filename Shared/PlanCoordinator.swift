@@ -102,6 +102,13 @@ final class PlanCoordinator {
         await refreshAdaptation()
     }
 
+    /// What the Plan tab shows on each day and week: what was run, what changed
+    /// from the plan built from the goal, and what each week is for.
+    var review: PlanReview? {
+        guard let plan = displayPlan else { return nil }
+        return PlanReview.make(plan: plan, original: regeneratedBasePlan(), completedRuns: recentRuns, asOf: .now, calendar: .current)
+    }
+
     var progress: PlanProgress? {
         guard let plan = displayPlan else { return nil }
         return PlanProgress.make(plan: plan, completedRuns: recentRuns, asOf: .now, calendar: .current)

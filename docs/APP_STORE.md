@@ -225,6 +225,13 @@ An honest outlook on your goal
 - It tells you whether your target is on track, within reach, a stretch or unlikely, and why.
 - If your target looks out of reach, it suggests a realistic time or a later race. It only changes your target if you tap it.
 
+A Plan tab worth opening
+- Past days show what you actually ran: done, shorter or missed, with distance and pace.
+- A day the plan changed shows what it was, and the week says why.
+- Each week says what it's for, its long run, and how much of it you've run.
+- On top: the week you're in, the phases up to race day, and what the plan is doing while it holds back.
+- Your 32 km runs and the start of the taper are marked, and the plan ends with your race and its outlook.
+
 Also
 - How it works explains every new rule and lists the books and studies behind it.
 - The "Skip Christmas & New Year" switch is gone. To keep a day free, drag its run to another day in the calendar.

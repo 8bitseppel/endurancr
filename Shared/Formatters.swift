@@ -96,7 +96,7 @@ enum Format {
     /// which is the safe default for a custom vacation reason.
     static func restSymbol(note: String) -> String {
         switch note {
-        case "", "Rest / cross-train", "Rest, the week's distance is already done": return "moon.zzz"
+        case "", "Rest / cross-train", "Rest, the week's distance is already done", "Rest, stay fresh", "Rest, an easier week": return "moon.zzz"
         case let n where n.hasPrefix("No training"): return "calendar.badge.minus"
         default: return "airplane"
         }
