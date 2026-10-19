@@ -239,7 +239,7 @@ new screens.
 
 ### Promotional text (170)
 
-See what you ran, what changed and why, and what each week is for: the Plan tab now follows your training day by day, up to race day and your outlook.
+Train like the books: marathon-pace runs, strides and a tune-up race, and a Plan tab that shows what you ran, what changed and why, up to race day.
 
 ### What's New (4000)
 
