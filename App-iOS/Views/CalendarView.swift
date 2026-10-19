@@ -28,64 +28,75 @@ struct CalendarView: View {
                 }
             }
             .navigationTitle("Plan")
+            // Inline, so the title and its subtitle look the same at the top of the
+            // plan as anywhere in it.
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 
     private func planList(_ plan: TrainingPlan, review: PlanReview?) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 6, pinnedViews: .sectionHeaders) {
+                // Horizontal padding goes on each part, not the stack, so a pinned week
+                // header spans the full width and nothing shows beside it.
+                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+                    PlanOverview(plan: plan, progress: coordinator.progress, showsHint: !hasSwappedDays)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                        .padding(.bottom, 20)
                     ForEach(plan.weeks, id: \.index) { week in
                         Section {
-                            if let summary = review?.weeks[week.index] {
-                                weekIntro(summary, isCurrent: isCurrent(week))
+                            VStack(alignment: .leading, spacing: 8) {
+                                if let summary = review?.weeks[week.index] {
+                                    weekIntro(summary, isCurrent: isCurrent(week))
+                                        .padding(.bottom, 4)
+                                }
+                                ForEach(week.workouts) { workout in
+                                    card(workout, zones: plan.paceZones, review: review?.day(workout.date),
+                                         weekNote: review?.weeks[week.index]?.changeNote)
+                                }
                             }
-                            ForEach(week.workouts) { workout in
-                                card(workout, zones: plan.paceZones, review: review?.day(workout.date),
-                                     weekNote: review?.weeks[week.index]?.changeNote)
-                                    .id(Calendar.current.startOfDay(for: workout.date))
-                            }
+                            .padding(.horizontal)
+                            .padding(.top, 4)
+                            .padding(.bottom, 28)
                         } header: {
                             weekHeader(week, summary: review?.weeks[week.index]).id("week-\(week.index)")
                         }
                     }
                     if let outlook = coordinator.outlook {
                         RaceCard(goal: plan.goal, outlook: outlook)
-                            .padding(.top, 10)
+                            .padding(.horizontal)
+                            .padding(.bottom, 24)
                     }
                 }
-                .padding(.horizontal)
-                .padding(.bottom)
             }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                PlanOverview(plan: plan, progress: coordinator.progress, showsHint: !hasSwappedDays)
-                    .padding(.horizontal)
-                    .padding(.bottom, 6)
-                    .background(.bar)
-            }
+            .navigationSubtitle(subtitle(coordinator.progress))
+            // A solid bar, like the pinned week header under it: the days scrolling
+            // past the header shouldn't show through the title blurred.
+            .toolbarBackground(Color(.systemBackground), for: .navigationBar)
+            .toolbarBackgroundVisibility(.visible, for: .navigationBar)
             .refreshable { await coordinator.refreshAdaptation() }
             .task {
-                // Open two days before today, so the last runs show above what's next;
-                // on the current week before that. Wait one layout pass so the lazy
-                // stack can resolve the target.
+                // Open on the current week, its header at the top. Wait one layout pass
+                // so the lazy stack can resolve the target.
                 guard !didScrollToToday,
                       let current = plan.weeks.last(where: { $0.startDate <= .now }) else { return }
                 didScrollToToday = true
                 try? await Task.sleep(for: .milliseconds(50))
-                if let week = DemoMode.planWeek {
-                    proxy.scrollTo("week-\(week - 1)", anchor: .top)
-                    return
-                }
-                let cal = Calendar.current
-                if let twoDaysAgo = cal.date(byAdding: .day, value: -2, to: cal.startOfDay(for: .now)),
-                   plan.allWorkouts.contains(where: { cal.isDate($0.date, inSameDayAs: twoDaysAgo) }) {
-                    // A little below the top, so the pinned week header doesn't cover it.
-                    proxy.scrollTo(twoDaysAgo, anchor: UnitPoint(x: 0.5, y: 0.1))
-                    return
-                }
-                proxy.scrollTo("week-\(current.index)", anchor: .top)
+                let week = DemoMode.planWeek.map { $0 - 1 } ?? current.index
+                guard week >= 0 else { return }
+                proxy.scrollTo("week-\(week)", anchor: .top)
             }
         }
+    }
+
+    /// "Week 7 of 30 · 167 days to go", always visible under the title.
+    private func subtitle(_ progress: PlanProgress?) -> String {
+        guard let progress else { return "" }
+        var parts: [String] = []
+        if let n = progress.currentWeekNumber { parts.append("Week \(n) of \(progress.totalWeeks)") }
+        if progress.daysUntilRace > 0 { parts.append("\(progress.daysUntilRace) days to go") }
+        return parts.joined(separator: " · ")
     }
 
     private func isExpandable(_ workout: PlannedWorkout) -> Bool {
@@ -165,10 +176,10 @@ struct CalendarView: View {
                 Spacer()
                 if let summary, started, summary.plannedMeters > 0 {
                     Text("\(Self.km(summary.doneMeters)) of \(Self.km(summary.plannedMeters))")
-                        .monospacedDigit().foregroundStyle(.secondary)
+                        .font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
                 } else {
                     Text(Format.distance(week.plannedVolumeMeters))
-                        .foregroundStyle(.secondary)
+                        .font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
                 }
             }
             if isCurrent, let summary, summary.plannedMeters > 0 {
@@ -177,8 +188,9 @@ struct CalendarView: View {
                     .accessibilityHidden(true)
             }
         }
-        .font(.subheadline.weight(.semibold))
-        .padding(.vertical, 8)
+        .font(.headline)
+        .padding(.horizontal)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity)
         .background(.background)
         .accessibilityElement(children: .combine)
@@ -454,37 +466,25 @@ private struct DayCard: View {
     }
 }
 
-/// Where the plan stands: the week and phase, and a bar of the phases with today
-/// marked. Kept short, since it stays pinned on top.
+/// The whole plan at a glance: a bar of the phases with the current week marked.
 private struct PlanOverview: View {
     let plan: TrainingPlan
     let progress: PlanProgress?
     let showsHint: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                if let progress, let n = progress.currentWeekNumber {
-                    Text("Week \(n) of \(progress.totalWeeks)").font(.headline)
-                    if let phase = progress.currentWeekPhase {
-                        Text(phase.displayName).font(.subheadline).foregroundStyle(.secondary)
-                    }
-                } else {
-                    Text("\(plan.weeks.count) weeks").font(.headline)
-                }
-                Spacer()
-                if let progress, progress.daysUntilRace > 0 {
-                    Text("\(progress.daysUntilRace) days to go")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                }
-            }
+        VStack(alignment: .leading, spacing: 10) {
+            // The week and days to go are in the subtitle; this is the whole plan.
+            Text("\(plan.weeks.count) weeks to \(plan.goal.displayName)")
+                .font(.headline)
             phaseBar
             if showsHint {
                 Label("Hold a day and drag it onto another to swap them.", systemImage: "hand.draw")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
-        .padding(12)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(.fill.quaternary, in: .rect(cornerRadius: 16))
     }
 

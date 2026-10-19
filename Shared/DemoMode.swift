@@ -13,7 +13,7 @@ import TrainingCore
 /// `progress` or `plan` (iPhone tabs). `-demoScroll YES` slowly scrolls the
 /// screen down and back up, for recording. `-demoRecentRun <meters>,<seconds>`
 /// makes Health hold only that one run, from yesterday, to try a plan from it.
-/// `-demoPlanWeek <n>` opens the Plan tab on week n.
+/// `-demoPlanWeek <n>` opens the Plan tab on week n (0: at the top).
 enum DemoMode {
     static var isOn: Bool {
         #if DEBUG
@@ -28,11 +28,11 @@ enum DemoMode {
         return UserDefaults.standard.string(forKey: "demoScreen")
     }
 
-    /// The week (1-based) the Plan tab opens on, instead of around today.
+    /// The week (1-based) the Plan tab opens on, instead of around today; 0 opens it
+    /// at the top.
     static var planWeek: Int? {
-        guard isOn else { return nil }
-        let week = UserDefaults.standard.integer(forKey: "demoPlanWeek")
-        return week > 0 ? week : nil
+        guard isOn, UserDefaults.standard.object(forKey: "demoPlanWeek") != nil else { return nil }
+        return max(0, UserDefaults.standard.integer(forKey: "demoPlanWeek"))
     }
 
     /// The welcome and goal screens start before any plan exists.
