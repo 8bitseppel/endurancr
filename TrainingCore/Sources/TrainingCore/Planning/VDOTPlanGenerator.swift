@@ -154,7 +154,7 @@ public struct VDOTPlanGenerator: PlanGenerator {
         appendRecovery(to: &weeks, goal: goal, raceDay: race0, zones: zones, calendar: calendar)
 
         return TrainingPlan(goal: goal, vdot: vdot, paceZones: zones, weeks: weeks,
-                            isMaintenance: isMaintenance, enduranceHoldback: holdback)
+                            isMaintenance: isMaintenance, enduranceHoldback: holdback, startDate: start0)
     }
 
     // MARK: Periodization

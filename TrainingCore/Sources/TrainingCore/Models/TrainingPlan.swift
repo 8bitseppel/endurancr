@@ -143,9 +143,14 @@ public struct TrainingPlan: Sendable, Equatable, Codable {
     /// what is still held back after long runs earned some back.
     public var enduranceHoldbackBase: Double
     public var enduranceHoldback: Double
+    /// The day training starts, as the athlete set it. Runs from this day on count,
+    /// even on a rest day before the first scheduled run. `nil` in plans saved
+    /// before it existed.
+    public var startDate: Date?
 
     public init(goal: Goal, vdot: Double, paceZones: PaceZones, weeks: [TrainingWeek],
-                isMaintenance: Bool = false, enduranceHoldback: Double = 0) {
+                isMaintenance: Bool = false, enduranceHoldback: Double = 0, startDate: Date? = nil) {
+        self.startDate = startDate
         self.goal = goal
         self.vdot = vdot
         self.paceZones = paceZones
@@ -160,7 +165,7 @@ public struct TrainingPlan: Sendable, Equatable, Codable {
     public var raceVDOT: Double { vdot - enduranceHoldback }
 
     private enum CodingKeys: String, CodingKey {
-        case goal, vdot, paceZones, weeks, isMaintenance, enduranceHoldbackBase, enduranceHoldback
+        case goal, vdot, paceZones, weeks, isMaintenance, enduranceHoldbackBase, enduranceHoldback, startDate
     }
 
     public init(from decoder: Decoder) throws {
@@ -172,6 +177,14 @@ public struct TrainingPlan: Sendable, Equatable, Codable {
         isMaintenance = try c.decodeIfPresent(Bool.self, forKey: .isMaintenance) ?? false
         enduranceHoldbackBase = try c.decodeIfPresent(Double.self, forKey: .enduranceHoldbackBase) ?? 0
         enduranceHoldback = try c.decodeIfPresent(Double.self, forKey: .enduranceHoldback) ?? 0
+        startDate = try c.decodeIfPresent(Date.self, forKey: .startDate)
+    }
+
+    /// The first day runs count toward the plan: the start date, or for plans without
+    /// one the first scheduled run.
+    public func trainingStart(calendar: Calendar = .current) -> Date? {
+        startDate.map { calendar.startOfDay(for: $0) }
+            ?? allWorkouts.filter(\.type.isRunning).map { calendar.startOfDay(for: $0.date) }.min()
     }
 
     public var allWorkouts: [PlannedWorkout] { weeks.flatMap(\.workouts) }

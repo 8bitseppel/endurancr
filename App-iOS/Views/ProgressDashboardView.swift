@@ -352,8 +352,12 @@ struct ProgressDashboardView: View {
                 // plainly and point at the first run instead of an empty adherence ring.
                 Label {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Training hasn't started yet").font(.subheadline).fontWeight(.semibold)
-                        if let next = progress.nextWorkout {
+                        Text(progress.completedDistanceMeters > 0 ? "No planned run due yet" : "Training hasn't started yet")
+                            .font(.subheadline).fontWeight(.semibold)
+                        if progress.completedDistanceMeters > 0, let next = progress.nextWorkout {
+                            Text("Your \(Format.distance(progress.completedDistanceMeters)) so far count toward this week. Your first planned run is \(next.date.formatted(.dateTime.weekday(.wide).day().month())), and sticking to the plan is measured from then.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        } else if let next = progress.nextWorkout {
                             Text("Your first run is \(next.date.formatted(.dateTime.weekday(.wide).day().month())). Adherence starts tracking once a run is due.")
                                 .font(.footnote).foregroundStyle(.secondary)
                         } else {

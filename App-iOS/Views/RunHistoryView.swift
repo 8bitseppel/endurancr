@@ -3,11 +3,16 @@ import HealthKit
 import TrainingCore
 
 /// Lists recorded running workouts from Apple Health (most recent first). Tapping
-/// one opens a detail view with its GPS route and stats.
+/// one opens a detail view with its GPS route and stats. Recordings with hardly any
+/// running in them aren't listed, and a run recorded twice (watch and iPhone) says
+/// which one counts, as in `CompletedRun.cleaned`.
 struct RunHistoryView: View {
     let coordinator: PlanCoordinator
 
     @State private var workouts: [HKWorkout] = []
+    @State private var hiddenCount = 0
+    /// Start times of the runs that count; one of two overlapping recordings doesn't.
+    @State private var counted: Set<String> = []
     @State private var loading = true
 
     var body: some View {
@@ -21,11 +26,17 @@ struct RunHistoryView: View {
                     description: Text("Runs recorded in the last 6 months show up here with their route and stats.")
                 )
             } else {
-                ForEach(workouts, id: \.uuid) { workout in
-                    NavigationLink {
-                        RunDetailView(workout: workout, coordinator: coordinator)
-                    } label: {
-                        row(workout)
+                Section {
+                    ForEach(workouts, id: \.uuid) { workout in
+                        NavigationLink {
+                            RunDetailView(workout: workout, coordinator: coordinator)
+                        } label: {
+                            row(workout)
+                        }
+                    }
+                } footer: {
+                    if hiddenCount > 0 {
+                        Text("\(hiddenCount) \(hiddenCount == 1 ? "recording" : "recordings") with hardly any running (under 200 m or a minute) \(hiddenCount == 1 ? "isn't" : "aren't") shown or counted.")
                     }
                 }
             }
@@ -34,9 +45,21 @@ struct RunHistoryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             let since = Calendar.current.date(byAdding: .month, value: -6, to: .now) ?? .now
-            workouts = await coordinator.health.recentRunningWorkouts(since: since)
+            let all = await coordinator.health.recentRunningWorkouts(since: since)
+            workouts = all.filter { coordinator.health.distanceMeters(for: $0) >= 200 && $0.duration >= 60 }
+            hiddenCount = all.count - workouts.count
+            counted = Set(CompletedRun.cleaned(workouts.map(run)).map(Self.key))
             loading = false
         }
+    }
+
+    private static func key(_ run: CompletedRun) -> String {
+        "\(run.date.timeIntervalSince1970)|\(Int(run.distanceMeters))"
+    }
+
+    private func run(_ workout: HKWorkout) -> CompletedRun {
+        CompletedRun(date: workout.startDate, distanceMeters: coordinator.health.distanceMeters(for: workout),
+                     durationSeconds: workout.duration)
     }
 
     private func row(_ workout: HKWorkout) -> some View {
@@ -54,8 +77,14 @@ struct RunHistoryView: View {
                     Text("·").foregroundStyle(.secondary)
                     Text(Format.pace(workout.duration / (dist / 1_000)))
                 }
+                Text("·").foregroundStyle(.secondary)
+                Text(workout.sourceRevision.source.name)
             }
             .font(.caption).foregroundStyle(.secondary)
+            if !counted.contains(Self.key(run(workout))) {
+                Text("Recorded at the same time as a longer run, so it counts once")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
     }
 }
@@ -89,6 +118,7 @@ struct RunDetailView: View {
                     LabeledContent("Active energy", value: "\(Int(kcal.rounded())) kcal")
                 }
                 LabeledContent("Date", value: workout.startDate.formatted(date: .abbreviated, time: .shortened))
+                LabeledContent("Recorded by", value: workout.sourceRevision.source.name)
             }
         }
         .navigationTitle(Format.distance(distanceMeters))

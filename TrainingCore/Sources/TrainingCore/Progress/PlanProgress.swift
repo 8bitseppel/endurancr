@@ -85,10 +85,9 @@ public struct PlanProgress: Sendable, Equatable {
             to: calendar.startOfDay(for: plan.goal.raceDate)).day ?? 0)
 
         // Plan span, for filtering runs to this plan. Week 0 starts on a Monday, but
-        // training may begin later that week; runs from the days before the first
-        // scheduled run belong to no plan and must not count as progress.
-        let firstRunDay = workouts.filter(\.type.isRunning).map { calendar.startOfDay(for: $0.date) }.min()
-        let planStart = firstRunDay
+        // training may begin later that week; runs from before the start date belong
+        // to no plan. From the start date on they count, rest day or not.
+        let planStart = plan.trainingStart(calendar: calendar)
             ?? plan.weeks.first.map { calendar.startOfDay(for: $0.startDate) } ?? asOfDay
         let runsInPlan = completedRuns.filter {
             let day = calendar.startOfDay(for: $0.date)

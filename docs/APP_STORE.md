@@ -264,6 +264,8 @@ Try it without installing
 
 Also
 - After an easier cutback week, a lighter stretch now holds you at the level of your last full week, not at the cutback.
+- Runs on the day your plan starts count, also on a rest day before the first planned run. Before, they were left out until that first run.
+- Recordings with hardly any running in them (under 200 m or a minute) are no longer listed or counted, and a run recorded on the watch and the iPhone at once counts once. Recent runs show which app recorded each run.
 - A clearer welcome screen with bigger text.
 - The goal form and How it works now say clearly that training paces come from your current fitness, not your target time.
 - The keyboard closes when you open a date in the goal form, and tapping today as the start date moves on to race day.

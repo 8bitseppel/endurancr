@@ -519,8 +519,9 @@ public struct TrainingBuddy: Sendable {
         return Self.distance(of: runs, from: from, to: today, calendar: calendar) / planned
     }
 
+    /// The day runs start counting toward the plan (`TrainingPlan.trainingStart`).
     static func firstRunDay(of plan: TrainingPlan, calendar: Calendar) -> Date? {
-        plan.allWorkouts.filter(\.type.isRunning).map { calendar.startOfDay(for: $0.date) }.min()
+        plan.trainingStart(calendar: calendar)
     }
 
     public static func distance(of runs: [CompletedRun], from: Date, to: Date, calendar: Calendar) -> Double {

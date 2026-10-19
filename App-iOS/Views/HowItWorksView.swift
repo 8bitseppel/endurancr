@@ -84,7 +84,7 @@ struct HowItWorksView: View {
                 topic(
                     "Adapting to your runs",
                     icon: "arrow.triangle.2.circlepath",
-                    detail: "The plan works like a running buddy who isn't pushy: it paces the coming weeks to the training you actually do, and past weeks are never rewritten. Missed kilometres are never piled onto later days, as Pete Pfitzinger, the Hansons and Hal Higdon all advise. A long run you missed moves to a free day only within the next 3 days, and only while training goes about as planned. Hold a day in Plan and drag it onto another to swap them. Your Apple Watch shows the same adjusted days as your iPhone. The rules are below, with where they come from."
+                    detail: "The plan works like a running buddy who isn't pushy: it paces the coming weeks to the training you actually do, and past weeks are never rewritten. Missed kilometres are never piled onto later days, as Pete Pfitzinger, the Hansons and Hal Higdon all advise. A long run you missed moves to a free day only within the next 3 days, and only while training goes about as planned. Every run from your start date counts, on a rest day too, and the rest of that week takes it into account. Recordings with hardly any running in them (under 200 m or a minute) don't count, and a run recorded twice at the same time, on the watch and the iPhone, counts once, the longer one. Hold a day in Plan and drag it onto another to swap them. Your Apple Watch shows the same adjusted days as your iPhone. The rules are below, with where they come from."
                 )
 
                 exampleSection

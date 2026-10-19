@@ -731,6 +731,46 @@ h.suite("Sessions from the books: marathon pace, strides, tune-up, recovery") {
             "progress counts the weeks to race day")
 }
 
+h.suite("A run on the start day, before the first scheduled run") {
+    // As reported: start Monday 19 Oct, 3 days a week, Tuesdays and Thursdays free,
+    // so the first scheduled run is Wednesday. 8.3 km on Monday evening, and two empty
+    // recordings at the same minute.
+    let goal = Goal(name: "Hamburg", race: .marathon, raceDate: date(2027, 4, 25), targetTimeSeconds: 4.5 * 3600,
+                    daysPerWeek: 3, restWeekdays: [3, 5])
+    let fitness = FitnessSnapshot(distanceMeters: 12_200, timeSeconds: 68 * 60 + 19, date: date(2026, 9, 27))
+    let plan = try VDOTPlanGenerator().makePlan(goal: goal, fitness: fitness, startDate: date(2026, 10, 19), calendar: cal)
+    let evening = date(2026, 10, 19).addingTimeInterval(20 * 3600 + 50 * 60)
+    let raw = [CompletedRun(date: evening, distanceMeters: 8_300, durationSeconds: 55 * 60 + 5, averageHeartRate: 151),
+               CompletedRun(date: evening, distanceMeters: 0, durationSeconds: 30, averageHeartRate: 85),
+               CompletedRun(date: evening, distanceMeters: 0, durationSeconds: 22)]
+    let runs = CompletedRun.cleaned(raw)
+    h.check(runs.count == 1 && runs[0].distanceMeters == 8_300, "the empty recordings don't count")
+    h.check(CompletedRun.cleaned([raw[0], CompletedRun(date: evening.addingTimeInterval(20), distanceMeters: 8_100, durationSeconds: 54 * 60)]).count == 1,
+            "a run recorded on the watch and the iPhone counts once")
+    let firstRun = plan.allWorkouts.first { $0.type.isRunning }!
+    h.check(cal.component(.weekday, from: firstRun.date) == 4, "the first scheduled run is Wednesday")
+
+    let asOf = evening.addingTimeInterval(3_600)
+    let progress = PlanProgress.make(plan: plan, completedRuns: runs, asOf: asOf, calendar: cal)
+    h.check(abs(progress.currentWeekCompletedMeters - 8_300) < 1, "this week counts the 8.3 km (got \(progress.currentWeekCompletedMeters))")
+    h.check(abs(progress.completedDistanceMeters - 8_300) < 1, "and so does the plan so far")
+    let review = PlanReview.make(plan: plan, original: plan, completedRuns: runs, asOf: asOf, calendar: cal)
+    h.check(review.day(evening, calendar: cal)?.status == .extra && review.day(evening, calendar: cal)?.ranMeters == 8_300,
+            "Monday shows the run, on a rest day")
+    h.check(abs((review.weeks[0]?.doneMeters ?? 0) - 8_300) < 1, "the week header shows 8 km done")
+    // The week takes it into account: the easy runs left get shorter, the long run keeps its length.
+    let adapted = AdaptationEngine().adapt(plan: plan, completedRuns: runs, asOf: asOf, calendar: cal)
+    let left = { (p: TrainingPlan) in p.weeks[0].workouts.filter { $0.date > asOf && $0.type == .easy }.map(\.distanceMeters).reduce(0, +) }
+    h.check(left(adapted) < left(plan) - 1_000, "the week's easy runs left get shorter (\(Int(left(plan))) to \(Int(left(adapted))) m)")
+    h.check(adapted.weeks[0].workouts.first { $0.type == .longRun }?.distanceMeters == plan.weeks[0].workouts.first { $0.type == .longRun }?.distanceMeters,
+            "the long run keeps its length")
+    // A plan saved before the start date existed still decodes.
+    var dict = try JSONSerialization.jsonObject(with: JSONEncoder().encode(plan)) as! [String: Any]
+    dict.removeValue(forKey: "startDate")
+    let old = try JSONDecoder().decode(TrainingPlan.self, from: JSONSerialization.data(withJSONObject: dict))
+    h.check(old.startDate == nil && old.trainingStart(calendar: cal) == cal.startOfDay(for: firstRun.date), "older plans fall back to the first run")
+}
+
 h.suite("Target time: race-day pace, not training paces") {
     let fitness = FitnessSnapshot(distanceMeters: 12_200, timeSeconds: 68 * 60 + 19, date: date(2026, 10, 3))
     func plan(_ target: Double?) throws -> TrainingPlan {

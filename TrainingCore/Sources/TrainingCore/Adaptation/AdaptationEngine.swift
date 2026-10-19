@@ -298,7 +298,7 @@ public struct AdaptationEngine: Sendable {
         let end = calendar.date(byAdding: .day, value: 7, to: start) ?? start
         // Runs before the plan's first run (e.g. the effort that set the fitness)
         // don't count toward the first week.
-        let planStart = plan.allWorkouts.filter(\.type.isRunning).map { calendar.startOfDay(for: $0.date) }.min() ?? start
+        let planStart = plan.trainingStart(calendar: calendar) ?? start
         let completedThisWeek = completedRuns
             .filter { $0.date >= max(start, planStart) && $0.date < end && $0.date <= asOf }
             .reduce(0.0) { $0 + $1.distanceMeters }

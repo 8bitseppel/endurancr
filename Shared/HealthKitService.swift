@@ -76,7 +76,7 @@ final class HealthKitService {
                 averageHeartRate: hr
             ))
         }
-        return runs
+        return CompletedRun.cleaned(runs)
     }
 
     /// Recent running workouts (most recent first) for the run-history screen —
