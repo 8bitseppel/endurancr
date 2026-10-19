@@ -14,6 +14,7 @@ import TrainingCore
 /// screen down and back up, for recording. `-demoRecentRun <meters>,<seconds>`
 /// makes Health hold only that one run, from yesterday, to try a plan from it.
 /// `-demoPlanWeek <n>` opens the Plan tab on week n (0: at the top).
+/// `-demoScrollPoints <n>` limits `-demoScroll` to n points from where it starts.
 enum DemoMode {
     static var isOn: Bool {
         #if DEBUG
@@ -234,9 +235,14 @@ private struct UIKitScroller: UIViewRepresentable {
             await DemoAutoScroll.run { y in
                 scrollView.setContentOffset(CGPoint(x: 0, y: y), animated: false)
             } bounds: {
+                // From where the screen is (the Plan tab opens on this week) to the
+                // bottom, or at most `-demoScrollPoints` further.
                 let inset = scrollView.adjustedContentInset
-                let bottom = scrollView.contentSize.height + inset.bottom - scrollView.bounds.height
-                return (-inset.top, max(-inset.top, bottom))
+                let start = max(-inset.top, scrollView.contentOffset.y)
+                var bottom = scrollView.contentSize.height + inset.bottom - scrollView.bounds.height
+                let limit = UserDefaults.standard.double(forKey: "demoScrollPoints")
+                if limit > 0 { bottom = min(bottom, start + limit) }
+                return (start, max(start, bottom))
             }
         }
         return view

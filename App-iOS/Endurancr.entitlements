@@ -6,5 +6,10 @@
     <true/>
     <key>com.apple.developer.healthkit.access</key>
     <array/>
+    <!-- The App Clip's invocation URLs (endurancr.app) open the full app once it's installed. -->
+    <key>com.apple.developer.associated-domains</key>
+    <array>
+        <string>appclips:endurancr.app</string>
+    </array>
 </dict>
 </plist>

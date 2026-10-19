@@ -105,6 +105,19 @@ shot "$PHONE" app.endurancr summary iphone-5-summary
 rec  "$PHONE" app.endurancr progress iphone-6-progress 360 20
 shot "$PHONE" app.endurancr plan iphone-7-plan
 
+echo "==> App Clip"
+xcrun simctl install "$PHONE" "$BUILD/Build/Products/Debug-iphonesimulator/EndurancrClip.app"
+clip() {
+  # Close the full app first, so the status bar shows no "back to endurancr" link.
+  xcrun simctl terminate "$PHONE" app.endurancr 2>/dev/null || true
+  xcrun simctl terminate "$PHONE" app.endurancr.Clip 2>/dev/null || true
+  xcrun simctl launch "$PHONE" app.endurancr.Clip "$@" >/dev/null
+  sleep 4
+}
+clip; xcrun simctl io "$PHONE" screenshot --type=png "$OUT/clip-1-calculator.png" >/dev/null 2>&1
+clip -clipResults; xcrun simctl io "$PHONE" screenshot --type=png "$OUT/clip-2-results.png" >/dev/null 2>&1
+echo "    $OUT/clip-1-calculator.png, $OUT/clip-2-results.png"
+
 echo "==> Apple Watch"
 rec "$WATCH" app.endurancr.watchkitapp - watch-1-today 312 25
 rec "$WATCH" app.endurancr.watchkitapp run watch-2-run 312 25

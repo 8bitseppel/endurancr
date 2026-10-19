@@ -70,6 +70,7 @@ struct CalendarView: View {
                     }
                 }
             }
+            .demoAutoScroll()
             .navigationSubtitle(subtitle(coordinator.progress))
             // A solid bar, like the pinned week header under it: the days scrolling
             // past the header shouldn't show through the title blurred.

@@ -16,7 +16,7 @@ packages:
 settings:
   base:
     MARKETING_VERSION: "1.2.0"
-    CURRENT_PROJECT_VERSION: "27"
+    CURRENT_PROJECT_VERSION: "28"
     SWIFT_VERSION: "6.0"
     # Signing baked in so `xcodegen generate` never wipes it (previously had to be
     # re-entered in Xcode after every regen). Automatic signing lets Xcode manage
@@ -45,6 +45,12 @@ schemes:
     build:
       targets:
         EndurancrWidgets: all
+  EndurancrClip:
+    build:
+      targets:
+        EndurancrClip: all
+    run:
+      config: Debug
   EndurancrUITests:
     build:
       targets:
@@ -54,6 +60,28 @@ schemes:
         - EndurancrUITests
 
 targets:
+  # The App Clip: a pace calculator that opens without installing (from a link, a QR
+  # code or the banner on endurancr.app). No HealthKit, which App Clips can't use.
+  EndurancrClip:
+    type: application.on-demand-install-capable
+    platform: iOS
+    sources:
+      - path: App-Clip
+      - path: Shared/Formatters.swift
+      - path: App-iOS/Views/PlanStyle.swift
+      - path: App-iOS/Assets.xcassets
+    dependencies:
+      - package: TrainingCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.endurancr.Clip
+        INFOPLIST_FILE: App-Clip/Info.plist
+        CODE_SIGN_ENTITLEMENTS: App-Clip/EndurancrClip.entitlements
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+
   Endurancr:
     type: application
     platform: iOS
@@ -66,6 +94,8 @@ targets:
       - target: Endurancr Watch App
         embed: true
       - target: EndurancrWidgets
+        embed: true
+      - target: EndurancrClip
         embed: true
     settings:
       base:

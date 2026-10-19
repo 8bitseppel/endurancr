@@ -259,6 +259,9 @@ Sessions from the training books
 - Race day tells you how to pace it and how much to eat and drink on the way.
 - After the race: rest, then short easy runs, an easy day for every 3 km you raced.
 
+Try it without installing
+- An App Clip: enter one recent race and your goal, and see your VDOT, your five training paces, a race-day range and the plan endurancr would build. Open it from endurancr.app/clip.
+
 Also
 - After an easier cutback week, a lighter stretch now holds you at the level of your last full week, not at the cutback.
 - A clearer welcome screen with bigger text.
@@ -266,6 +269,36 @@ Also
 - The keyboard closes when you open a date in the goal form, and tapping today as the start date moves on to race day.
 - Race-week rest days show a rest icon instead of the vacation one.
 - The "Skip Christmas & New Year" switch is gone. To keep a day free, drag its run to another day in the calendar.
+
+### App Clip (new in 1.2.0)
+
+A pace calculator that opens without installing: one recent race and a goal give the
+VDOT, the five training paces, a race-day range and a preview of the plan, then
+Apple's overlay offers the full app. No HealthKit (App Clips can't use it), nothing
+stored. Bundle ID `app.endurancr.Clip`, embedded in the app, so it ships with the build.
+
+In App Store Connect, on the 1.2.0 version page under App Clip:
+- **Header image:** `screenshots/appstore/appclip/card-3x2.png` (3000 x 2000, no text).
+- **Subtitle (56):** `Your training paces from one recent race, in a minute.`
+- **Action:** Open.
+- **Default experience:** used by the App Store, Messages and the Safari banner on
+  https://endurancr.app/clip (that page has the `app-clip-bundle-id` meta tag, and
+  `/.well-known/apple-app-site-association` lists the clip).
+- **Advanced experience (optional):** for QR codes or an App Clip Code, add one with
+  the URL `https://endurancr.app/clip`, the same image and texts. App Clip Codes can be
+  made in App Store Connect once it's live.
+
+The card's title is the app name. To try it before release: run the EndurancrClip
+scheme on an iPhone once, then Settings > Developer > App Clips Testing > Local
+Experiences, register `https://endurancr.app/clip` for `app.endurancr.Clip`, and scan a
+QR code of that URL.
+
+### App Preview video (new in 1.2.0)
+
+`screenshots/appstore/preview/iphone-6.9.mp4`: 886 x 1920, 30 fps, about 25 s, a
+silent stereo track, only app footage. Upload it under the 6.9" iPhone screenshots
+(App Store Connect uses it for the smaller sizes too); the poster frame can be picked
+there. Re-record with `./scripts/app-preview.sh` after `./scripts/screenshots.sh`.
 
 ### Screenshots
 

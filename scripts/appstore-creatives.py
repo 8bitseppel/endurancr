@@ -4,6 +4,8 @@
 Writes screenshots/appstore/creative/:
   header-21x9.png    product page header, 3840 x 1646
   search-3x2.png     search results, 3840 x 2560
+and screenshots/appstore/appclip/card-3x2.png, the App Clip card header image
+(3000 x 2000, no text: the card shows the title and subtitle itself).
 
 Run ./scripts/screenshots.sh first. Needs Pillow. The text is centered with the
 phones below it, so a header cropped at the sides still reads (Apple's advice is
@@ -115,7 +117,26 @@ def compose(w, h, title_size, phone_height, top):
     return canvas.convert("RGB")
 
 
+def clip_card(w=3000, h=2000):
+    """The App Clip card image: the calculator and its results, side by side and a
+    little turned toward each other, on the plum gradient. No text."""
+    canvas = background(w, h).convert("RGBA")
+    height = round(h * 1.02)
+    left = phone("clip-1-calculator.png", height).rotate(4, resample=Image.BICUBIC, expand=True)
+    right = phone("clip-2-results.png", height).rotate(-4, resample=Image.BICUBIC, expand=True)
+    gap = round(w * 0.03)
+    x = (w - left.width - right.width - gap) // 2
+    paste_with_shadow(canvas, left, (x, round(h * 0.12)))
+    paste_with_shadow(canvas, right, (x + left.width + gap, round(h * 0.08)))
+    return canvas.convert("RGB")
+
+
 def main():
+    clip_out = SHOTS / "appstore" / "appclip"
+    if (SHOTS / "clip-2-results.png").exists():
+        clip_out.mkdir(parents=True, exist_ok=True)
+        clip_card().save(clip_out / "card-3x2.png", optimize=True)
+        print(f"    {(clip_out / 'card-3x2.png').relative_to(ROOT)} 3000x2000 RGB")
     OUT.mkdir(parents=True, exist_ok=True)
     compose(3840, 1646, title_size=150, phone_height=1900, top=120).save(OUT / "header-21x9.png", optimize=True)
     compose(3840, 2560, title_size=190, phone_height=2700, top=190).save(OUT / "search-3x2.png", optimize=True)
