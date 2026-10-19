@@ -63,7 +63,7 @@ public enum WorkoutSteps {
         case .threshold: return z.thresholdSecPerKm
         case .interval: return z.intervalSecPerKm
         case .repetitionSpeed: return z.repetitionSecPerKm
-        case .rest, .raceDay: return nil
+        case .rest, .raceDay, .timeTrial: return nil
         }
     }
 
@@ -97,9 +97,11 @@ public enum WorkoutSteps {
                                 label: "Warm-up"))
         }
         for r in 1...max(1, s.reps) {
+            // A single block is named for what it is ("Marathon pace"), not "Rep 1/1".
+            let label = s.reps == 1 ? blockLabel(s.workType) : "Rep \(r)/\(s.reps)"
             drafts.append(Draft(kind: .work, distance: s.workMeters,
                                 paceType: s.workType, repNumber: r, repTotal: s.reps,
-                                label: "Rep \(r)/\(s.reps)"))
+                                label: label))
             if s.recoveryMeters > 0 {
                 drafts.append(Draft(kind: .recovery, distance: s.recoveryMeters,
                                     paceType: s.recoveryType, repNumber: r, repTotal: s.reps,
@@ -119,12 +121,28 @@ public enum WorkoutSteps {
                 kind: d.kind, index: i, total: drafts.count,
                 repNumber: d.repNumber, repTotal: d.repTotal,
                 distanceMeters: d.distance, startMeters: cumulative,
-                paceType: d.paceType, targetPaceSecPerKm: zonePace(d.paceType, zones),
+                paceType: d.paceType, targetPaceSecPerKm: pace(d.paceType, of: w, zones),
                 label: d.label
             ))
             cumulative += d.distance
         }
         return steps
+    }
+
+    /// A time trial's pace is the race pace predicted for its distance, kept on the
+    /// workout (it depends on the VDOT, not on a zone); every other part runs at its zone.
+    private static func pace(_ type: WorkoutType, of w: PlannedWorkout, _ zones: PaceZones) -> Double? {
+        if type == .timeTrial, let range = w.targetPaceSecPerKm { return (range.lowerBound + range.upperBound) / 2 }
+        return zonePace(type, zones)
+    }
+
+    private static func blockLabel(_ type: WorkoutType) -> String {
+        switch type {
+        case .marathonPace: "Marathon pace"
+        case .threshold: "Threshold"
+        case .timeTrial: "Time trial"
+        default: "Rep 1/1"
+        }
     }
 
     /// The step the athlete is currently in for a given cumulative distance: the

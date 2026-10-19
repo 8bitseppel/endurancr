@@ -251,6 +251,14 @@ A Plan tab worth opening
 - On top: the week you're in and the phases up to race day.
 - Your 32 km runs and the start of the taper are marked, and the plan ends with your race and its outlook.
 
+Sessions from the training books
+- Marathon-pace runs: every other build week, and the last part of the peak long runs at marathon pace, as in Daniels, Pfitzinger, the Hansons and Hal Higdon.
+- Strides: once or twice a week, an easy run ends with 6 × 20 s quick and light.
+- A tune-up race: a 10 km 6 weeks before the marathon. Run it all out and your paces follow the result.
+- Never more than two harder sessions a week, each within Jack Tupper Daniels' limits.
+- Race day tells you how to pace it and how much to eat and drink on the way.
+- After the race: rest, then short easy runs, an easy day for every 3 km you raced.
+
 Also
 - After an easier cutback week, a lighter stretch now holds you at the level of your last full week, not at the cutback.
 - A clearer welcome screen with bigger text.

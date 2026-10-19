@@ -96,6 +96,7 @@ struct CalendarView: View {
         var parts: [String] = []
         if let n = progress.currentWeekNumber { parts.append("Week \(n) of \(progress.totalWeeks)") }
         if progress.daysUntilRace > 0 { parts.append("\(progress.daysUntilRace) days to go") }
+        if progress.currentWeekPhase == .recovery { parts.append("Recovery after the race") }
         return parts.joined(separator: " · ")
     }
 
@@ -314,7 +315,7 @@ private struct DayCard: View {
     private var isRest: Bool { workout.type == .rest }
     /// The reason for a change, shown on the card rather than only when it's open.
     private var showsNoteInline: Bool {
-        review?.isChanged == true && !isRest && !workout.notes.isEmpty && workout.notes != weekNote
+        review?.isChanged == true && !isRest && !workout.notes.isEmpty && PlanReview.reason(of: workout.notes) != weekNote
     }
 
     var body: some View {
@@ -339,12 +340,16 @@ private struct DayCard: View {
                         .font(isRest ? .subheadline : .body.weight(.medium))
                         .foregroundStyle(isRest ? .secondary : .primary)
                         .lineLimit(2)
+                    if !isRest, let summary = Format.sessionSummary(workout) {
+                        Text(summary)
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
                     if let was = wasText {
                         Text(was)
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     if showsNoteInline {
-                        Text(workout.notes)
+                        Text(PlanReview.reason(of: workout.notes))
                             .font(.caption).foregroundStyle(.tint)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -458,6 +463,7 @@ private struct DayCard: View {
         var parts = [date]
         if let tag { parts.append(tag.text) }
         parts.append(isRest ? title : "\(title), \(Format.distance(workout.distanceMeters))")
+        if !isRest, let summary = Format.sessionSummary(workout) { parts.append(summary) }
         if let wasText { parts.append(wasText) }
         if showsNoteInline { parts.append(workout.notes) }
         if !isPast, let was = review?.originalPace { parts.append("pace was \(Format.paceRange(was))") }
@@ -475,7 +481,7 @@ private struct PlanOverview: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             // The week and days to go are in the subtitle; this is the whole plan.
-            Text("\(plan.weeks.count) weeks to \(plan.goal.displayName)")
+            Text("\(plan.weeksToRace.count) weeks to \(plan.goal.displayName)")
                 .font(.headline)
             phaseBar
             if showsHint {
@@ -554,6 +560,10 @@ private struct RaceCard: View {
                 LabeledContent("Your target", value: GoalOutlook.format(target))
                     .font(.subheadline)
             }
+            Text(VDOTPlanGenerator.raceDayAdvice(for: goal.race, expectedSeconds: (outlook.raceDay.lowerBound + outlook.raceDay.upperBound) / 2)
+                    .replacingOccurrences(of: "Race day. ", with: ""))
+                .font(.footnote).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Text("More in Progress.")
                 .font(.footnote).foregroundStyle(.secondary)
         }

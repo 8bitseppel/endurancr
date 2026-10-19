@@ -153,6 +153,7 @@ struct CoachView: View {
         case .threshold: return "Comfortably hard, controlled, never a race."
         case .interval: return "Strong, focused reps. Recover fully between them."
         case .repetitionSpeed: return "Quick and light, short and sharp."
+        case .timeTrial: return "Race it: even and all out. Your paces follow the result."
         case .raceDay: return "This is the one. Trust your training and enjoy it."
         }
     }

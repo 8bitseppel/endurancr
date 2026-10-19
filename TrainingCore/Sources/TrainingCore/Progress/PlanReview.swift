@@ -137,7 +137,7 @@ public struct PlanReview: Sendable, Equatable {
             if inBuild, !isCutback { lastFullWeek = basis }
             let notes = week.workouts
                 .filter { $0.type.isRunning && !$0.notes.isEmpty && days[calendar.startOfDay(for: $0.date)]?.isChanged == true }
-                .map(\.notes)
+                .map { Self.reason(of: $0.notes) }
             let common = Dictionary(grouping: notes, by: { $0 }).max { $0.value.count < $1.value.count }
             weeks[week.index] = Week(
                 doneMeters: done,
@@ -151,20 +151,45 @@ public struct PlanReview: Sendable, Equatable {
         return PlanReview(days: days, weeks: weeks)
     }
 
-    /// What the week is for, and its longest run.
+    /// A changed run's reason without the strides it keeps, so runs changed for the same
+    /// reason match ("Shorter, then 6 × 20 s strides" is "Shorter").
+    public static func reason(of notes: String) -> String {
+        notes.replacingOccurrences(of: ", then 6 × 20 s strides", with: "")
+    }
+
+    /// What the week is for, its harder sessions, and its long run.
     static func purpose(of week: TrainingWeek, isCutback: Bool) -> String {
+        let hasTuneUp = week.workouts.contains { $0.type == .timeTrial }
         let line: String = switch week.phase {
+        case _ where hasTuneUp: "A lighter week around the tune-up race."
         case _ where isCutback: "An easier week, so the last weeks can sink in."
-        case .base: "Easy runs and a long run build the base."
-        case .build: "A harder session each week, and a growing long run."
-        case .peak: "The biggest weeks, with two harder sessions."
+        case .base: "Easy runs build the base."
+        case .build: "Building up, with a harder session each week."
+        case .peak: "The biggest weeks of the plan."
         case .taper: "Less running, so you start the race rested."
         case .raceWeek: "Short and easy until race day."
         case .maintenance: "Steady weeks that hold your fitness."
+        case .recovery: "Rest, then short easy runs: an easy day for every 3 km you raced."
         }
-        guard week.phase != .raceWeek,
-              let long = week.workouts.filter({ $0.type == .longRun }).map(\.distanceMeters).max() else { return line }
-        return line + " Long run \(Self.km(long))."
+        guard week.phase != .raceWeek, week.phase != .recovery else { return line }
+        // The harder sessions in order, then the long run, as one sentence:
+        // "Threshold and a long run of 28 km, the last 9 km at marathon pace."
+        let names: [WorkoutType: String] = [.threshold: "threshold", .interval: "intervals", .repetitionSpeed: "speed",
+                                             .marathonPace: "a marathon-pace run"]
+        var items = week.workouts.compactMap { names[$0.type] }
+        if let long = week.workouts.filter({ $0.type == .longRun }).max(by: { $0.distanceMeters < $1.distanceMeters }) {
+            if let s = long.structure, s.workType == .marathonPace {
+                items.append("a long run of \(km(long.distanceMeters)), the last \(km((s.workMeters / 500).rounded() * 500)) at marathon pace")
+            } else {
+                items.append("a long run of \(km(long.distanceMeters))")
+            }
+        }
+        var parts = [line]
+        if !items.isEmpty {
+            let sentence = items.count == 1 ? items[0] : items.dropLast().joined(separator: ", ") + " and " + items.last!
+            parts.append(sentence.prefix(1).uppercased() + sentence.dropFirst() + ".")
+        }
+        return parts.joined(separator: " ")
     }
 
     static func km(_ meters: Double) -> String {

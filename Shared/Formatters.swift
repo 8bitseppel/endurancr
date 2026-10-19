@@ -77,6 +77,22 @@ enum Format {
         return steps
     }
 
+    /// What a run holds, in a few words for the plan's day cards: "Last 10 km at
+    /// marathon pace", "5 × 1 km", "With 6 × 20 s strides". `nil` for a plain run.
+    static func sessionSummary(_ w: PlannedWorkout) -> String? {
+        if w.notes.contains("6 × 20 s strides") { return "With 6 × 20 s strides" }
+        guard let s = w.structure else { return nil }
+        // Rounded to half a kilometre: a shortened run scales its parts.
+        let work = distanceCompact(s.workMeters >= 1_000 ? (s.workMeters / 500).rounded() * 500 : s.workMeters)
+        switch s.workType {
+        case .marathonPace: return w.type == .longRun ? "Last \(work) at marathon pace" : "\(work) at marathon pace"
+        case .threshold: return "\(work) at threshold pace"
+        case .timeTrial: return "\(work) all out"
+        case .interval, .repetitionSpeed: return "\(s.reps) × \(work)"
+        default: return nil
+        }
+    }
+
     static func workoutTitle(_ type: WorkoutType) -> String {
         switch type {
         case .rest: return "Rest"
@@ -86,6 +102,7 @@ enum Format {
         case .threshold: return "Threshold"
         case .interval: return "Intervals"
         case .repetitionSpeed: return "Speed"
+        case .timeTrial: return "Tune-up Race"
         case .raceDay: return "Race Day"
         }
     }
@@ -96,7 +113,7 @@ enum Format {
     /// which is the safe default for a custom vacation reason.
     static func restSymbol(note: String) -> String {
         switch note {
-        case "", "Rest / cross-train", "Rest, the week's distance is already done", "Rest, stay fresh", "Rest, an easier week": return "moon.zzz"
+        case "", "Rest / cross-train", "Rest, the week's distance is already done", "Rest, stay fresh", "Rest, an easier week", "Rest after the race": return "moon.zzz"
         case let n where n.hasPrefix("No training"): return "calendar.badge.minus"
         default: return "airplane"
         }
@@ -113,6 +130,7 @@ extension TrainingPhase {
         case .taper: "Taper"
         case .raceWeek: "Race week"
         case .maintenance: "Maintenance"
+        case .recovery: "Recovery"
         }
     }
 }

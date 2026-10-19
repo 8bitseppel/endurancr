@@ -181,6 +181,9 @@ public struct TrainingBuddy: Sendable {
             reason = nil
         } else if case .easingBack(let daysOff, _) = status.phase, status.vdotFactor < 1 {
             reason = "Your paces eased a little after \(daysOff) days off, as Jack Tupper Daniels advises, and come back as you do."
+        } else if vdot > base, let trial = Self.tuneUp(in: plan, runs: completedRuns,
+                   from: Self.firstRunDay(of: plan, calendar: calendar) ?? asOf, through: asOf, calendar: calendar) {
+            reason = "Your paces are faster: they follow your \(Self.km(trial.distanceMeters)) tune-up."
         } else if vdot > base {
             reason = "Your paces are a little faster: a recent run showed you're fitter than when the plan started."
         } else {
@@ -202,9 +205,34 @@ public struct TrainingBuddy: Sendable {
             .filter { let d = calendar.startOfDay(for: $0.date); return d >= planStart && d <= today && $0.distanceMeters >= 3_000 }
             .map { calculator.vdot(distanceMeters: $0.distanceMeters, timeSeconds: $0.durationSeconds) }
             .max() ?? base
-        let gain = min(max(0, (best - base) * 0.5), allowedGain)
+        // A tune-up race counts in full, like a race does for Daniels; any other fast
+        // run by half, since it may not have been all out.
+        let trial = Self.tuneUp(in: plan, runs: completedRuns, from: planStart, through: today, calendar: calendar)
+            .map { calculator.vdot(distanceMeters: $0.distanceMeters, timeSeconds: $0.durationSeconds) }
+        let gain = min(max(0, (best - base) * 0.5, (trial ?? base) - base), allowedGain)
         let slower = hardSessionsSlower(plan: plan, runs: completedRuns, today: today, calendar: calendar) ? 1.0 : 0
         return ((base + gain - slower) * status.vdotFactor * 10).rounded() / 10
+    }
+
+    /// The run that did the plan's tune-up race (on its day, at least 90% of the race
+    /// distance), the race part only when the run was longer: the warm-up and cool-down
+    /// don't count. `nil` before it, or when it was skipped.
+    static func tuneUp(in plan: TrainingPlan, runs: [CompletedRun], from start: Date, through today: Date, calendar: Calendar) -> CompletedRun? {
+        guard let w = plan.allWorkouts.first(where: { $0.type == .timeTrial }) else { return nil }
+        let d = calendar.startOfDay(for: w.date)
+        guard d >= start, d <= today else { return nil }
+        let race = w.structure?.workMeters ?? w.distanceMeters
+        return runs.filter { calendar.startOfDay(for: $0.date) == d && $0.distanceMeters >= 0.9 * race }
+            .max { $0.distanceMeters < $1.distanceMeters }
+            .map { run in
+                // A run that included the warm-up and cool-down: take off those parts at
+                // easy pace, so the race itself is what's measured.
+                let extra = max(0, run.distanceMeters - race)
+                let easySeconds = extra / 1_000 * plan.paceZones.easySecPerKm
+                return run.distanceMeters > race * 1.1 && run.durationSeconds > easySeconds
+                    ? CompletedRun(date: run.date, distanceMeters: race, durationSeconds: run.durationSeconds - easySeconds)
+                    : run
+            }
     }
 
     /// Daniels' multiplier for VDOT after `daysOff` without running (no cross-training).
@@ -372,7 +400,7 @@ public struct TrainingBuddy: Sendable {
             } else {
                 week.workouts[i].distanceMeters = scaled
                 week.workouts[i].structure = week.workouts[i].structure.map { Self.scaled($0, to: scaled) }
-                week.workouts[i].notes = note
+                week.workouts[i].notes = VDOTPlanGenerator.note(note, keepingStridesOf: week.workouts[i].notes)
             }
         }
     }
@@ -423,7 +451,9 @@ public struct TrainingBuddy: Sendable {
         let from = day(-28, today, calendar)
         var slow = 0, total = 0
         let easyPace = plan.paceZones.easySecPerKm
-        for w in plan.allWorkouts where [.threshold, .interval, .marathonPace].contains(w.type) {
+        // Threshold and intervals only: marathon pace sits close to easy pace for many
+        // runners, so a slow one can't be told from an easy day.
+        for w in plan.allWorkouts where [.threshold, .interval].contains(w.type) {
             let d = calendar.startOfDay(for: w.date)
             guard d >= from, d < today, let target = w.targetPaceSecPerKm, w.distanceMeters > 0,
                   let run = runs.first(where: { calendar.startOfDay(for: $0.date) == d && $0.distanceMeters > 0 }),
@@ -462,7 +492,8 @@ public struct TrainingBuddy: Sendable {
             if workout.distanceMeters > cap {
                 plan.weeks[w].workouts[i].distanceMeters = cap
                 plan.weeks[w].workouts[i].structure = workout.structure.map { Self.scaled($0, to: cap) }
-                plan.weeks[w].workouts[i].notes = "\(Self.km(cap)) for now, a step past your longest recent run"
+                plan.weeks[w].workouts[i].notes = VDOTPlanGenerator.note(
+                    "\(Self.km(cap)) for now, a step past your longest recent run", keepingStridesOf: workout.notes)
             }
             longest = max(longest, plan.weeks[w].workouts[i].distanceMeters)
         }

@@ -11,6 +11,7 @@ extension TrainingPhase {
         case .peak: .indigo
         case .taper: .green
         case .raceWeek: .purple
+        case .recovery: .mint
         }
     }
 }

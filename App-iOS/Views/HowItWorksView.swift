@@ -46,6 +46,42 @@ struct HowItWorksView: View {
                 )
 
                 topic(
+                    "The harder sessions",
+                    icon: "bolt.heart",
+                    detail: "Base weeks are easy runs and a long run. From the build on there's a threshold run each week, and in the peak weeks intervals too, unless the long run finishes at marathon pace: never more than two harder sessions a week, as Jack Tupper Daniels plans them. Each one stays within his limits: the threshold part at most 10% of the week, intervals at most 8% or 10 km, marathon pace at most 20% or 29 km. What a limit takes off goes to the easy warm-up and cool-down, so the run keeps its length. One limit is set aside on purpose: Daniels keeps the long run to about 25 to 30% of the week, and the 32 km run is more than that for most runners."
+                )
+
+                topic(
+                    "Marathon-pace runs",
+                    icon: "metronome",
+                    detail: "Every marathon book has them: Daniels' M-pace runs, Pfitzinger's long runs with a marathon-pace block, the Hansons' weekly goal-pace tempo, Hal Higdon's pace runs. In a marathon plan every other build week swaps the threshold run for one: 2 km easy, the rest at marathon pace, 1 km easy. Peak long runs finish at marathon pace: the last third, at most 16 km, as in Pfitzinger's plans. They count as one of the week's two harder sessions. The 32 km runs and the easier weeks stay easy. Marathon pace comes from your current fitness, like all paces."
+                )
+
+                topic(
+                    "Strides",
+                    icon: "hare",
+                    detail: "Once a week in the base and taper and twice in the build and peak, an easy run ends with 6 × 20 seconds of strides: quick and light, not a sprint, about a minute easy between them. Daniels uses 4 to 6. They keep your legs quick without making you tired. They go on easy days that aren't right before the long run or a harder session whenever the week has such days."
+                )
+
+                topic(
+                    "A tune-up race",
+                    icon: "flag.2.crossed",
+                    detail: "Daniels moves your paces up only when a race shows you're ready, and Pfitzinger puts tune-up races in the weeks before a marathon, the first one 6 weeks out. So the plan has one: a 10 km 6 weeks before race week for the marathon, 5 weeks before for the half, and a 5 km 4 weeks before a 10 km, in plans long enough for it. Run it all out, in a local race or on your own, with 2 km easy before and 1.5 km after. That week is about 10% lighter, with no other harder session. Your result counts in full: if it shows a higher VDOT, your paces follow it right away. Any other fast run counts by half, since it may not have been all out. Skipping the tune-up changes nothing."
+                )
+
+                topic(
+                    "Race day",
+                    icon: "flag.checkered",
+                    detail: "Start at your race pace, not faster, and keep it even. In races of over an hour, take carbohydrate from early on: about 60 g an hour, and in races over about 2½ hours up to 90 g from drinks and gels with mixed sugars (Jeukendrup 2014). Your gut gets used to it with practice, so the marathon's peak long runs remind you to try your race-day drinks and gels on them."
+                )
+
+                topic(
+                    "After the race",
+                    icon: "bed.double",
+                    detail: "Daniels gives an easy day for every 3 km raced: about 14 days after a marathon, 7 after a half, 3 after a 10 km. The plan goes on after race day with those days: full rest first (3 days after a marathon, as in Hal Higdon's post-marathon weeks), then short easy runs every other day, growing a little. They're only if your legs feel ready. They don't count toward your training weeks or progress."
+                )
+
+                topic(
                     "Adapting to your runs",
                     icon: "arrow.triangle.2.circlepath",
                     detail: "The plan works like a running buddy who isn't pushy: it paces the coming weeks to the training you actually do, and past weeks are never rewritten. Missed kilometres are never piled onto later days, as Pete Pfitzinger, the Hansons and Hal Higdon all advise. A long run you missed moves to a free day only within the next 3 days, and only while training goes about as planned. Hold a day in Plan and drag it onto another to swap them. Your Apple Watch shows the same adjusted days as your iPhone. The rules are below, with where they come from."
@@ -197,17 +233,22 @@ struct HowItWorksView: View {
                 source(
                     title: "Daniels' Running Formula (4th ed.)",
                     author: "Jack Tupper Daniels, PhD · Human Kinetics, 2021",
-                    detail: "The training system: VDOT, the five pace zones, periodization, and long-run guidance. The steps back after time off follow the 3rd edition (2014) and Daniels' VDOT adjustments for time off (news.vdoto2.com)."
+                    detail: "The training system: VDOT, the five pace zones, periodization, long-run guidance, the limits per session, strides, updating VDOT from races, and an easy day for every 3 km raced. The steps back after time off follow the 3rd edition (2014) and Daniels' VDOT adjustments for time off (news.vdoto2.com)."
                 )
                 source(
                     title: "Marathon and half marathon training plans",
                     author: "Hal Higdon (halhigdon.com) · Hansons Marathon Method",
-                    detail: "When the longest long runs go: 32 km for the marathon and 19 km for the half, the last one about 3 weeks before race day."
+                    detail: "When the longest long runs go: 32 km for the marathon and 19 km for the half, the last one about 3 weeks before race day. Goal-pace runs, and Higdon's post-marathon weeks that start with rest."
                 )
                 source(
                     title: "Advanced Marathoning and Faster Road Racing",
                     author: "Pete Pfitzinger and Scott Douglas · Human Kinetics",
-                    detail: "Making up for lost time after missed training, the 90% benchmark, the base before a marathon plan, and not cramming missed mileage."
+                    detail: "Making up for lost time after missed training, the 90% benchmark, the base before a marathon plan, not cramming missed mileage, marathon-pace long runs and tune-up races."
+                )
+                source(
+                    title: "A Step Towards Personalized Sports Nutrition: Carbohydrate Intake During Exercise (2014)",
+                    author: "Asker Jeukendrup, Sports Medicine",
+                    detail: "About 60 g of carbohydrate an hour in longer races, up to 90 g from mixed sugars past about 2½ hours, and training the gut."
                 )
                 source(
                     title: "How much running is too much? (BJSM, 2025)",

@@ -117,15 +117,41 @@ public struct VDOTPlanGenerator: PlanGenerator {
                 // A maintenance week is steady, so it makes room for the peak long run
                 // (it holds the volume rather than ramping, and isn't limited by it).
                 if isMaintenance, let longTarget { volume = max(volume, longTarget / Self.maxLongRunShare) }
+                // The marathon's own sessions: every other build week the threshold run
+                // becomes a marathon-pace run, and peak long runs finish at marathon
+                // pace, except the plan's longest and the easier weeks.
+                let isMarathonBuild = goal.race == .marathon && !isMaintenance
+                let buildIndex = (0..<i).filter { Self.phase(weekIndex: $0, total: total) == .build }.count
+                let cutback = i < progressionVolumes.count && Self.isCutbackWeek(i, count: progressionVolumes.count)
+                let peakLong = Self.peakLongRun(for: goal.race) ?? 0
+                var sessions = WeekSessions()
+                sessions.marathonPaceRun = isMarathonBuild && phase == .build && buildIndex % 2 == 1
+                sessions.marathonPaceLongRun = isMarathonBuild && phase == .peak && !cutback
+                    && (longTarget ?? 0) < peakLong - 1
+                if !isMaintenance, let trial = Self.timeTrial(for: goal.race, totalWeeks: total), trial.weeksOut == weeksOut,
+                   [.build, .peak].contains(phase) {
+                    // A lighter week around the race (Pfitzinger): no other hard
+                    // session, and an easy long run.
+                    sessions.timeTrialMeters = trial.meters
+                    sessions.marathonPaceRun = false
+                    sessions.marathonPaceLongRun = false
+                    sessions.timeTrialPace = calculator.predictedTimeSeconds(distanceMeters: trial.meters, vdot: vdot) / (trial.meters / 1_000)
+                }
+                sessions.strides = switch phase {
+                case .base, .taper: 1
+                case .build, .peak, .maintenance: 2
+                case .raceWeek, .recovery: 0
+                }
                 workouts = trainingWeekWorkouts(
                     weekStart: weekStart, phase: phase, volume: volume,
                     daysPerWeek: dpw, longRunCap: cap, longRunTarget: longTarget,
-                    earliestOffset: earliestOffset,
+                    earliestOffset: earliestOffset, sessions: sessions,
                     goal: goal, zones: zones, calendar: calendar
                 )
             }
             weeks.append(TrainingWeek(index: i, startDate: weekStart, phase: phase, workouts: workouts))
         }
+        appendRecovery(to: &weeks, goal: goal, raceDay: race0, zones: zones, calendar: calendar)
 
         return TrainingPlan(goal: goal, vdot: vdot, paceZones: zones, weeks: weeks,
                             isMaintenance: isMaintenance, enduranceHoldback: holdback)
@@ -204,7 +230,7 @@ public struct VDOTPlanGenerator: PlanGenerator {
         case .taper:
             // Two taper weeks (total-3, total-2): 65% then 50% of peak.
             return i == total - 3 ? 0.65 * peak : 0.50 * peak
-        case .raceWeek:
+        case .raceWeek, .recovery:
             return 0
         }
     }
@@ -462,10 +488,33 @@ public struct VDOTPlanGenerator: PlanGenerator {
         ))
     }
 
+    /// The week's special sessions, on top of the phase's usual ones.
+    struct WeekSessions {
+        /// The threshold run becomes a marathon-pace run.
+        var marathonPaceRun = false
+        /// The long run finishes at marathon pace.
+        var marathonPaceLongRun = false
+        /// A tune-up race or time trial of this distance takes the first quality day.
+        var timeTrialMeters: Double?
+        /// Its race pace from the current VDOT (sec/km).
+        var timeTrialPace: Double = 0
+        /// How many easy runs end with strides.
+        var strides = 0
+    }
+
+    /// 6 × 20 s strides after an easy run (Daniels: 4 to 6 × 20 s, quick and light,
+    /// not a sprint, about a minute easy between them).
+    public static let stridesNote = "Easy run, then 6 × 20 s strides: quick and light, not a sprint, about a minute easy between them"
+
+    /// A new note for a run the plan changed, keeping its strides if it had them.
+    public static func note(_ note: String, keepingStridesOf old: String) -> String {
+        old.contains("6 × 20 s strides") ? note + ", then 6 × 20 s strides" : note
+    }
+
     private func trainingWeekWorkouts(
         weekStart: Date, phase: TrainingPhase, volume rawVolume: Double,
         daysPerWeek dpw: Int, longRunCap cap: Double, longRunTarget: Double? = nil,
-        earliestOffset: Int = 0,
+        earliestOffset: Int = 0, sessions: WeekSessions = WeekSessions(),
         goal: Goal, zones: PaceZones, calendar: Calendar
     ) -> [PlannedWorkout] {
         let layout = Self.weekLayout(
@@ -489,7 +538,32 @@ public struct VDOTPlanGenerator: PlanGenerator {
         // go on the ones that keep them away from the long run and each other.
         let otherDays = runDays.filter { $0 != longOffset }
         let n = otherDays.count
-        let qualityDays = Self.qualityDays(otherDays: otherDays, longOffset: longOffset, phase: phase)
+        var qualityDays = Self.qualityDays(otherDays: otherDays, longOffset: longOffset, phase: phase)
+        if sessions.marathonPaceRun, let t = qualityDays.first(where: { $0.value == .threshold })?.key {
+            qualityDays[t] = .marathonPace
+        }
+        // Daniels plans two quality sessions a week; a long run with a marathon-pace
+        // finish is one, so the intervals become an easy run that week.
+        if sessions.marathonPaceLongRun {
+            qualityDays = qualityDays.filter { $0.value != .interval }
+        }
+        // The tune-up takes the threshold day (or the first hard day, or a mid-week
+        // easy day in a week without one).
+        if sessions.timeTrialMeters != nil {
+            let day = qualityDays.first(where: { $0.value == .threshold })?.key
+                ?? qualityDays.keys.sorted().first
+                ?? (otherDays.isEmpty ? nil : otherDays[otherDays.count / 2])
+            if let day { qualityDays = [day: .timeTrial] }
+        }
+        // Strides on easy days that aren't right before the long run or a hard day.
+        let stridesDays: Set<Int> = {
+            let easy = otherDays.filter { qualityDays[$0] == nil }
+            let fresh = easy.filter { d in
+                ((d + 1) % 7) != longOffset && qualityDays[(d + 1) % 7] == nil
+            }
+            // Fresh days first, then the other easy days if there aren't enough.
+            return Set((fresh + easy.filter { !fresh.contains($0) }).prefix(sessions.strides))
+        }()
 
         // The long run must stay the week's single longest run. Its phase fraction
         // (0.28–0.36) can dip below an even per-day share when there are few running
@@ -505,29 +579,55 @@ public struct VDOTPlanGenerator: PlanGenerator {
         let remaining = max(0, volume - longDistance)
         // Spread the rest across the easy/quality days. Clamp to the long run so that
         // if the per-race cap clipped the long run, no easy day can still exceed it.
-        let easyEach = n == 0 ? 0 : min(longDistance, remaining / Double(n))
+        var easyEach = n == 0 ? 0 : min(longDistance, remaining / Double(n))
+        // A tune-up week is about 10% lighter: the race takes its own distance and
+        // the easy runs share what's left.
+        if let trial = sessions.timeTrialMeters, n > 1 {
+            let trialTotal = Self.timeTrialStructure(distance: trial).totalMeters
+            easyEach = min(longDistance, max(3_000, (0.9 * volume - longDistance - trialTotal) / Double(n - 1)))
+        }
 
         var workouts: [PlannedWorkout] = []
         for offset in 0..<7 {
             let date = calendar.date(byAdding: .day, value: offset, to: weekStart)!
             if offset == longOffset {
-                let isMarathonPeak = (goal.race == .marathon && phase == .peak)
+                let finish = sessions.marathonPaceLongRun ? Self.marathonPaceFinish(longRun: longDistance, weekVolume: volume) : nil
+                let note = finish.map {
+                    "Long run, the last \(Self.distLabel($0.workMeters)) at marathon pace. Practise your race-day drinks and gels on it."
+                } ?? (phase == .peak && goal.race == .marathon
+                      ? "Long run, easy and conversational. Practise your race-day drinks and gels on it."
+                      : "Long run, easy and conversational")
                 workouts.append(PlannedWorkout(
                     id: workoutID(date: date, type: .longRun, calendar: calendar),
                     date: date, type: .longRun, distanceMeters: longDistance,
                     targetPaceSecPerKm: window(zones.easySecPerKm),
-                    notes: isMarathonPeak ? "Long run, finish last third at marathon pace" : "Long run, easy and conversational"
+                    notes: note,
+                    structure: finish
                 ))
             } else if otherDays.contains(offset) {
                 let type = qualityDays[offset] ?? .easy
+                if type == .timeTrial, let meters = sessions.timeTrialMeters {
+                    // Its own distance (the race plus warm-up and cool-down), at the
+                    // race pace the current VDOT predicts.
+                    let structure = Self.timeTrialStructure(distance: meters)
+                    let racePace = sessions.timeTrialPace
+                    workouts.append(PlannedWorkout(
+                        id: workoutID(date: date, type: type, calendar: calendar),
+                        date: date, type: type, distanceMeters: structure.totalMeters,
+                        targetPaceSecPerKm: window(racePace, tolerance: 0.02),
+                        notes: Self.note(for: type, structure: structure),
+                        structure: structure
+                    ))
+                    continue
+                }
                 // Quality days (intervals/tempo) carry a structured breakdown; the
                 // parts sum to easyEach, so weekly volume is unchanged.
-                let structure = Self.structure(for: type, totalMeters: easyEach)
+                let structure = Self.structure(for: type, totalMeters: easyEach, weekVolume: volume)
                 workouts.append(PlannedWorkout(
                     id: workoutID(date: date, type: type, calendar: calendar),
                     date: date, type: type, distanceMeters: easyEach,
                     targetPaceSecPerKm: window(pace(for: type, zones: zones)),
-                    notes: Self.note(for: type, structure: structure),
+                    notes: stridesDays.contains(offset) ? Self.stridesNote : Self.note(for: type, structure: structure),
                     structure: structure
                 ))
             } else {
@@ -586,22 +686,73 @@ public struct VDOTPlanGenerator: PlanGenerator {
 
     /// Builds the warm-up / work / cool-down breakdown for a quality session so its
     /// parts sum exactly to `total` (weekly volume is preserved). Steady runs (easy,
-    /// long, marathon-pace) get no structure.
-    static func structure(for type: WorkoutType, totalMeters total: Double) -> WorkoutStructure? {
+    /// long) get no structure.
+    /// The hard part stays within Daniels' caps for the week (`weekVolume`): threshold
+    /// at most 10%, intervals the lesser of 10 km and 8%, repetitions the lesser of
+    /// 8 km and 5%, marathon pace the lesser of 29 km and 20%. What a cap takes off
+    /// the hard part goes to the easy warm-up and cool-down, so the run keeps its length.
+    static func structure(for type: WorkoutType, totalMeters total: Double, weekVolume: Double = .infinity) -> WorkoutStructure? {
         switch type {
-        case .interval:      return repeatStructure(total: total, work: 1_000, recovery: 400, workType: .interval)
-        case .repetitionSpeed: return repeatStructure(total: total, work: 400, recovery: 400, workType: .repetitionSpeed)
-        case .threshold:     return tempoStructure(total: total)
-        default:             return nil
+        case .interval:
+            return repeatStructure(total: total, work: 1_000, recovery: 400, workType: .interval, maxWork: min(10_000, 0.08 * weekVolume))
+        case .repetitionSpeed:
+            return repeatStructure(total: total, work: 400, recovery: 400, workType: .repetitionSpeed, maxWork: min(8_000, 0.05 * weekVolume))
+        case .threshold:
+            return tempoStructure(total: total, maxWork: 0.10 * weekVolume)
+        case .marathonPace:
+            var s = blockStructure(total: total, warmup: 2_000, cooldown: 1_000, workType: .marathonPace)
+            let cap = min(29_000, 0.20 * weekVolume)
+            if s.workMeters > cap { s.warmupMeters += s.workMeters - cap; s.workMeters = cap }
+            return s
+        default:
+            return nil
+        }
+    }
+
+    /// Warm-up, one block at `workType`, cool-down; the block takes what's left.
+    static func blockStructure(total: Double, warmup: Double, cooldown: Double, workType: WorkoutType) -> WorkoutStructure {
+        let work = max(0, total - warmup - cooldown)
+        return WorkoutStructure(warmupMeters: total - work - cooldown, reps: 1, workMeters: work,
+                                recoveryMeters: 0, cooldownMeters: cooldown, workType: workType)
+    }
+
+    /// The marathon-pace finish of a long run: the last third, at most 16 km (10
+    /// miles) after Pfitzinger's marathon-pace long runs and at most 20% of the week
+    /// (Daniels' cap for marathon pace), then 1 km easy.
+    static func marathonPaceFinish(longRun total: Double, weekVolume: Double) -> WorkoutStructure {
+        let block = (min(16_000, total / 3, 0.2 * weekVolume) / 1_000).rounded(.down) * 1_000
+        return WorkoutStructure(warmupMeters: max(0, total - block - 1_000), reps: 1, workMeters: block,
+                                recoveryMeters: 0, cooldownMeters: 1_000, workType: .marathonPace)
+    }
+
+    /// A tune-up race or time trial with 2 km easy before it and 1.5 km after.
+    static func timeTrialStructure(distance: Double) -> WorkoutStructure {
+        WorkoutStructure(warmupMeters: 2_000, reps: 1, workMeters: distance,
+                         recoveryMeters: 0, cooldownMeters: 1_500, workType: .timeTrial)
+    }
+
+    /// The distance of the build's tune-up race or time trial, and how many weeks
+    /// before race week it comes: a 10 km 6 weeks out for the marathon (before the
+    /// long runs that peak 5 and 3 weeks out; Pfitzinger's first tune-up is 6 weeks out,
+    /// 8 to 15 km), 5 weeks out for the half, and a 5 km
+    /// 4 weeks out for a 10 km. Only in plans long enough to have a build by then.
+    static func timeTrial(for race: RaceDistance, totalWeeks: Int) -> (meters: Double, weeksOut: Int)? {
+        switch race {
+        case .marathon where totalWeeks >= 14: return (10_000, 6)
+        case .halfMarathon where totalWeeks >= 10: return (10_000, 5)
+        case .tenK where totalWeeks >= 8: return (5_000, 4)
+        default: return nil
         }
     }
 
     /// A warm-up, `reps` × (work + recovery jog), cool-down — sized to fit `total`.
-    private static func repeatStructure(total: Double, work: Double, recovery: Double, workType: WorkoutType) -> WorkoutStructure {
+    private static func repeatStructure(total: Double, work: Double, recovery: Double, workType: WorkoutType,
+                                        maxWork: Double = .infinity) -> WorkoutStructure {
         let repDist = work + recovery
         let desiredWarmCool = 3_000.0
         var reps = Int(((total - desiredWarmCool) / repDist).rounded())
         reps = max(3, min(8, reps))
+        while Double(reps) * work > maxWork && reps > 3 { reps -= 1 }
         // Never let the work block overrun the total.
         while Double(reps) * repDist > total && reps > 1 { reps -= 1 }
         let wc = max(0, total - Double(reps) * repDist)
@@ -613,8 +764,8 @@ public struct VDOTPlanGenerator: PlanGenerator {
     }
 
     /// Warm-up, one continuous tempo block, cool-down.
-    private static func tempoStructure(total: Double) -> WorkoutStructure {
-        let wc = min(total * 0.4, max(2_000, total * 0.35))
+    private static func tempoStructure(total: Double, maxWork: Double = .infinity) -> WorkoutStructure {
+        let wc = max(total - maxWork, min(total * 0.4, max(2_000, total * 0.35)))
         let warmup = (wc * 0.55).rounded()
         return WorkoutStructure(
             warmupMeters: warmup, reps: 1, workMeters: max(0, total - wc), recoveryMeters: 0,
@@ -632,6 +783,10 @@ public struct VDOTPlanGenerator: PlanGenerator {
             return "Speed: \(distLabel(s.workMeters)) × \(s.reps) @ rep pace, \(distLabel(s.recoveryMeters)) jog"
         case .threshold:
             return "Threshold: \(distLabel(s.workMeters)) continuous @ threshold pace"
+        case .marathonPace:
+            return "Marathon pace: \(distLabel(s.workMeters)) @ marathon pace, steady and relaxed"
+        case .timeTrial:
+            return "Tune-up: \(distLabel(s.workMeters)) all out, a local race or on your own. Your paces follow the result."
         default:
             return ""
         }
@@ -653,7 +808,69 @@ public struct VDOTPlanGenerator: PlanGenerator {
         case .threshold: return zones.thresholdSecPerKm
         case .interval: return zones.intervalSecPerKm
         case .repetitionSpeed: return zones.repetitionSecPerKm
-        case .raceDay: return zones.marathonSecPerKm
+        case .timeTrial, .raceDay: return zones.marathonSecPerKm   // set from the race's own pace
+        }
+    }
+
+    /// What to do on the day: start no faster than race pace and keep it even, and for
+    /// races of over an hour take carbohydrate from early on, about 60 g an hour, up
+    /// to 90 g from mixed sugars past about 2½ hours (Jeukendrup 2014), as practised
+    /// on the long runs.
+    public static func raceDayAdvice(for race: RaceDistance, expectedSeconds: Double) -> String {
+        let pacing = "Start at your race pace, not faster, and keep it even."
+        guard expectedSeconds > 3_600 else { return "Race day. " + pacing }
+        let carbs = expectedSeconds > 9_000
+            ? "Take carbohydrate from early on: about 60 g an hour, up to 90 g from drinks and gels with mixed sugars, as you practised on your long runs."
+            : "Take carbohydrate from early on, about 60 g an hour, as you practised on your long runs."
+        return "Race day. " + pacing + " " + carbs
+    }
+
+    /// Daniels: an easy day for every 3 km raced, so about 14 days after a marathon and
+    /// 7 after a half. The first days are full rest (3 after a marathon, as in Hal
+    /// Higdon's post-marathon weeks), then short easy runs every other day that grow a
+    /// little. They follow the race in its week and in recovery weeks after it.
+    static func recoveryDays(for race: RaceDistance) -> [(type: WorkoutType, meters: Double)] {
+        let km = race.meters / 1_000
+        let days = max(2, Int((km / 3).rounded()))
+        let rest = km >= 30 ? 3 : (km >= 15 ? 2 : 1)
+        let first = km >= 30 ? 5_000.0 : 4_000
+        let last = km >= 30 ? 10_000.0 : (km >= 15 ? 8_000 : 6_000)
+        let runDays = (rest..<days).filter { ($0 - rest) % 2 == 0 }
+        return (0..<days).map { d in
+            guard let n = runDays.firstIndex(of: d) else { return (.rest, 0) }
+            let step = runDays.count > 1 ? (last - first) / Double(runDays.count - 1) : 0
+            return (.easy, ((first + step * Double(n)) / 500).rounded() * 500)
+        }
+    }
+
+    private func appendRecovery(to weeks: inout [TrainingWeek], goal: Goal, raceDay: Date, zones: PaceZones, calendar: Calendar) {
+        var days = Self.recoveryDays(for: goal.race)
+        func date(_ n: Int) -> Date { calendar.date(byAdding: .day, value: n + 1, to: raceDay)! }
+        func isFree(_ n: Int) -> Bool { goal.restWeekdays.contains(calendar.component(.weekday, from: date(n))) }
+        // A run on a weekday the athlete keeps free moves to the next rest day.
+        for n in days.indices where days[n].type == .easy && isFree(n) {
+            if let m = (n + 1..<days.count).first(where: { days[$0].type == .rest && !isFree($0) }) {
+                days.swapAt(n, m)
+            } else {
+                days[n] = (.rest, 0)
+            }
+        }
+        for (n, day) in days.enumerated() {
+            let date = date(n)
+            let weekday = calendar.component(.weekday, from: date)
+            let workout = day.type == .rest
+                ? PlannedWorkout(id: workoutID(date: date, type: .rest, calendar: calendar), date: date, type: .rest,
+                                 distanceMeters: 0,
+                                 notes: isFree(n) ? "No training, you keep \(calendar.weekdaySymbols[weekday - 1])s free" : "Rest after the race")
+                : PlannedWorkout(id: workoutID(date: date, type: .easy, calendar: calendar), date: date, type: .easy,
+                                 distanceMeters: day.meters, targetPaceSecPerKm: window(zones.easySecPerKm),
+                                 notes: "Recovery run: short and easy, only if your legs feel ready")
+            let weekStart = Self.startOfWeek(date, calendar: calendar)
+            if let last = weeks.indices.last, calendar.isDate(weeks[last].startDate, inSameDayAs: weekStart) {
+                weeks[last].workouts.append(workout)
+            } else {
+                weeks.append(TrainingWeek(index: weeks.count, startDate: weekStart, phase: .recovery, workouts: [workout]))
+            }
         }
     }
 
@@ -667,7 +884,7 @@ public struct VDOTPlanGenerator: PlanGenerator {
             ?? calculator.predictedTimeSeconds(distanceMeters: goal.race.meters, vdot: vdot)
         let raceCenter = raceSeconds / goalKm
 
-        // The plan ends at the finish line — no days after the race.
+        // Up to the finish line; the recovery days after it come from `appendRecovery`.
         var workouts: [PlannedWorkout] = []
         for offset in 0...raceOffset {
             let date = calendar.date(byAdding: .day, value: offset, to: weekStart)!
@@ -676,7 +893,7 @@ public struct VDOTPlanGenerator: PlanGenerator {
                     id: workoutID(date: date, type: .raceDay, calendar: calendar),
                     date: date, type: .raceDay, distanceMeters: goal.race.meters,
                     targetPaceSecPerKm: window(raceCenter, tolerance: 0.015),
-                    notes: "🏁 Race day: \(goal.race.displayName)"
+                    notes: Self.raceDayAdvice(for: goal.race, expectedSeconds: raceSeconds)
                 ))
             } else if offset == raceOffset - 2 {
                 workouts.append(PlannedWorkout(

@@ -38,6 +38,8 @@ public struct PaceZones: Sendable, Equatable, Codable {
         case .interval: return intervalSecPerKm
         case .repetitionSpeed: return repetitionSecPerKm
         case .raceDay: return marathonSecPerKm
+        // Close to threshold; the workout carries the exact race pace for its distance.
+        case .timeTrial: return thresholdSecPerKm
         }
     }
 }

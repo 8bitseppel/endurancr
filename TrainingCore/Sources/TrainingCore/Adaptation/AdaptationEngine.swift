@@ -20,7 +20,7 @@ public struct AdaptationEngine: Sendable {
     /// Intensity sessions that should be softened to easy running when the athlete
     /// is showing fatigue. Long runs and easy days are left alone.
     public static let qualityTypes: Set<WorkoutType> = [
-        .marathonPace, .threshold, .interval, .repetitionSpeed,
+        .marathonPace, .threshold, .interval, .repetitionSpeed, .timeTrial,
     ]
 
     // MARK: Fitness re-rating
@@ -98,7 +98,7 @@ public struct AdaptationEngine: Sendable {
                       workout.type != .rest,
                       workout.targetPaceSecPerKm != nil else { return workout }
                 var w = workout
-                let center = paceCenter(for: workout.type, zones: zones, plan: plan, vdot: vdot)
+                let center = paceCenter(for: workout, zones: zones, plan: plan, vdot: vdot)
                 let tolerance = workout.type == .raceDay ? 0.015 : 0.03
                 w.targetPaceSecPerKm = (center * (1 - tolerance))...(center * (1 + tolerance))
                 return w
@@ -108,13 +108,16 @@ public struct AdaptationEngine: Sendable {
         return updated
     }
 
-    private func paceCenter(for type: WorkoutType, zones: PaceZones, plan: TrainingPlan, vdot: Double) -> Double {
-        switch type {
+    private func paceCenter(for workout: PlannedWorkout, zones: PaceZones, plan: TrainingPlan, vdot: Double) -> Double {
+        switch workout.type {
         case .easy, .longRun, .rest: return zones.easySecPerKm
         case .marathonPace: return zones.marathonSecPerKm
         case .threshold: return zones.thresholdSecPerKm
         case .interval: return zones.intervalSecPerKm
         case .repetitionSpeed: return zones.repetitionSecPerKm
+        case .timeTrial:
+            let meters = workout.structure?.workMeters ?? workout.distanceMeters
+            return calculator.predictedTimeSeconds(distanceMeters: meters, vdot: vdot) / (meters / 1_000)
         case .raceDay:
             let goalKm = plan.goal.race.meters / 1_000
             let seconds = plan.goal.targetTimeSeconds
@@ -366,9 +369,9 @@ public struct AdaptationEngine: Sendable {
                 week.workouts[i].notes = "Rest, the week's distance is already done"
             } else if abs(newDistance - original) >= 100 {
                 week.workouts[i].distanceMeters = newDistance
-                week.workouts[i].notes = newDistance < original
-                    ? "Shorter, the week's distance is nearly done"
-                    : "Adjusted to keep the week on target"
+                week.workouts[i].notes = VDOTPlanGenerator.note(
+                    newDistance < original ? "Shorter, the week's distance is nearly done" : "Adjusted to keep the week on target",
+                    keepingStridesOf: week.workouts[i].notes)
             }
         }
 

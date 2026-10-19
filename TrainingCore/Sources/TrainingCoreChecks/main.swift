@@ -40,18 +40,19 @@ h.suite("VDOT calculator") {
 h.suite("VDOT plan generator") {
     let plan = try marathonPlan()
 
-    let last = try require(plan.allWorkouts.last, "final workout")
+    let last = try require(plan.weeksToRace.last?.workouts.last, "final workout")
     h.check(last.type == .raceDay, "plan ends on race day")
     h.check(last.distanceMeters == RaceDistance.marathon.meters, "race-day distance is the marathon distance")
     h.check(cal.isDate(last.date, inSameDayAs: date(2027, 4, 25)), "race day is 2027-04-25")
-    h.check(plan.weeks.last?.phase == .raceWeek, "last week is race week")
+    h.check(plan.weeksToRace.last?.phase == .raceWeek, "the last week before recovery is race week")
+    h.check(plan.weeks.last?.phase == .recovery, "recovery weeks follow the race")
 
     // Weeks are anchored to Monday (ISO Kalenderwoche): the count spans the Monday of
     // the start week through the Monday of the race week, inclusive.
     let firstMonday = VDOTPlanGenerator.startOfWeek(date(2026, 1, 1), calendar: cal)
     let raceMonday = VDOTPlanGenerator.startOfWeek(date(2027, 4, 25), calendar: cal)
     let expectedWeeks = cal.dateComponents([.day], from: firstMonday, to: raceMonday).day! / 7 + 1
-    h.check(plan.weeks.count == expectedWeeks, "week count matches Monday-anchored span (\(plan.weeks.count) weeks)")
+    h.check(plan.weeksToRace.count == expectedWeeks, "week count matches Monday-anchored span (\(plan.weeks.count) weeks)")
     h.check(plan.weeks.allSatisfy { cal.component(.weekday, from: $0.startDate) == 2 }, "every week starts on a Monday")
 
     let baseWeek = try require(plan.weeks.first { $0.phase == .base && $0.index > 0 }, "a base week")
@@ -210,7 +211,7 @@ h.suite("Rest days between runs") {
             goal: Goal(race: .marathon, raceDate: date(2027, 4, 25), daysPerWeek: dpw),
             fitness: fitness, startDate: date(2026, 1, 7), calendar: cal
         )
-        let full = plan.weeks.dropFirst().filter { $0.phase != .raceWeek && $0.phase != .taper }
+        let full = plan.weeks.dropFirst().filter { ![.raceWeek, .taper, .recovery].contains($0.phase) }
         let layouts = full.map { Set($0.workouts.filter(\.type.isRunning).map { (cal.component(.weekday, from: $0.date) + 5) % 7 }) }
         let pairs = layouts.map { days in days.filter { days.contains(($0 + 1) % 7) }.count }
         h.check(pairs.allSatisfy { $0 <= max(0, dpw - (7 - dpw)) },
@@ -260,7 +261,7 @@ h.suite("Day swaps") {
     // Race day never moves.
     let race = try require(base.allWorkouts.last, "race day")
     moved.daySwaps = [DaySwap(race.date, cal.date(byAdding: .day, value: -1, to: race.date)!)]
-    h.check(try moved.makePlan(calendar: cal).allWorkouts.last?.type == .raceDay, "race day can't be swapped")
+    h.check(try moved.makePlan(calendar: cal).weeksToRace.last?.workouts.last?.type == .raceDay, "race day can't be swapped")
 
     // Swaps survive encoding, and older data without swaps still decodes.
     moved.daySwaps = [DaySwap(run.date, rest.date)]
@@ -613,8 +614,8 @@ h.suite("Plan review: what was run, what changed, what each week is for") {
     h.check(abs(first.doneMeters - firstDone) < 1, "week 1 counts what was run in it")
     h.check(review.weeks.values.contains { $0.isCutback } && review.weeks.values.filter(\.isCutback).allSatisfy { $0.purpose.hasPrefix("An easier week") },
             "cutback weeks say they're easier")
-    h.check(review.weeks[plan.weeks.count - 1]!.purpose == "Short and easy until race day.", "race week has its own line")
-    h.check(review.weeks[0]!.purpose.contains("Long run"), "a week names its long run")
+    h.check(review.weeks[plan.weeksToRace.count - 1]!.purpose == "Short and easy until race day.", "race week has its own line")
+    h.check(review.weeks[0]!.purpose.contains("long run"), "a week names its long run")
 
     // Paces: a fast 10 km lifts them, says why, and the days know their old pace.
     let fastTime = VDOTCalculator().predictedTimeSeconds(distanceMeters: 10_000, vdot: plan.vdot + 3)
@@ -633,6 +634,101 @@ h.suite("Plan review: what was run, what changed, what each week is for") {
     let longest = plan.allWorkouts.filter { review.day($0.date, calendar: cal)?.milestone == .longestRun }
     h.check(!longest.isEmpty && longest.allSatisfy { $0.type == .longRun && $0.distanceMeters == 32_000 }, "the 32 km runs are marked")
     h.check(plan.allWorkouts.filter { review.day($0.date, calendar: cal)?.milestone == .taperBegins }.count == 1, "the taper's first long run is marked")
+}
+
+h.suite("Sessions from the books: marathon pace, strides, tune-up, recovery") {
+    let fitness = FitnessSnapshot(distanceMeters: 12_200, timeSeconds: 68 * 60 + 19, date: date(2026, 10, 3))
+    let goal = Goal(race: .marathon, raceDate: date(2027, 4, 25), targetTimeSeconds: 4.5 * 3600, daysPerWeek: 5, restWeekdays: [2])
+    let plan = try VDOTPlanGenerator().makePlan(goal: goal, fitness: fitness, startDate: date(2026, 10, 5), calendar: cal)
+    let race = plan.weeksToRace
+
+    // Marathon pace: every other build week, as a block between easy parts.
+    let build = race.filter { $0.phase == .build }
+    let mpWeeks = build.filter { $0.workouts.contains { $0.type == .marathonPace } }
+    h.check(!mpWeeks.isEmpty && mpWeeks.count == build.count / 2, "every other build week has a marathon-pace run (\(mpWeeks.count) of \(build.count))")
+    let mp = mpWeeks.flatMap(\.workouts).filter { $0.type == .marathonPace }
+    h.check(mp.allSatisfy { $0.structure?.workType == .marathonPace && $0.structure!.reps == 1 && abs($0.structure!.totalMeters - $0.distanceMeters) < 1 },
+            "marathon-pace runs are warm-up, a block, cool-down, adding up to the run")
+    // Peak long runs finish at marathon pace; the 32 km ones and the easier weeks don't.
+    let peakLongs = race.filter { $0.phase == .peak }.flatMap(\.workouts).filter { $0.type == .longRun }
+    let mpFinish = peakLongs.filter { $0.structure?.workType == .marathonPace }
+    h.check(!mpFinish.isEmpty, "some peak long runs finish at marathon pace")
+    h.check(peakLongs.filter { $0.distanceMeters >= 32_000 - 1 }.allSatisfy { $0.structure == nil }, "the 32 km runs stay easy")
+    h.check(mpFinish.allSatisfy { $0.structure!.workMeters <= 16_000 && $0.structure!.workMeters <= $0.distanceMeters / 3 + 1 },
+            "a marathon-pace finish is at most a third, and at most 16 km")
+    h.check(WorkoutSteps.steps(for: mpFinish[0], zones: plan.paceZones).contains { $0.label == "Marathon pace" }, "the watch names the block Marathon pace")
+
+    // Daniels' caps per session: T at most 10% of the week, I the lesser of 10 km
+    // and 8%, M the lesser of 29 km and 20%.
+    for week in race where week.plannedVolumeMeters > 0 {
+        let v = week.plannedVolumeMeters
+        for w in week.workouts {
+            guard let st = w.structure else { continue }
+            let work = Double(st.reps) * st.workMeters
+            switch st.workType {
+            case .threshold: h.check(work <= 0.10 * v + 1, "threshold \(Int(work)) m within 10% of week \(week.index + 1) (\(Int(v)) m)")
+            case .interval: h.check(work <= min(10_000, 0.08 * v) + 1, "intervals \(Int(work)) m within Daniels' cap in week \(week.index + 1)")
+            case .marathonPace: h.check(work <= min(29_000, 0.20 * v) + 1, "marathon pace \(Int(work)) m within 20% of week \(week.index + 1)")
+            default: break
+            }
+        }
+    }
+
+    // At most two quality sessions a week (Daniels), a marathon-pace long run counting as one.
+    h.check(race.allSatisfy { week in
+        week.workouts.filter { AdaptationEngine.qualityTypes.contains($0.type) || $0.structure?.workType == .marathonPace && $0.type == .longRun }.count <= 2
+    }, "never more than two quality sessions in a week")
+
+    // Strides: one easy run a week in the base, two in the build and peak.
+    let strides = { (w: TrainingWeek) in w.workouts.filter { $0.notes.contains("strides") }.count }
+    h.check(race.filter { $0.phase == .base && $0.index > 0 }.allSatisfy { strides($0) == 1 }, "base weeks: strides once")
+    h.check(race.filter { $0.phase == .build }.allSatisfy { strides($0) == 2 }, "build weeks: strides twice")
+
+    // A run the plan shortens keeps its strides.
+    h.check(VDOTPlanGenerator.note("Shorter", keepingStridesOf: VDOTPlanGenerator.stridesNote) == "Shorter, then 6 × 20 s strides",
+            "a shortened run keeps its strides")
+
+    // The tune-up: a 10 km six weeks out, with its race pace.
+    let trials = plan.allWorkouts.filter { $0.type == .timeTrial }
+    h.check(trials.count == 1, "one tune-up race in a marathon plan")
+    let trial = trials[0]
+    let trialWeek = race.firstIndex { $0.workouts.contains(trial) }!
+    h.check(race.count - 1 - trialWeek == 6 && trial.structure?.workMeters == 10_000, "a 10 km six weeks before race week")
+    // Running it fast lifts the paces in full and says so; skipping it changes nothing.
+    let engine = AdaptationEngine()
+    let before = plan.allWorkouts.filter { $0.type.isRunning && $0.date < trial.date }
+        .map { w in CompletedRun(date: w.date, distanceMeters: w.distanceMeters,
+                                 durationSeconds: w.distanceMeters / 1_000 * plan.paceZones.easySecPerKm * 1.01) }
+    let raced = VDOTCalculator().predictedTimeSeconds(distanceMeters: 10_000, vdot: plan.vdot + 1.5)
+    let withTrial = before + [CompletedRun(date: trial.date, distanceMeters: 13_500,
+                                           durationSeconds: raced + 3_500 / 1_000 * plan.paceZones.easySecPerKm)]
+    let after = cal.date(byAdding: .day, value: 1, to: trial.date)!
+    let up = engine.adaptWithStatus(plan: plan, completedRuns: withTrial, asOf: after, calendar: cal).pacing
+    h.check(abs(up.vdot - (plan.vdot + 1.5)) < 0.15, "the tune-up lifts the paces by its full VDOT (+\(up.vdot - plan.vdot))")
+    h.check(up.reason?.contains("tune-up") == true, "and says it's from the tune-up")
+    h.check(engine.adaptWithStatus(plan: plan, completedRuns: before, asOf: after, calendar: cal).pacing.vdot <= plan.vdot + 0.05,
+            "skipping it doesn't change the paces")
+    h.check(race[trialWeek].plannedVolumeMeters <= 0.92 * max(race[trialWeek - 1].plannedVolumeMeters, race[trialWeek + 1].plannedVolumeMeters),
+            "the tune-up week is lighter than the weeks around it")
+    let shortPlan = try VDOTPlanGenerator().makePlan(goal: goal, fitness: fitness, startDate: date(2027, 2, 15), calendar: cal)
+    h.check(!shortPlan.allWorkouts.contains { $0.type == .timeTrial }, "no tune-up in a plan under 14 weeks")
+
+    // Recovery: an easy day per 3 km raced, rest first, then short easy runs.
+    let recovery = plan.allWorkouts.filter { $0.date > goal.raceDate }
+    h.check(recovery.count == 14, "14 recovery days after a marathon (got \(recovery.count))")
+    h.check(recovery.prefix(3).allSatisfy { $0.type == .rest }, "the first 3 days are rest")
+    h.check(recovery.filter(\.type.isRunning).allSatisfy { $0.type == .easy && $0.distanceMeters <= 10_000 }, "then only easy runs, at most 10 km")
+    h.check(!recovery.contains { $0.type.isRunning && cal.component(.weekday, from: $0.date) == 2 }, "and none on the weekday kept free")
+    let half = try VDOTPlanGenerator().makePlan(goal: Goal(race: .halfMarathon, raceDate: date(2027, 4, 25), daysPerWeek: 4),
+                                                 fitness: fitness, startDate: date(2027, 1, 4), calendar: cal)
+    h.check(half.allWorkouts.filter { $0.date > half.goal.raceDate }.count == 7, "7 recovery days after a half")
+    // Race day: pacing always, carbohydrate for races over an hour, 90 g past 2½ hours.
+    let raceDay = plan.allWorkouts.first { $0.type == .raceDay }!
+    h.check(raceDay.notes.contains("not faster") && raceDay.notes.contains("90 g"), "a 4:30 marathon gets pacing and up to 90 g an hour")
+    h.check(!VDOTPlanGenerator.raceDayAdvice(for: .tenK, expectedSeconds: 50 * 60).contains(" g "), "a 50-minute 10 km gets no fuelling advice")
+    // Progress counts the weeks to race day only.
+    h.check(PlanProgress.make(plan: plan, completedRuns: [], asOf: date(2026, 11, 1), calendar: cal).totalWeeks == race.count,
+            "progress counts the weeks to race day")
 }
 
 h.suite("Target time: race-day pace, not training paces") {
@@ -683,7 +779,7 @@ h.suite("Goal outlook: an honest range and verdict") {
 
 h.suite("Peak long run: 32 km for the marathon, 19 km for the half") {
     func longRun(_ plan: TrainingPlan, weeksOut: Int) -> Double {
-        plan.weeks[plan.weeks.count - 1 - weeksOut].workouts.first { $0.type == .longRun }?.distanceMeters ?? 0
+        plan.weeksToRace[plan.weeksToRace.count - 1 - weeksOut].workouts.first { $0.type == .longRun }?.distanceMeters ?? 0
     }
     let fitness = FitnessSnapshot(distanceMeters: 12_200, timeSeconds: 12.2 * 336, date: date(2026, 10, 3))
     for (label, start) in [("28 weeks", date(2026, 10, 5)), ("16 weeks", date(2027, 1, 4))] {
@@ -933,7 +1029,7 @@ h.suite("Plan progress") {
         .map { CompletedRun(date: $0.date, distanceMeters: $0.distanceMeters, durationSeconds: 1_800, plannedWorkoutID: $0.id) }
 
     let full = PlanProgress.make(plan: plan, completedRuns: doneRuns, asOf: asOf, calendar: cal)
-    h.check(full.totalWeeks == plan.weeks.count, "total weeks matches plan")
+    h.check(full.totalWeeks == plan.weeksToRace.count, "total weeks matches the weeks to race day")
     h.check(full.daysUntilRace == cal.dateComponents([.day], from: asOfDay, to: date(2027, 4, 25)).day!, "days-until-race counts correctly")
     h.check(full.workoutsCompleted == full.workoutsScheduledToDate, "all scheduled-to-date workouts counted as done")
     h.check(full.workoutsScheduledToDate > 0, "there are scheduled workouts by March")
@@ -1028,12 +1124,12 @@ h.suite("Weekday rules & regeneration") {
     h.check(!longRuns.isEmpty && weekendLongs.count == longRuns.count, "long runs fall on a weekend (Sat/Sun)")
 
     // Regeneration preserves the race-day anchor, Monday-anchored week span, and the 10% rule.
-    h.check(plan.allWorkouts.last?.type == .raceDay, "race day preserved with rest weekdays")
-    h.check(cal.isDate(plan.allWorkouts.last!.date, inSameDayAs: date(2027, 4, 25)), "race day date unchanged with rest weekdays")
+    h.check(plan.weeksToRace.last?.workouts.last?.type == .raceDay, "race day preserved with rest weekdays")
+    h.check(cal.isDate(plan.weeksToRace.last!.workouts.last!.date, inSameDayAs: date(2027, 4, 25)), "race day date unchanged with rest weekdays")
     let firstMonday = VDOTPlanGenerator.startOfWeek(date(2026, 1, 1), calendar: cal)
     let raceMonday = VDOTPlanGenerator.startOfWeek(date(2027, 4, 25), calendar: cal)
     let expectedWeeks = cal.dateComponents([.day], from: firstMonday, to: raceMonday).day! / 7 + 1
-    h.check(plan.weeks.count == expectedWeeks, "week span unchanged with rest weekdays")
+    h.check(plan.weeksToRace.count == expectedWeeks, "week span unchanged with rest weekdays")
 
     var maxSoFar = 0.0, tenPercentOK = true
     for week in plan.weeks where week.phase != .raceWeek && week.index > 0 {
@@ -1096,7 +1192,7 @@ h.suite("Plan inputs round-trip") {
     let a = try gen.makePlan(goal: inputs.goal, fitness: inputs.fitness, startDate: inputs.startDate, calendar: cal)
     let b = try gen.makePlan(goal: decoded.goal, fitness: decoded.fitness, startDate: decoded.startDate, calendar: cal)
     h.check(a == b, "regeneration from equal inputs is deterministic")
-    h.check(a.allWorkouts.last?.type == .raceDay, "regenerated plan still ends on race day")
+    h.check(a.weeksToRace.last?.workouts.last?.type == .raceDay, "regenerated plan still has race day last before recovery")
 }
 
 // MARK: Plan backup (export / import)
@@ -1154,7 +1250,7 @@ h.suite("Plan backup") {
         goal: decoded.inputs.goal, fitness: decoded.inputs.fitness,
         startDate: decoded.inputs.startDate, calendar: cal
     )
-    h.check(plan.allWorkouts.last?.type == .raceDay, "restored inputs regenerate a plan ending on race day")
+    h.check(plan.weeksToRace.last?.workouts.last?.type == .raceDay, "restored inputs regenerate a plan ending on race day")
 }
 
 // MARK: Target VDOT + maintenance ("good to go")
@@ -1199,7 +1295,9 @@ h.suite("Target VDOT & maintenance") {
         let longest = runs.max(by: { $0.distanceMeters < $1.distanceMeters })
         h.check(longest?.type == .longRun, "long run is the longest session in a maintenance week")
     }
-    h.check(maint.allWorkouts.last?.type == .raceDay, "maintenance plan still ends on race day")
+    h.check(maint.allWorkouts.first { $0.type == .raceDay }.map { cal.isDate($0.date, inSameDayAs: maint.goal.raceDate) } == true
+            && maint.allWorkouts.filter { $0.date > maint.goal.raceDate }.allSatisfy { $0.type == .rest || $0.notes.hasPrefix("Recovery run") },
+            "maintenance plan: race day on its date, only recovery after it")
 
     // Slower runner + ambitious target for the same distance → a real build, not maintenance.
     let slowRun = FitnessSnapshot(distanceMeters: 10_000, timeSeconds: 60 * 60, date: date(2026, 6, 1)) // ~VDOT 32

@@ -84,7 +84,7 @@ public struct GoalAchievement: Sendable, Equatable, Codable, Identifiable {
             targetTimeSeconds: plan.goal.targetTimeSeconds,
             finalVDOT: plan.vdot,
             requiredVDOT: progress.requiredVDOT,
-            weeksTrained: plan.weeks.count,
+            weeksTrained: plan.weeksToRace.count,
             totalDistanceMeters: progress.completedDistanceMeters,
             workoutsCompleted: progress.workoutsCompleted,
             workoutsPlanned: plan.allWorkouts.filter(\.type.isRunning).count

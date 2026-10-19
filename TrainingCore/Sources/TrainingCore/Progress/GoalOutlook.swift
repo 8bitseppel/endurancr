@@ -72,7 +72,7 @@ public struct GoalOutlook: Sendable, Equatable {
             of: completedRuns, from: windowStart,
             to: calendar.date(byAdding: .day, value: 1, to: today) ?? today, calendar: calendar) / min(4, windowWeeks) / 1_000
         // The plan's last 6 build weeks, at the share of the plan being run lately.
-        let buildWeeks = plan.weeks.filter { $0.phase != .taper && $0.phase != .raceWeek }.suffix(6)
+        let buildWeeks = plan.weeks.filter { ![.taper, .raceWeek, .recovery].contains($0.phase) }.suffix(6)
         let buildMeters: Double = buildWeeks.map(\.plannedVolumeMeters).reduce(0, +)
         let share: Double = max(0.5, min(1, buddy.completion ?? 1))
         let peakKmPerWeek = buildMeters / Double(max(1, buildWeeks.count)) / 1_000 * share

@@ -72,6 +72,12 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   marathon 19 km, then shorter long runs in the two taper weeks.
 - Runs are spread over the repeating week: a rest day after the Sunday long run when
   there's one to spare, and no threshold or intervals right next to the long run.
+- Sessions from the books: marathon-pace runs every other build week and marathon-pace
+  finishes on peak long runs (Daniels, Pfitzinger, Hansons, Higdon), strides on easy
+  days, a 10 km tune-up race 6 weeks out whose result sets your paces, never more than
+  two harder sessions a week, each within Daniels' limits per session.
+- Race-day pacing and fuelling (about 60 g of carbohydrate an hour, up to 90 g past
+  2½ hours, Jeukendrup 2014), then an easy day for every 3 km raced after it (Daniels).
 - Training paces come from your current fitness, never from your target time (Daniels); the target sets race-day pace and the outlook.
 - Swap days by dragging them in the plan; the watch shows the same adjusted days.
 - The plan shows what you ran on each past day (done, shorter or missed), what a changed day was and why, new paces next to the old ones with the reason, what each week is for, how far the week is, the 32 km runs and the taper, and ends with the race outlook.

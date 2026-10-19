@@ -9,6 +9,10 @@ public enum WorkoutType: String, Sendable, Codable, CaseIterable {
     case threshold
     case interval
     case repetitionSpeed
+    /// An all-out tune-up race or time trial (10 km, or 5 km for a 10 km goal) in the
+    /// build, after Pfitzinger's tune-up races; it updates the paces like a race does
+    /// for Daniels.
+    case timeTrial
     case raceDay
 
     /// Non-rest sessions count toward the weekly running-days budget.
@@ -25,6 +29,9 @@ public enum TrainingPhase: String, Sendable, Codable {
     /// Steady, non-progressive week used by a maintenance plan — the athlete is
     /// already fit enough for the goal, so volume holds instead of ramping.
     case maintenance
+    /// The days after the race: rest, then short easy runs (Daniels: an easy day for
+    /// every 3 km raced).
+    case recovery
 }
 
 /// The breakdown of a structured quality session (intervals, tempo) into a
@@ -168,6 +175,8 @@ public struct TrainingPlan: Sendable, Equatable, Codable {
     }
 
     public var allWorkouts: [PlannedWorkout] { weeks.flatMap(\.workouts) }
+    /// The weeks up to and including race week, without the recovery after it.
+    public var weeksToRace: [TrainingWeek] { weeks.filter { $0.phase != .recovery } }
     public var peakVolumeMeters: Double { weeks.map(\.plannedVolumeMeters).max() ?? 0 }
 
 }
