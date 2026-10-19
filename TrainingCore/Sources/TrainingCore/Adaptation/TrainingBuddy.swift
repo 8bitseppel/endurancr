@@ -134,7 +134,7 @@ public struct TrainingBuddy: Sendable {
         let today = calendar.startOfDay(for: asOf)
         var updated = plan
         applyWeeklyCaps(&updated, status: status, completedRuns: completedRuns, today: today, calendar: calendar)
-        let off = plan.effectiveUnavailablePeriods(calendar: calendar)
+        let off = plan.goal.unavailablePeriods
         // Today keeps the plan it had this morning, run or not, so finishing a run
         // never reshapes the week; only runs before today count.
         let firstOpen = today
@@ -304,7 +304,7 @@ public struct TrainingBuddy: Sendable {
                 continue
             }
             scaleWeek(&plan.weeks[w], to: weekCap, completedRuns: completedRuns, today: today,
-                      off: plan.effectiveUnavailablePeriods(calendar: calendar), note: note, calendar: calendar)
+                      off: plan.goal.unavailablePeriods, note: note, calendar: calendar)
         }
     }
 
@@ -376,7 +376,7 @@ public struct TrainingBuddy: Sendable {
     /// A hard session in the last 7 days had no run on its day (missed, not made up).
     private func missedQuality(plan: TrainingPlan, runs: [CompletedRun], today: Date, calendar: Calendar) -> Bool {
         let from = day(-7, today, calendar)
-        let skipped = plan.effectiveUnavailablePeriods(calendar: calendar)
+        let skipped = plan.goal.unavailablePeriods
         return plan.allWorkouts.contains { w in
             let d = calendar.startOfDay(for: w.date)
             return AdaptationEngine.qualityTypes.contains(w.type) && d >= from && d < today
@@ -446,7 +446,7 @@ public struct TrainingBuddy: Sendable {
     ) -> Double? {
         let from = max(planStart, day(-14, today, calendar))
         guard (calendar.dateComponents([.day], from: from, to: today).day ?? 0) >= 7 else { return nil }
-        let off = plan.effectiveUnavailablePeriods(calendar: calendar)
+        let off = plan.goal.unavailablePeriods
         let planned = plan.allWorkouts.filter { w in
             let d = calendar.startOfDay(for: w.date)
             return w.type.isRunning && w.type != .raceDay && d >= from && d < today

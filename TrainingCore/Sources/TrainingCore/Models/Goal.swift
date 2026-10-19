@@ -20,10 +20,6 @@ public struct Goal: Sendable, Equatable, Codable {
     /// Days the athlete can't train (vacation, travel, illness). Workouts landing
     /// inside these are blanked to rest during adaptation.
     public var unavailablePeriods: [UnavailablePeriod]
-    /// When true, the fixed year-end holidays (Christmas Eve–Boxing Day and New
-    /// Year's Eve–Day) are treated as time off wherever the plan crosses them, on
-    /// top of any `unavailablePeriods` the athlete adds. See `Holidays`.
-    public var skipHolidays: Bool
 
     public init(
         name: String = "",
@@ -32,8 +28,7 @@ public struct Goal: Sendable, Equatable, Codable {
         targetTimeSeconds: Double? = nil,
         daysPerWeek: Int = 5,
         restWeekdays: Set<Int> = [],
-        unavailablePeriods: [UnavailablePeriod] = [],
-        skipHolidays: Bool = true
+        unavailablePeriods: [UnavailablePeriod] = []
     ) {
         self.name = name
         self.race = race
@@ -42,11 +37,10 @@ public struct Goal: Sendable, Equatable, Codable {
         self.daysPerWeek = daysPerWeek
         self.restWeekdays = restWeekdays
         self.unavailablePeriods = unavailablePeriods
-        self.skipHolidays = skipHolidays
     }
 
     private enum CodingKeys: String, CodingKey {
-        case name, race, raceDate, targetTimeSeconds, daysPerWeek, restWeekdays, unavailablePeriods, skipHolidays
+        case name, race, raceDate, targetTimeSeconds, daysPerWeek, restWeekdays, unavailablePeriods
     }
 
     public init(from decoder: Decoder) throws {
@@ -59,7 +53,6 @@ public struct Goal: Sendable, Equatable, Codable {
         daysPerWeek = try c.decodeIfPresent(Int.self, forKey: .daysPerWeek) ?? 5
         restWeekdays = try c.decodeIfPresent(Set<Int>.self, forKey: .restWeekdays) ?? []
         unavailablePeriods = try c.decodeIfPresent([UnavailablePeriod].self, forKey: .unavailablePeriods) ?? []
-        skipHolidays = try c.decodeIfPresent(Bool.self, forKey: .skipHolidays) ?? true
     }
 
     /// The name to show for this goal, falling back to the race distance when the

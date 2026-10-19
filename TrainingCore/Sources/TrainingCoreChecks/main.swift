@@ -835,62 +835,6 @@ h.suite("Unavailability") {
     h.check(adaptedRunningInVacation.isEmpty, "adapt() applies the goal's unavailable periods")
 }
 
-// MARK: Fixed year-end holidays
-
-h.suite("Holidays") {
-    let engine = AdaptationEngine()
-    // A window that crosses one Christmas and one New Year.
-    let periods = Holidays.periods(from: date(2026, 12, 1), to: date(2027, 1, 31), calendar: cal)
-    h.check(periods.count == 2, "one Christmas + one New Year period across a single winter (got \(periods.count))")
-    let christmas = try require(periods.first { $0.reason == "Christmas" }, "Christmas period")
-    h.check(christmas.contains(date(2026, 12, 24), calendar: cal) && christmas.contains(date(2026, 12, 26), calendar: cal), "Christmas spans Dec 24–26")
-    h.check(!christmas.contains(date(2026, 12, 23), calendar: cal) && !christmas.contains(date(2026, 12, 27), calendar: cal), "Christmas excludes Dec 23 and 27")
-    let newYear = try require(periods.first { $0.reason == "New Year" }, "New Year period")
-    h.check(newYear.contains(date(2026, 12, 31), calendar: cal) && newYear.contains(date(2027, 1, 1), calendar: cal), "New Year spans Dec 31 – Jan 1")
-
-    // A window opening on Jan 1 still catches the New Year that began Dec 31 prior.
-    let janOnly = Holidays.periods(from: date(2027, 1, 1), to: date(2027, 1, 5), calendar: cal)
-    h.check(janOnly.contains { $0.reason == "New Year" && $0.contains(date(2027, 1, 1), calendar: cal) }, "New Year from the prior Dec 31 is caught by a Jan window")
-
-    // Deterministic ids so regeneration reproduces the same period.
-    let again = Holidays.periods(from: date(2026, 12, 1), to: date(2027, 1, 31), calendar: cal)
-    h.check(periods == again, "holiday periods are deterministic across calls")
-
-    // A summer-only window has no year-end holidays.
-    h.check(Holidays.periods(from: date(2026, 6, 1), to: date(2026, 8, 31), calendar: cal).isEmpty, "no holidays in a summer window")
-
-    // adapt() blanks holidays when skipHolidays is on, and only then. Adapt as of
-    // before the plan starts so every holiday it crosses is in the future (and thus
-    // eligible for blanking — past days are history and never rewritten).
-    let base = try marathonPlan()
-    let holidayAsOf = date(2025, 12, 1)
-    let span = (first: base.weeks.first!.startDate, last: base.allWorkouts.map(\.date).max()!)
-    let expected = Holidays.periods(from: span.first, to: span.last, calendar: cal)
-        .filter { cal.startOfDay(for: $0.start) >= cal.startOfDay(for: holidayAsOf) }
-    if let holiday = expected.first, let sampleDay = base.allWorkouts.first(where: { holiday.contains($0.date, calendar: cal) && $0.type.isRunning })?.date {
-        var onPlan = base
-        onPlan.goal.skipHolidays = true
-        let adaptedOn = engine.adapt(plan: onPlan, completedRuns: [], asOf: holidayAsOf, calendar: cal)
-        let runningOnHoliday = adaptedOn.allWorkouts.contains { $0.type.isRunning && cal.isDate($0.date, inSameDayAs: sampleDay) }
-        h.check(!runningOnHoliday, "skipHolidays on: adapt() blanks a run that lands on a holiday")
-
-        var offPlan = base
-        offPlan.goal.skipHolidays = false
-        offPlan.goal.unavailablePeriods = []
-        let adaptedOff = engine.adapt(plan: offPlan, completedRuns: [], asOf: holidayAsOf, calendar: cal)
-        let runningOffHoliday = adaptedOff.allWorkouts.contains { $0.type.isRunning && cal.isDate($0.date, inSameDayAs: sampleDay) }
-        h.check(runningOffHoliday, "skipHolidays off: the holiday run is left in place")
-    } else {
-        // The reference marathon plan doesn't cross a holiday — cover the toggle via effectiveUnavailablePeriods directly.
-        var onPlan = base
-        onPlan.goal.skipHolidays = true
-        var offPlan = base
-        offPlan.goal.skipHolidays = false
-        offPlan.goal.unavailablePeriods = []
-        h.check(onPlan.effectiveUnavailablePeriods(calendar: cal).count >= offPlan.effectiveUnavailablePeriods(calendar: cal).count, "skipHolidays never removes time off")
-    }
-}
-
 // MARK: Plan progress
 
 h.suite("Plan progress") {
@@ -1038,13 +982,11 @@ h.suite("Goal decoding tolerance") {
     dict.removeValue(forKey: "daysPerWeek")
     dict.removeValue(forKey: "restWeekdays")
     dict.removeValue(forKey: "unavailablePeriods")
-    dict.removeValue(forKey: "skipHolidays")
     let legacyData = try JSONSerialization.data(withJSONObject: dict)
     let decoded = try JSONDecoder().decode(Goal.self, from: legacyData)
     h.check(decoded.daysPerWeek == 5, "missing daysPerWeek defaults to 5")
     h.check(decoded.restWeekdays.isEmpty, "missing restWeekdays defaults to empty")
     h.check(decoded.unavailablePeriods.isEmpty, "missing unavailablePeriods stays empty")
-    h.check(decoded.skipHolidays, "missing skipHolidays defaults to on")
     h.check(decoded.race == .marathon && cal.isDate(decoded.raceDate, inSameDayAs: date(2027, 4, 25)), "core fields survive")
 }
 

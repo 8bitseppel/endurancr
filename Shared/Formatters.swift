@@ -92,12 +92,11 @@ enum Format {
 
     /// Icon for a rest day, chosen from its note so the calendar reads at a glance:
     /// scheduled recovery vs. a weekday the athlete keeps free vs. one-off time off
-    /// (vacation) vs. a fixed holiday. Unknown notes fall back to the time-off icon,
+    /// (vacation). Unknown notes fall back to the time-off icon,
     /// which is the safe default for a custom vacation reason.
     static func restSymbol(note: String) -> String {
         switch note {
         case "", "Rest / cross-train", "Rest, the week's distance is already done": return "moon.zzz"
-        case "Christmas", "New Year": return "gift"
         case let n where n.hasPrefix("No training"): return "calendar.badge.minus"
         default: return "airplane"
         }

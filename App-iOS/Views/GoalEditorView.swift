@@ -14,7 +14,6 @@ struct GoalEditorView: View {
     @State private var startDate: Date
     @State private var daysPerWeek: Int
     @State private var restWeekdays: Set<Int>
-    @State private var skipHolidays: Bool
 
     @State private var hasTarget: Bool
     @State private var targetHours: Int
@@ -91,7 +90,6 @@ struct GoalEditorView: View {
             ?? Calendar.current.startOfDay(for: .now))
         _daysPerWeek = State(initialValue: goal?.daysPerWeek ?? 5)
         _restWeekdays = State(initialValue: goal?.restWeekdays ?? [])
-        _skipHolidays = State(initialValue: goal?.skipHolidays ?? true)
 
         let target = Int(goal?.targetTimeSeconds ?? 0)
         _hasTarget = State(initialValue: goal?.targetTimeSeconds != nil)
@@ -265,15 +263,13 @@ struct GoalEditorView: View {
                 }
             }
             .padding(.vertical, 2)
-
-            Toggle("Skip Christmas & New Year", isOn: $skipHolidays)
         } header: {
             Text("Days you don't want to train")
         } footer: {
             if allowedDays < 3 {
                 Text("Leave at least 3 days open to run.").foregroundStyle(.red)
             } else {
-                Text("Tap weekdays you'll never run. At most \(allowedDays) running days/week. Skipping the holidays blanks Dec 24 to 26 and Dec 31 to Jan 1 wherever your plan crosses them.")
+                Text("Tap weekdays you'll never run. At most \(allowedDays) running days/week.")
             }
         }
     }
@@ -410,8 +406,7 @@ struct GoalEditorView: View {
             targetTimeSeconds: hasTarget && target > 0 ? target : nil,
             daysPerWeek: daysPerWeek,
             restWeekdays: restWeekdays,
-            unavailablePeriods: draftPeriods,
-            skipHolidays: skipHolidays
+            unavailablePeriods: draftPeriods
         )
         // A chosen HealthKit run wins — it carries the run's exact distance, time,
         // and date; otherwise fall back to the manually entered preset + time.

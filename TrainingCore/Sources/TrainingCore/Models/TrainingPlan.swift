@@ -170,16 +170,4 @@ public struct TrainingPlan: Sendable, Equatable, Codable {
     public var allWorkouts: [PlannedWorkout] { weeks.flatMap(\.workouts) }
     public var peakVolumeMeters: Double { weeks.map(\.plannedVolumeMeters).max() ?? 0 }
 
-    /// Every stretch of time off the calendar should blank: the athlete's own
-    /// `unavailablePeriods` plus the fixed year-end holidays (when `goal.skipHolidays`
-    /// is on) for the span this plan actually covers.
-    public func effectiveUnavailablePeriods(calendar: Calendar = .current) -> [UnavailablePeriod] {
-        var periods = goal.unavailablePeriods
-        if goal.skipHolidays,
-           let first = weeks.first?.startDate,
-           let last = allWorkouts.map(\.date).max() {
-            periods += Holidays.periods(from: first, to: last, calendar: calendar)
-        }
-        return periods
-    }
 }

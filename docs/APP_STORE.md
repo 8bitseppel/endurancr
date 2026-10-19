@@ -227,6 +227,7 @@ An honest outlook on your goal
 
 Also
 - How it works explains every new rule and lists the books and studies behind it.
+- The "Skip Christmas & New Year" switch is gone. To keep a day free, drag its run to another day in the calendar.
 
 ### Screenshots
 

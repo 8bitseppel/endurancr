@@ -419,7 +419,7 @@ public struct AdaptationEngine: Sendable {
         let eased = easedForFatigue(plan: rescheduled, assessment: assessment, asOf: asOf, calendar: calendar)
         let paced = buddy.adjusted(plan: eased, status: status, completedRuns: completedRuns, asOf: asOf, calendar: calendar)
         let available = applyUnavailability
-            ? applyingUnavailability(plan: paced, periods: paced.effectiveUnavailablePeriods(calendar: calendar), asOf: asOf, calendar: calendar)
+            ? applyingUnavailability(plan: paced, periods: paced.goal.unavailablePeriods, asOf: asOf, calendar: calendar)
             : paced
         // Last: fit the current week's easy runs to what it still needs, after any
         // rescheduling/easing/pacing/unavailability reshaped it.

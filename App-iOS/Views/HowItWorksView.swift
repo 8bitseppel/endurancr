@@ -98,7 +98,7 @@ struct HowItWorksView: View {
                 topic(
                     "The rules you set",
                     icon: "slider.horizontal.3",
-                    detail: "The weekdays you don't want to train repeat every week; vacation periods are one-off breaks. You can also skip the year-end holidays (Christmas Eve to Boxing Day and New Year's Eve to New Year's Day) with one toggle. All of them blank out training on those days, and the plan works around them."
+                    detail: "The weekdays you don't want to train repeat every week; vacation periods are one-off breaks. Both blank out training on those days, and the plan works around them. For a single day, like Christmas, drag the run to another day in the calendar."
                 )
 
                 topic(

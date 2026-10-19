@@ -73,7 +73,7 @@ final class PlanCoordinator {
     var displayPlan: TrainingPlan? {
         guard let plan = currentPlan else { return nil }
         return adaptation.applyingUnavailability(
-            plan: plan, periods: plan.effectiveUnavailablePeriods(calendar: .current), asOf: .now, calendar: .current
+            plan: plan, periods: plan.goal.unavailablePeriods, asOf: .now, calendar: .current
         )
     }
 
@@ -291,7 +291,7 @@ final class PlanCoordinator {
         let cal = Calendar.current
         guard workout.type != .raceDay,
               cal.startOfDay(for: workout.date) >= cal.startOfDay(for: .now) else { return false }
-        let away = currentPlan?.effectiveUnavailablePeriods(calendar: cal) ?? []
+        let away = currentPlan?.goal.unavailablePeriods ?? []
         return !away.contains { $0.contains(workout.date, calendar: cal) }
     }
 
