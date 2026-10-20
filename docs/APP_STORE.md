@@ -352,9 +352,17 @@ days and the overview. Re-take with `./scripts/screenshots.sh`, then
 
 ### Promotional text (170)
 
-Your paces in a minute: one recent race and your goal give your VDOT, your five training paces and the plan endurancr would build. Like it? Create it with one tap.
+A fresh new look, light and dark, with every run in its own colour. And your paces in a minute: one recent race gives your VDOT, your paces and the plan to start.
 
 ### What's New (4000)
+
+A fresh new look
+- endurancr has a new design, in light and dark: a calm purple background, glass cards and rounded numbers.
+- Every kind of run has its own colour, the same on Today, in the plan and in your paces: easy teal, long run cyan, marathon pace blue, threshold indigo, intervals purple, speed pink, race green.
+- Today shows your run big, with its pace and time, and under it your week: a circle for every day, filled once it's done, crossed out if you missed it.
+- Below that, your next run and how training is going.
+- In the plan, every day has a stripe in its run's colour. Runs with parts (intervals, tempo, a marathon-pace finish) show them as a bar in their colours.
+- Progress has a big countdown and your paces as coloured tiles. The longer explanations are one tap away under "How it's worked out".
 
 The pace calculator, now in the app
 - The calculator from the App Clip is in endurancr too. Enter one recent race and your goal, and see your VDOT, your five training paces, a race-day range and the plan endurancr would build.
@@ -374,9 +382,10 @@ Same as 1.2.0. To mention the calculator, add this line to the list of what endu
 
 1.3.0 (33). Build 32 was an archive of 1.2.0 that wasn't released; don't use it.
 
-### Screenshots
+### Screenshots and App Preview
 
-New: `iphone-5-paces.png`, the pace calculator. The others moved one place down
-(run, summary, goal, welcome are now 6 to 9). Upload all nine from
-`screenshots/appstore/` (and the 6.5" and 6.3" folders), in file name order. The App
-Preview video is unchanged from 1.2.0.
+All new, in the new design, in light mode. Nine iPhone screenshots: `iphone-5-paces.png`
+is the pace calculator, and run, summary, goal and welcome are 6 to 9. Upload all nine
+from `screenshots/appstore/` (and the 6.5" and 6.3" folders), in file name order, and
+the new App Preview `screenshots/appstore/preview/iphone-6.9.mp4` (886 x 1920, about
+27 s). The website shows each screen in light and dark with a slider.

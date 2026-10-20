@@ -68,6 +68,7 @@ struct RunSummaryView: View {
                     }
                 }
             }
+            .brandList()
             .navigationTitle("Run complete")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

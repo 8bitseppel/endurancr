@@ -81,6 +81,7 @@ struct PhoneLiveRunView: View {
                     : "Keep your phone with you. Tracking continues with the screen off, and your stats show on the Lock Screen.")
             }
         }
+        .brandList()
         .navigationTitle(recorder.isPaused ? "Paused" : "Running")
         .navigationBarBackButtonHidden(true)
         .onChange(of: recorder.isRunning) { _, running in

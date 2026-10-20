@@ -45,7 +45,7 @@ WATCH=$(device "$WATCH_TYPE")
 # clock is set to 10:09 afterwards (scripts/watch-clock.py).
 xcrun simctl status_bar "$PHONE" override --time 10:09 --dataNetwork 5g \
   --cellularBars 4 --wifiBars 3 --batteryState charged --batteryLevel 100
-xcrun simctl ui "$PHONE" appearance dark
+xcrun simctl ui "$PHONE" appearance light   # the light look is the face of the app
 xcrun simctl ui "$WATCH" appearance dark 2>/dev/null || true
 
 echo "==> Building"
@@ -110,6 +110,20 @@ shot "$PHONE" app.endurancr plan iphone-7-plan
 shot "$PHONE" app.endurancr plan iphone-8-week -demoPlanWeek 6
 # The pace calculator, on its results.
 shot "$PHONE" app.endurancr paces iphone-9-paces -clipResults
+
+# The same in dark, for the light and dark slider on the website.
+echo "==> iPhone, dark"
+xcrun simctl ui "$PHONE" appearance dark
+shot "$PHONE" app.endurancr welcome iphone-1-welcome-dark
+rec  "$PHONE" app.endurancr goal iphone-2-goal-dark 360 20
+shot "$PHONE" app.endurancr - iphone-3-today-dark
+shot "$PHONE" app.endurancr run iphone-4-run-dark
+shot "$PHONE" app.endurancr summary iphone-5-summary-dark
+rec  "$PHONE" app.endurancr progress iphone-6-progress-dark 360 20
+shot "$PHONE" app.endurancr plan iphone-7-plan-dark
+shot "$PHONE" app.endurancr plan iphone-8-week-dark -demoPlanWeek 6
+shot "$PHONE" app.endurancr paces iphone-9-paces-dark -clipResults
+xcrun simctl ui "$PHONE" appearance light
 
 echo "==> App Clip"
 xcrun simctl install "$PHONE" "$BUILD/Build/Products/Debug-iphonesimulator/EndurancrClip.app"

@@ -56,7 +56,7 @@ PY
 
 # Videos for the website. +igndts: the Simulator's recordings confuse ffmpeg's
 # timing otherwise (see screenshots.sh).
-for n in iphone-2-goal iphone-6-progress watch-2-run watch-3-summary; do
+for n in iphone-2-goal iphone-2-goal-dark iphone-6-progress iphone-6-progress-dark watch-2-run watch-3-summary; do
   w=440; case $n in watch*) w=340;; esac
   ffmpeg -loglevel error -y -fflags +igndts -i "build/screenshots/$n.mov" \
     -vf "fps=30,scale=$w:-2:flags=lanczos" -c:v libx264 -crf 26 -pix_fmt yuv420p -movflags +faststart -an \

@@ -44,6 +44,13 @@ segment() {
   echo "    $name"
 }
 
+# Close the App Clip (screenshots.sh opens it last), or the status bar shows a
+# "back to endurancr" link in the first segment.
+xcrun simctl terminate "$PHONE" app.endurancr.Clip 2>/dev/null || true
+xcrun simctl launch "$PHONE" com.apple.Preferences >/dev/null 2>&1 || true
+sleep 1
+xcrun simctl terminate "$PHONE" com.apple.Preferences 2>/dev/null || true
+
 echo "==> Recording"
 segment 1-welcome  3  0.3 2.4 -demoScreen welcome
 segment 2-goal    10  2.4 5.6 -demoScreen goal -demoScroll YES
