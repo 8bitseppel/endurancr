@@ -75,7 +75,7 @@ struct PaceCalculatorView: View {
                                 .id("results")
                                 .transition(.opacity.combined(with: .move(edge: .bottom)))
                         }
-                        if isClip { footer }
+                        footer
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 24)
@@ -294,10 +294,8 @@ struct PaceCalculatorView: View {
                 if let tuneUp, let s = tuneUp.structure {
                     bullet("flag.2.crossed", "A \(Format.distanceCompact(s.workMeters)) tune-up race that sets your paces")
                 }
-                if isClip {
-                    bullet("arrow.triangle.2.circlepath", "Adapts to the runs you really do, like a running buddy")
-                    bullet("applewatch", "Records on Apple Watch or iPhone, saved to Apple Health")
-                }
+                bullet("arrow.triangle.2.circlepath", "Adapts to the runs you really do, like a running buddy")
+                bullet("applewatch", "Records on Apple Watch or iPhone, saved to Apple Health")
             }
             .font(.subheadline)
         }
@@ -319,7 +317,7 @@ struct PaceCalculatorView: View {
             .font(.footnote)
             .foregroundStyle(.white.opacity(0.6))
             .multilineTextAlignment(.center)
-            .padding(.bottom, 80)   // room for the App Store overlay
+            .padding(.bottom, isClip ? 80 : 0)   // room for the App Store overlay
     }
 
     private func wheel(_ value: Binding<Int>, range: Range<Int>, unit: String, label: String) -> some View {
