@@ -64,7 +64,7 @@ struct PaceCalculatorView: View {
         // Worked out once per change of the inputs, not for every use below.
         let plan = self.plan
         return ZStack {
-            BrandBackground()
+            BrandBackground(animated: true)
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 20) {
@@ -184,15 +184,15 @@ struct PaceCalculatorView: View {
                 // A plain Grid: in a lazy one the first row went missing after a jump.
                 Grid(horizontalSpacing: 10, verticalSpacing: 10) {
                     GridRow {
-                        paceTile("Easy", zones.easySecPerKm, color: .teal, note: "Most of your running")
-                        paceTile("Marathon", zones.marathonSecPerKm, color: .blue, note: "Steady, all day")
+                        paceTile("Easy", zones.easySecPerKm, color: WorkoutType.easy.tint, note: "Most of your running")
+                        paceTile("Marathon", zones.marathonSecPerKm, color: WorkoutType.marathonPace.tint, note: "Steady, all day")
                     }
                     GridRow {
-                        paceTile("Threshold", zones.thresholdSecPerKm, color: .indigo, note: "Comfortably hard")
-                        paceTile("Interval", zones.intervalSecPerKm, color: .purple, note: "Hard, 3 to 5 min")
+                        paceTile("Threshold", zones.thresholdSecPerKm, color: WorkoutType.threshold.tint, note: "Comfortably hard")
+                        paceTile("Interval", zones.intervalSecPerKm, color: WorkoutType.interval.tint, note: "Hard, 3 to 5 min")
                     }
                     GridRow {
-                        paceTile("Repetition", zones.repetitionSecPerKm, color: .pink, note: "Quick and light")
+                        paceTile("Repetition", zones.repetitionSecPerKm, color: WorkoutType.repetitionSpeed.tint, note: "Quick and light")
                         raceTile(outlook)
                     }
                 }
@@ -232,7 +232,7 @@ struct PaceCalculatorView: View {
         }
         .buttonStyle(.glassProminent)
         // The deep purple of the background, so the white title reads clearly.
-        .tint(Color(red: 0.42, green: 0.26, blue: 0.70))
+        .tint(Brand.purple)
         .controlSize(.large)
     }
 
@@ -336,30 +336,5 @@ struct PaceCalculatorView: View {
         case .marathon: "Marathon"
         case .custom: race.displayName
         }
-    }
-}
-
-/// A slow, living gradient in the app's purples and blues.
-private struct BrandBackground: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
-            let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate / 6
-            MeshGradient(
-                width: 3, height: 3,
-                points: [
-                    [0, 0], [0.5, 0], [1, 0],
-                    [0, 0.5], [Float(0.5 + 0.15 * sin(t)), Float(0.45 + 0.12 * cos(t * 0.8))], [1, 0.5],
-                    [0, 1], [0.5, 1], [1, 1],
-                ],
-                colors: [
-                    .black, Color(red: 0.16, green: 0.08, blue: 0.32), .black,
-                    Color(red: 0.10, green: 0.12, blue: 0.36), Color(red: 0.42, green: 0.26, blue: 0.70), Color(red: 0.06, green: 0.22, blue: 0.34),
-                    .black, Color(red: 0.12, green: 0.06, blue: 0.24), .black,
-                ]
-            )
-        }
-        .ignoresSafeArea()
     }
 }

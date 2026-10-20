@@ -70,6 +70,7 @@ targets:
       - path: Shared/Formatters.swift
       - path: App-iOS/Views/PlanStyle.swift
       - path: App-iOS/Views/PaceCalculatorView.swift
+      - path: App-iOS/Views/Theme.swift
       - path: App-iOS/Assets.xcassets
     dependencies:
       - package: TrainingCore
