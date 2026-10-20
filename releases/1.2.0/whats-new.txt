@@ -1,0 +1,32 @@
+A Plan tab worth opening
+- Past days show what you actually ran: done runs are highlighted, missed ones struck through, with distance and pace.
+- A run on a rest day shows up as an extra run that counts toward the week, with how hard it was.
+- A day the plan changed shows what it was, and the week says why.
+- When your paces change, every coming run shows its new pace next to the old one, and this week says why: a run that showed you're fitter, hard sessions that came in slow, or time off.
+- Each week says what it's for, its long run, and how much of it you've run.
+- On top: the week you're in and the phases up to race day.
+- Your 32 km runs and the start of the taper are marked, and the plan ends with your race and its outlook.
+
+Please create your plan again
+- After updating, set up your goal again (Today > the menu > Set your goal, or delete the old one first) so your plan gets the new sessions. Update endurancr on your Apple Watch too, so it shows the same plan.
+
+Sessions from the training books
+- Marathon-pace runs: every other build week, and the last part of the peak long runs at marathon pace, as in Jack Tupper Daniels, Pete Pfitzinger, the Hansons and Hal Higdon.
+- Strides: once or twice a week, an easy run ends with 6 × 20 s quick and light.
+- A tune-up race: a 10 km 6 weeks before the marathon (in plans of 14 weeks or more), 5 weeks before a half. Run it all out and your paces follow the result.
+- Never more than two harder sessions a week, each within Jack Tupper Daniels' limits.
+- Race day tells you how to pace it and how much to eat and drink on the way.
+- After the race: rest, then short easy runs, an easy day for every 3 km you raced. Saving your goal as achieved keeps them in your plan.
+
+Try it without installing
+- An App Clip: enter one recent race and your goal, and see your VDOT, your five training paces, a race-day range and the plan endurancr would build. Open it from endurancr.app/clip.
+
+Also
+- After an easier cutback week, a lighter stretch now holds you at the level of your last full week, not at the cutback.
+- Runs on the day your plan starts count, also on a rest day before the first planned run. Before, they were left out until that first run.
+- Recordings with hardly any running in them (under 200 m or a minute) are no longer listed or counted, and a run recorded on the watch and the iPhone at once counts once. Recent runs show which app recorded each run.
+- A clearer welcome screen with bigger text.
+- The goal form and How it works now say clearly that training paces come from your current fitness, not your target time.
+- The keyboard closes when you open a date in the goal form, and tapping today as the start date moves on to race day.
+- Race-week rest days show a rest icon instead of the vacation one.
+- The "Skip Christmas & New Year" switch is gone. To keep a day free, drag its run to another day in the calendar.

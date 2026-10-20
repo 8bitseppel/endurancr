@@ -1,0 +1,24 @@
+endurancr builds a running plan around one goal, records your runs on Apple Watch or iPhone, and adapts the plan to what you really ran. No account, no feed, no ads.
+
+SET ONE GOAL
+Pick a race, from 5K to the marathon, and its date. endurancr builds a full plan with the VDOT method from Jack Tupper Daniels, paced to the fitness you have now. It uses a recent run from Apple Health, or a race result you type in. A short race shows your speed, not your endurance, so marathon pace starts a little easier until your long runs prove it.
+
+A PLAN THAT FOLLOWS YOU
+After every run the plan adapts. Missed your long run? It moves to where it still fits. Ran short? The rest of the week's distance spreads over your easy runs, while the long run and the quality sessions keep theirs. Strong runs nudge your paces up a little at a time. Drag days to swap them when life gets in the way.
+
+RUN ON YOUR WRIST OR YOUR PHONE
+Start today's run on Apple Watch with heart rate, or on iPhone with GPS. The run screens show time, distance, your pace and the target pace. A Live Activity lets you pause and finish from the Lock Screen. Every run is saved to Apple Health.
+
+SEE WHERE YOU STAND
+Progress shows the days to race day, this week's distance, how well you stick to the plan, your fitness, your projected finish time and all your paces.
+
+NOTHING HIDDEN
+How it works explains every rule the plan follows, in plain words. endurancr is open source, so you can read every line that touches your data.
+
+PRIVATE BY DESIGN
+No account, no server, no analytics, no ads, no tracking. Your plan stays on your device, and your runs live in Apple Health.
+
+FREE
+No subscription and no in-app purchases.
+
+endurancr is a training aid, not medical advice. Talk to a doctor before you start a new training plan.
