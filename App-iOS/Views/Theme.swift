@@ -45,6 +45,15 @@ enum Brand {
             : UIColor(red: 0.42, green: 0.26, blue: 0.70, alpha: 1)
     })
 
+    /// The fill of small cards in long lists (plan days), lighter than glass: frosted
+    /// white by day, a faint lift at night.
+    static let rowFill = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.06) : UIColor(white: 1, alpha: 0.6)
+    })
+    static let rowStroke = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.08) : UIColor(white: 1, alpha: 0.8)
+    })
+
     /// Rounded bold, for titles and numbers.
     static func rounded(_ style: Font.TextStyle, weight: Font.Weight = .bold) -> Font {
         .system(style, design: .rounded, weight: weight)

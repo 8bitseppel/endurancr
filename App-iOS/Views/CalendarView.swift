@@ -9,7 +9,8 @@ import TrainingCore
 /// sessions. Tap a run to see its steps.
 ///
 /// A plain scroll view rather than a List: List rows don't receive drops, and the
-/// scroll view auto-scrolls while a day is dragged near its edges.
+/// scroll view auto-scrolls while a day is dragged near its edges. Week headings
+/// scroll with their days rather than pinning, so nothing piles up under the bar.
 struct CalendarView: View {
     let coordinator: PlanCoordinator
     @State private var targetedDay: Date?
@@ -39,7 +40,7 @@ struct CalendarView: View {
             ScrollView {
                 // Horizontal padding goes on each part, not the stack, so a pinned week
                 // header spans the full width and nothing shows beside it.
-                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+                LazyVStack(alignment: .leading, spacing: 0) {
                     PlanOverview(plan: plan, progress: coordinator.progress, showsHint: !hasSwappedDays)
                         .padding(.horizontal)
                         .padding(.top, 8)
@@ -58,7 +59,7 @@ struct CalendarView: View {
                             }
                             .padding(.horizontal)
                             .padding(.top, 4)
-                            .padding(.bottom, 28)
+                            .padding(.bottom, 26)
                         } header: {
                             weekHeader(week, summary: review?.weeks[week.index]).id("week-\(week.index)")
                         }
@@ -71,11 +72,8 @@ struct CalendarView: View {
                 }
             }
             .demoAutoScroll()
+            .background { BrandBackground() }
             .navigationSubtitle(subtitle(coordinator.progress))
-            // A solid bar, like the pinned week header under it: the days scrolling
-            // past the header shouldn't show through the title blurred.
-            .toolbarBackground(Color(.systemBackground), for: .navigationBar)
-            .toolbarBackgroundVisibility(.visible, for: .navigationBar)
             .refreshable { await coordinator.refreshAdaptation() }
             .task {
                 // Open on the current week, its header at the top. Wait one layout pass
@@ -121,12 +119,12 @@ struct CalendarView: View {
             isToday: cal.isDateInToday(workout.date), isExpanded: isExpanded
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: 16)
                 .strokeBorder(Color.accentColor, lineWidth: isTargeted ? 2 : 0)
         }
         .scaleEffect(isTargeted ? 1.02 : 1)
         .animation(.snappy(duration: 0.2), value: isTargeted)
-        .contentShape(.rect(cornerRadius: 14))
+        .contentShape(.rect(cornerRadius: 16))
         .onTapGesture { toggleExpanded(workout, isExpanded: isExpanded) }
         // VoiceOver: the card opens like a button, and days swap without dragging.
         .accessibilityAddTraits(isExpandable(workout) ? .isButton : [])
@@ -152,7 +150,7 @@ struct CalendarView: View {
                 .draggable(String(workout.date.timeIntervalSince1970)) {
                     DayCard(workout: workout, zones: zones, isPast: false, isToday: false, isExpanded: false)
                         .frame(width: 340)
-                        .background(Color(.secondarySystemBackground), in: .rect(cornerRadius: 14))
+                        .background(Color(.secondarySystemBackground), in: .rect(cornerRadius: 16))
                 }
                 .onDrop(of: [.plainText], delegate: SwapDropDelegate(day: workout.date, targetedDay: $targetedDay) { from in
                     withAnimation(.snappy) {
@@ -172,9 +170,13 @@ struct CalendarView: View {
     private func weekHeader(_ week: TrainingWeek, summary: PlanReview.Week?) -> some View {
         let started = week.startDate <= .now
         let isCurrent = isCurrent(week)
-        return VStack(spacing: 6) {
-            HStack {
-                Text("Week \(week.index + 1) · \(week.phase.displayName)")
+        return VStack(spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                HStack(spacing: 6) {
+                    Circle().fill(week.phase.tint).frame(width: 8, height: 8)
+                    Text("Week \(week.index + 1)").font(Brand.rounded(.title3))
+                    Text(week.phase.displayName).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                }
                 Spacer()
                 if let summary, started, summary.plannedMeters > 0 {
                     Text("\(Self.km(summary.doneMeters)) of \(Self.km(summary.plannedMeters))")
@@ -191,10 +193,10 @@ struct CalendarView: View {
             }
         }
         .font(.headline)
-        .padding(.horizontal)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .padding(.bottom, 6)
         .frame(maxWidth: .infinity)
-        .background(.background)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
     }
@@ -225,9 +227,7 @@ struct CalendarView: View {
                         }
                     }
                 }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.accentColor.opacity(0.12), in: .rect(cornerRadius: 12))
+                .brandCard(cornerRadius: 16, padding: 12)
             }
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -313,6 +313,7 @@ private struct DayCard: View {
     var isPast = false
     var isToday = false
     var isExpanded = false
+    @Environment(\.colorScheme) private var colorScheme
 
     private var isRest: Bool { workout.type == .rest }
     /// A run on a rest day: shown as a run that counts, not as rest.
@@ -337,6 +338,13 @@ private struct DayCard: View {
                         .font(.title3.weight(.semibold)).monospacedDigit()
                 }
                 .frame(width: 40)
+
+                // The run's colour, filled once it's done.
+                Capsule()
+                    .fill(stripe)
+                    .frame(width: 4)
+                    .frame(maxHeight: .infinity)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 3) {
                     if let tag {
@@ -419,28 +427,28 @@ private struct DayCard: View {
                         WorkoutStepsView(structure: structure, zones: zones)
                     }
                 }
-                .padding(.leading, 52)
+                .padding(.leading, 68)
                 .transition(.opacity)
             }
         }
-        .padding(.vertical, looksRest ? 8 : 10)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.vertical, looksRest ? 8 : 12)
         .padding(.horizontal, 12)
-        .background(
-            looksRest ? AnyShapeStyle(.clear) : AnyShapeStyle(.fill.tertiary),
-            in: .rect(cornerRadius: 14)
-        )
+        .background(looksRest ? AnyShapeStyle(.clear) : AnyShapeStyle(Brand.rowFill), in: .rect(cornerRadius: 16))
         // A run done, on its day or extra on a rest day, is lightly highlighted.
-        .background(isDone ? Color.green.opacity(0.10) : .clear, in: .rect(cornerRadius: 14))
+        .background(isDone ? Color.green.opacity(0.10) : .clear, in: .rect(cornerRadius: 16))
         .overlay {
             if looksRest {
-                RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(.quaternary, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(.secondary.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
             } else if isDone {
-                RoundedRectangle(cornerRadius: 14)
+                RoundedRectangle(cornerRadius: 16)
                     .strokeBorder(Color.green.opacity(0.35), lineWidth: 1)
             } else if review?.milestone == .longestRun, !isPast {
-                RoundedRectangle(cornerRadius: 14)
+                RoundedRectangle(cornerRadius: 16)
                     .strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1)
+            } else {
+                RoundedRectangle(cornerRadius: 16).strokeBorder(Brand.rowStroke, lineWidth: 1)
             }
         }
         // Days behind you step back a little, except runs done; a missed one's title
@@ -449,6 +457,18 @@ private struct DayCard: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
         .accessibilityHint(isPast ? "In the past" : "")
+    }
+
+    /// Full colour for a run done, softer for one to come, faint for a missed one,
+    /// and none for rest. At night a little softer still.
+    private var stripe: Color {
+        if isExtra { return .green.opacity(colorScheme == .dark ? 0.7 : 1) }
+        if looksRest { return .clear }
+        let tint = workout.type.tint
+        let night = colorScheme == .dark ? 0.7 : 1
+        if isDone { return tint.opacity(night) }
+        if isMissed || (isPast && !isDone) { return tint.opacity(0.25 * night) }
+        return tint.opacity(0.6 * night)
     }
 
     private var title: String {
@@ -520,16 +540,14 @@ private struct PlanOverview: View {
         VStack(alignment: .leading, spacing: 10) {
             // The week and days to go are in the subtitle; this is the whole plan.
             Text("\(plan.weeksToRace.count) weeks to \(plan.goal.displayName)")
-                .font(.headline)
+                .font(Brand.rounded(.title3))
             phaseBar
             if showsHint {
                 Label("Hold a day and drag it onto another to swap them.", systemImage: "hand.draw")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.fill.quaternary, in: .rect(cornerRadius: 16))
+        .brandCard()
     }
 
     /// One segment per week in its phase's colour, weeks already behind you full,
@@ -582,7 +600,7 @@ private struct RaceCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(goal.displayName, systemImage: "flag.checkered")
-                .font(.headline)
+                .font(Brand.rounded(.title3))
             Text(goal.raceDate.formatted(date: .complete, time: .omitted))
                 .font(.subheadline).foregroundStyle(.secondary)
             if let verdict = outlook.verdict {
@@ -605,9 +623,7 @@ private struct RaceCard: View {
             Text("More in Progress.")
                 .font(.footnote).foregroundStyle(.secondary)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.fill.quaternary, in: .rect(cornerRadius: 16))
+        .brandCard(tint: WorkoutType.raceDay.tint)
         .accessibilityElement(children: .combine)
     }
 }
