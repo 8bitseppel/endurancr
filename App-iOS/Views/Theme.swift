@@ -41,7 +41,7 @@ enum Brand {
     /// The same purple for the app's buttons: as it is by day, muted at night.
     static let buttonPurple = Color(UIColor { traits in
         traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.33, green: 0.24, blue: 0.50, alpha: 1)
+            ? UIColor(red: 0.27, green: 0.21, blue: 0.38, alpha: 1)
             : UIColor(red: 0.42, green: 0.26, blue: 0.70, alpha: 1)
     })
 
@@ -104,7 +104,7 @@ private struct BrandCard: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
-        let opacity = colorScheme == .dark ? 0.10 : 0.22
+        let opacity = colorScheme == .dark ? 0.05 : 0.22
         content
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(padding)

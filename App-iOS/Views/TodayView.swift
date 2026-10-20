@@ -284,7 +284,7 @@ struct TodayView: View {
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)
                 .frame(width: 44, height: 44)
-                .background(workout.type.tint.opacity(colorScheme == .dark ? 0.55 : 1).gradient, in: .circle)
+                .background(workout.type.tint.opacity(colorScheme == .dark ? 0.4 : 1).gradient, in: .circle)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Next · \(nextDayName(workout.date))").brandEyebrow()
@@ -324,7 +324,7 @@ private struct WeekDayDot: View {
     private var isRun: Bool { workout?.type.isRunning ?? false }
     @Environment(\.colorScheme) private var colorScheme
     /// Softer at night, where full colours on black glare.
-    private var strength: Double { colorScheme == .dark ? 0.6 : 1 }
+    private var strength: Double { colorScheme == .dark ? 0.4 : 1 }
 
     var body: some View {
         VStack(spacing: 6) {
