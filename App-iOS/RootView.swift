@@ -26,6 +26,8 @@ struct RootView: View {
                 // tap away at the bottom.
                 if DemoMode.screen == "run", let demoRecorder {
                     NavigationStack { PhoneLiveRunView(recorder: demoRecorder) }
+                } else if DemoMode.screen == "paces" {
+                    PaceCalculatorSheet(action: .createPlan { _ in })
                 } else if DemoMode.screen == "goal" {
                     GoalEditorView(coordinator: coordinator)
                 } else if DemoMode.screen == "summary" {

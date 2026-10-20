@@ -2,10 +2,29 @@ import StoreKit
 import SwiftUI
 import TrainingCore
 
+/// What the pace calculator was set to, to start a plan from it.
+struct PaceCalculatorInputs {
+    var effort: RaceDistance
+    var effortSeconds: Double
+    var goal: RaceDistance
+    var raceDate: Date
+}
+
 /// Enter a recent race and a goal; see your VDOT, the five training paces, a
 /// race-day range and the plan endurancr would build, all from the same TrainingCore
-/// engine as the app. Then Apple's overlay offers the full app.
+/// engine. The App Clip and the app share it: in the clip Apple's overlay offers the
+/// full app, in the app the button starts a plan from these inputs.
 struct PaceCalculatorView: View {
+    enum Action {
+        /// The App Clip: offer the full app.
+        case offerApp
+        /// The app without a plan: start one from these inputs.
+        case createPlan((PaceCalculatorInputs) -> Void)
+        /// The app with a plan running: just the numbers.
+        case none
+    }
+    var action: Action = .offerApp
+
     @State private var effort: RaceDistance = .tenK
     @State private var hours = 0
     @State private var minutes = 54
@@ -56,7 +75,7 @@ struct PaceCalculatorView: View {
                                 .id("results")
                                 .transition(.opacity.combined(with: .move(edge: .bottom)))
                         }
-                        footer
+                        if isClip { footer }
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 24)
@@ -77,7 +96,10 @@ struct PaceCalculatorView: View {
         .appStoreOverlay(isPresented: $showsAppOverlay) {
             SKOverlay.AppClipConfiguration(position: .bottom)
         }
+    }
 
+    private var isClip: Bool {
+        if case .offerApp = action { true } else { false }
     }
 
     // MARK: Parts
@@ -159,37 +181,59 @@ struct PaceCalculatorView: View {
 
             // The five paces.
             GlassEffectContainer(spacing: 10) {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                    paceTile("Easy", zones.easySecPerKm, color: .teal, note: "Most of your running")
-                    paceTile("Marathon", zones.marathonSecPerKm, color: .blue, note: "Steady, all day")
-                    paceTile("Threshold", zones.thresholdSecPerKm, color: .indigo, note: "Comfortably hard")
-                    paceTile("Interval", zones.intervalSecPerKm, color: .purple, note: "Hard, 3 to 5 min")
-                    paceTile("Repetition", zones.repetitionSecPerKm, color: .pink, note: "Quick and light")
-                    raceTile(outlook)
+                // A plain Grid: in a lazy one the first row went missing after a jump.
+                Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                    GridRow {
+                        paceTile("Easy", zones.easySecPerKm, color: .teal, note: "Most of your running")
+                        paceTile("Marathon", zones.marathonSecPerKm, color: .blue, note: "Steady, all day")
+                    }
+                    GridRow {
+                        paceTile("Threshold", zones.thresholdSecPerKm, color: .indigo, note: "Comfortably hard")
+                        paceTile("Interval", zones.intervalSecPerKm, color: .purple, note: "Hard, 3 to 5 min")
+                    }
+                    GridRow {
+                        paceTile("Repetition", zones.repetitionSecPerKm, color: .pink, note: "Quick and light")
+                        raceTile(outlook)
+                    }
                 }
             }
 
             planPreview(plan)
 
-            Button {
-                showsAppOverlay = true
-            } label: {
-                Label("Get the full plan, free", systemImage: "arrow.down.app")
-                    .font(.title3.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-            }
-            .buttonStyle(.glassProminent)
-            .controlSize(.large)
-            // Offer the app once you've read down to here, not over the results.
-            .onScrollVisibilityChange(threshold: 0.8) { visible in
-                if visible, !hasOfferedApp, !Self.isScreenshot {
-                    hasOfferedApp = true
+            switch action {
+            case .offerApp:
+                actionButton("Get the full plan, free", systemImage: "arrow.down.app") {
                     showsAppOverlay = true
                 }
+                // Offer the app once you've read down to here, not over the results.
+                .onScrollVisibilityChange(threshold: 0.8) { visible in
+                    if visible, !hasOfferedApp, !Self.isScreenshot {
+                        hasOfferedApp = true
+                        showsAppOverlay = true
+                    }
+                }
+            case .createPlan(let create):
+                actionButton("Create this plan", systemImage: "calendar.badge.plus") {
+                    create(PaceCalculatorInputs(effort: effort, effortSeconds: timeSeconds, goal: goal, raceDate: raceDate))
+                }
+            case .none:
+                EmptyView()
             }
         }
         .foregroundStyle(.white)
+    }
+
+    private func actionButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.title3.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+        }
+        .buttonStyle(.glassProminent)
+        // The deep purple of the background, so the white title reads clearly.
+        .tint(Color(red: 0.42, green: 0.26, blue: 0.70))
+        .controlSize(.large)
     }
 
     private func paceTile(_ title: String, _ secPerKm: Double, color: Color, note: String) -> some View {
@@ -250,8 +294,10 @@ struct PaceCalculatorView: View {
                 if let tuneUp, let s = tuneUp.structure {
                     bullet("flag.2.crossed", "A \(Format.distanceCompact(s.workMeters)) tune-up race that sets your paces")
                 }
-                bullet("arrow.triangle.2.circlepath", "Adapts to the runs you really do, like a running buddy")
-                bullet("applewatch", "Records on Apple Watch or iPhone, saved to Apple Health")
+                if isClip {
+                    bullet("arrow.triangle.2.circlepath", "Adapts to the runs you really do, like a running buddy")
+                    bullet("applewatch", "Records on Apple Watch or iPhone, saved to Apple Health")
+                }
             }
             .font(.subheadline)
         }

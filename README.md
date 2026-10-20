@@ -90,7 +90,7 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   watch's Workout settings), and a double tap pauses or resumes.
 - Live run screens on Apple Watch and iPhone, with a Live Activity and controls on
   the Lock Screen.
-- An App Clip: a pace calculator that opens without installing (endurancr.app/clip), from the same engine, with no HealthKit and nothing stored.
+- A pace calculator: a recent race and a goal give your VDOT, the five paces, a race-day range and the plan it would build. In the app it's on the welcome screen and under Progress, and can start that plan. As an App Clip it opens without installing (endurancr.app/clip), with no HealthKit and nothing stored.
 - The plan syncs directly between iPhone and Apple Watch with WatchConnectivity.
 - Backup and import of your plan as a file, only when you choose to share it.
 
@@ -100,7 +100,7 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
 TrainingCore/       Plain Swift package: VDOT engine, plan generator, adaptation. Runs anywhere.
 Shared/             Code shared by both apps: HealthKit, SwiftData store, plan coordinator.
 App-iOS/            iPhone app.
-App-Clip/           App Clip: the pace calculator that opens without installing.
+App-Clip/           App Clip: the pace calculator (App-iOS/Views/PaceCalculatorView.swift) that opens without installing.
 App-iOS-Widgets/    Live Activity extension.
 App-watchOS/        Apple Watch app and run recorder.
 LiveActivity/       Shared Live Activity attributes and App Intents.

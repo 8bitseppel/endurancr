@@ -10,6 +10,7 @@ struct ProgressDashboardView: View {
     private let calculator = VDOTCalculator()
     @State private var showingGoalEditor = false
     @State private var showingDataManagement = false
+    @State private var showingPaces = false
     /// A target time the athlete is asked to confirm, from the outlook.
     @State private var pendingTarget: Double?
     @State private var recorder = PhoneWorkoutManager.shared
@@ -64,6 +65,7 @@ struct ProgressDashboardView: View {
             .sheet(isPresented: $showingDataManagement) {
                 NavigationStack { DataManagementView(coordinator: coordinator) }
             }
+            .sheet(isPresented: $showingPaces) { PaceCalculatorSheet(action: .none) }
             .navigationDestination(isPresented: $showLiveRun) {
                 PhoneLiveRunView(recorder: recorder)
             }
@@ -542,6 +544,11 @@ struct ProgressDashboardView: View {
                 UnavailabilityView(coordinator: coordinator)
             } label: {
                 Label("Vacation & time off", systemImage: "airplane")
+            }
+            Button {
+                showingPaces = true
+            } label: {
+                Label("Pace calculator", systemImage: "speedometer")
             }
             Button {
                 showingDataManagement = true

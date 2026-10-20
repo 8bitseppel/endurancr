@@ -77,7 +77,8 @@ struct GoalEditorView: View {
         }
     }
 
-    init(coordinator: PlanCoordinator) {
+    /// `prefill` starts a new goal from what the pace calculator was set to.
+    init(coordinator: PlanCoordinator, prefill: PaceCalculatorInputs? = nil) {
         self.coordinator = coordinator
         let inputs = coordinator.inputs ?? DemoMode.goalPrefill
         let goal = inputs?.goal
@@ -117,6 +118,16 @@ struct GoalEditorView: View {
         }
 
         _draftPeriods = State(initialValue: goal?.unavailablePeriods ?? [])
+
+        if let prefill {
+            _raceKind = State(initialValue: RaceKind(distance: prefill.goal))
+            _raceDate = State(initialValue: prefill.raceDate)
+            _recentKind = State(initialValue: RaceKind(distance: prefill.effort))
+            let seconds = Int(prefill.effortSeconds)
+            _recentMinutes = State(initialValue: seconds / 60)
+            _recentSeconds = State(initialValue: seconds % 60)
+            _healthRun = State(initialValue: nil)
+        }
     }
 
     /// Whether `meters` is exactly one of the four race presets the manual distance

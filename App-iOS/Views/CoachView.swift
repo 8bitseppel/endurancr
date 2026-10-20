@@ -16,6 +16,9 @@ struct CoachView: View {
     @State private var showingWeek = false
     @State private var showingHowItWorks = false
     @State private var showingDataManagement = false
+    @State private var showingPaces = false
+    /// What the pace calculator was set to when "Create this plan" was tapped.
+    @State private var prefill: PaceCalculatorInputs?
 
     var body: some View {
         NavigationStack {
@@ -31,7 +34,16 @@ struct CoachView: View {
             .navigationDestination(isPresented: $showLiveRun) {
                 PhoneLiveRunView(recorder: recorder)
             }
-            .sheet(isPresented: $showingGoalEditor) { GoalEditorView(coordinator: coordinator) }
+            .sheet(isPresented: $showingGoalEditor, onDismiss: { prefill = nil }) {
+                GoalEditorView(coordinator: coordinator, prefill: prefill)
+            }
+            // "Create this plan" closes the calculator, then opens the goal form with it.
+            .sheet(isPresented: $showingPaces, onDismiss: { if prefill != nil { showingGoalEditor = true } }) {
+                PaceCalculatorSheet(action: .createPlan { inputs in
+                    prefill = inputs
+                    showingPaces = false
+                })
+            }
             .sheet(isPresented: $showingProgress) { ProgressDashboardView(coordinator: coordinator) }
             .sheet(isPresented: $showingWeek) { CalendarView(coordinator: coordinator) }
             .sheet(isPresented: $showingHowItWorks) { NavigationStack { HowItWorksView() } }
@@ -200,6 +212,8 @@ struct CoachView: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
 
+                    Button("Work out your paces first") { showingPaces = true }
+                        .font(.body.weight(.medium))
                     Button("Import a backup") { showingDataManagement = true }
                         .font(.body.weight(.medium))
                 }
