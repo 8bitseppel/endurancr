@@ -252,6 +252,9 @@ A Plan tab worth opening
 - On top: the week you're in and the phases up to race day.
 - Your 32 km runs and the start of the taper are marked, and the plan ends with your race and its outlook.
 
+Please create your plan again
+- After updating, set up your goal again (Today > the menu > Set your goal, or delete the old one first) so your plan gets the new sessions. Update endurancr on your Apple Watch too, so it shows the same plan.
+
 Sessions from the training books
 - Marathon-pace runs: every other build week, and the last part of the peak long runs at marathon pace, as in Jack Tupper Daniels, Pete Pfitzinger, the Hansons and Hal Higdon.
 - Strides: once or twice a week, an easy run ends with 6 × 20 s quick and light.
