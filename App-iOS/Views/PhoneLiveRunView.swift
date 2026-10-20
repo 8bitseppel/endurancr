@@ -22,67 +22,90 @@ struct PhoneLiveRunView: View {
     }
 
     var body: some View {
-        List {
-            Section {
-                metric("Time", Format.duration(recorder.elapsedSeconds))
-                metric("Distance", Format.distance(recorder.distanceMeters))
-                if recorder.plannedDistanceMeters > 0 {
-                    metric("Target distance", Format.distance(recorder.plannedDistanceMeters))
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(recorder.isPaused ? "Paused" : "Running")
+                    .font(Brand.rounded(.largeTitle))
+                    .accessibilityAddTraits(.isHeader)
+
+                // The time, big, as on the watch.
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Time").brandEyebrow()
+                    Text(Format.duration(recorder.elapsedSeconds))
+                        .font(.system(size: 72, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
                 }
-                if let step = recorder.activeStep, step.kind != .steady {
-                    metric("Step", "\(step.label) · \(Format.distanceCompact(step.distanceMeters))")
-                }
-                // The symbol and VoiceOver say what the colour says.
-                LabeledContent("Current pace") {
-                    HStack(spacing: 4) {
-                        Text(Format.pace(recorder.currentPaceSecPerKm)).monospacedDigit()
-                        if let onTarget = recorder.isOnTarget {
-                            Image(systemName: onTarget ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                                .font(.subheadline)
+                .brandCard(cornerRadius: 30, padding: 22)
+
+                Grid(horizontalSpacing: 12, verticalSpacing: 12) {
+                    GridRow {
+                        tile("Distance", Format.distance(recorder.distanceMeters),
+                             detail: recorder.plannedDistanceMeters > 0 ? "of \(Format.distance(recorder.plannedDistanceMeters))" : nil)
+                        paceTile
+                    }
+                    GridRow {
+                        if let target = stepTargetPace {
+                            tile("Target pace", Format.pace(target), detail: nil)
+                        } else if let target = recorder.targetPaceRange {
+                            tile("Target pace", Format.paceRange(target), detail: nil)
+                        } else {
+                            tile("Target pace", "--", detail: nil)
+                        }
+                        if let step = recorder.activeStep, step.kind != .steady {
+                            tile("Step", step.label, detail: Format.distanceCompact(step.distanceMeters))
+                        } else {
+                            tile("GPS", recorder.routePointCount > 0 ? "\(recorder.routePointCount)" : "…",
+                                 detail: recorder.routePointCount > 0 ? "points" : "acquiring")
                         }
                     }
-                    .font(.title3)
-                    .foregroundStyle(paceTint)
                 }
-                .accessibilityValue(recorder.isOnTarget.map { $0 ? "on target" : "off target" } ?? "")
-                if let target = stepTargetPace {
-                    metric("Target pace", Format.pace(target))
-                } else if let target = recorder.targetPaceRange {
-                    metric("Target pace", Format.paceRange(target))
-                }
-                metric("GPS", recorder.routePointCount > 0 ? "\(recorder.routePointCount) pts" : "acquiring…")
-            }
 
-            if let error = recorder.lastError {
-                Section {
+                if let error = recorder.lastError {
                     Text(error).font(.footnote).foregroundStyle(.red)
                 }
-            }
 
-            Section {
-                Button {
-                    recorder.isPaused ? recorder.resume() : recorder.pause()
-                } label: {
-                    if recorder.isPaused {
-                        Label("Resume", systemImage: "play.fill")
-                    } else {
-                        Label("Pause", systemImage: "pause.fill")
+                VStack(spacing: 12) {
+                    Button {
+                        recorder.isPaused ? recorder.resume() : recorder.pause()
+                    } label: {
+                        Label(recorder.isPaused ? "Resume" : "Pause", systemImage: recorder.isPaused ? "play.fill" : "pause.fill")
+                            .font(.title3.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
                     }
+                    .buttonStyle(.glassProminent)
+                    .tint(Brand.buttonPurple)
+                    Button(role: .destructive) {
+                        recorder.end()
+                        dismiss()
+                    } label: {
+                        Label("Finish run", systemImage: "stop.fill")
+                            .font(.title3.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.glass)
+                    .foregroundStyle(.red)
                 }
-                Button(role: .destructive) {
-                    recorder.end()
-                    dismiss()
-                } label: {
-                    Label("Finish run", systemImage: "stop.fill")
-                }
-            } footer: {
+                .controlSize(.large)
+                .padding(.top, 4)
+
                 Text(recorder.isPaused
                     ? "Paused. Time and distance are on hold. Resume to keep recording, or Finish to save to Health."
                     : "Keep your phone with you. Tracking continues with the screen off, and your stats show on the Lock Screen.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
             }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 24)
         }
-        .brandList()
-        .navigationTitle(recorder.isPaused ? "Paused" : "Running")
+        .background { BrandBackground() }
+        .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .onChange(of: recorder.isRunning) { _, running in
             // The run can also be finished from the Live Activity (Lock Screen /
@@ -91,17 +114,45 @@ struct PhoneLiveRunView: View {
         }
     }
 
+    /// Current pace, green on target and orange off it; the symbol and VoiceOver
+    /// say what the colour says.
+    private var paceTile: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Pace").brandEyebrow()
+            HStack(spacing: 6) {
+                Text(Format.pace(recorder.currentPaceSecPerKm))
+                    .font(Brand.rounded(.title2)).monospacedDigit()
+                    .minimumScaleFactor(0.6).lineLimit(1)
+                if let onTarget = recorder.isOnTarget {
+                    Image(systemName: onTarget ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                        .font(.subheadline)
+                }
+            }
+            .foregroundStyle(paceTint)
+            Text(recorder.isOnTarget.map { $0 ? "On target" : "Off target" } ?? "Now")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .brandCard(cornerRadius: 22, padding: 16)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func tile(_ title: String, _ value: String, detail: String?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).brandEyebrow()
+            Text(value)
+                .font(Brand.rounded(.title2)).monospacedDigit()
+                .minimumScaleFactor(0.6).lineLimit(1)
+            Text(detail ?? " ").font(.caption).foregroundStyle(.secondary)
+        }
+        .brandCard(cornerRadius: 22, padding: 16)
+        .accessibilityElement(children: .combine)
+    }
+
     private var paceTint: Color {
         switch recorder.isOnTarget {
         case .some(true): return .green
         case .some(false): return .orange
         case .none: return .primary
-        }
-    }
-
-    private func metric(_ label: String, _ value: String, tint: Color = .primary) -> some View {
-        LabeledContent(label) {
-            Text(value).font(.title3).monospacedDigit().foregroundStyle(tint)
         }
     }
 }

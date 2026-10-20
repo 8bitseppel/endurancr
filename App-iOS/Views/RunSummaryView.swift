@@ -36,39 +36,50 @@ struct RunSummaryView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    stat("Distance", Format.distance(data.distanceMeters), tint: .accentColor)
-                    stat("Time", Format.duration(data.durationSeconds))
-                    stat("Average pace", Format.pace(data.averagePaceSecPerKm), tint: .green)
-                } header: {
-                    Label(data.saved ? "Saved to Health" : "Could not save to Health",
-                          systemImage: data.saved ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                        .foregroundStyle(data.saved ? .green : .orange)
-                        .font(.subheadline.weight(.semibold))
-                        .textCase(nil)
-                }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(data.saved ? "Saved to Health" : "Could not save to Health",
+                              systemImage: data.saved ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(data.saved ? .green : .orange)
+                        Text(Format.distance(data.distanceMeters))
+                            .font(.system(size: 64, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .minimumScaleFactor(0.6)
+                            .lineLimit(1)
+                        HStack(spacing: 12) {
+                            stat("Time", Format.duration(data.durationSeconds))
+                            stat("Average pace", Format.pace(data.averagePaceSecPerKm))
+                        }
+                    }
+                    .brandCard(tint: .green, cornerRadius: 30, padding: 22)
+                    .accessibilityElement(children: .combine)
 
-                if data.weekTargetMeters > 0 {
-                    Section {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(weekLine)
-                                .font(.headline)
+                    if data.weekTargetMeters > 0 {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(data.weekNumber.map { "Week \($0)" } ?? "This week").brandEyebrow()
+                            Text(weekLine).font(Brand.rounded(.headline))
                             ProgressView(value: data.weekFraction)
-                                .tint(.accentColor)
+                                .tint(Brand.buttonPurple)
                             Text(data.weekRemainingMeters > 0
                                  ? "\(Format.distance(data.weekRemainingMeters)) still to go this week"
                                  : "Week's target met. Nice work.")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 4)
-                    } footer: {
+                        .brandCard()
+                        .accessibilityElement(children: .combine)
+
                         Text("A shorter run isn't made up on the days after. If the weeks keep coming in lighter, the plan builds from what you ran.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
             }
-            .brandList()
+            .background { BrandBackground() }
             .navigationTitle("Run complete")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -80,17 +91,16 @@ struct RunSummaryView: View {
     }
 
     private var weekLine: String {
-        let done = Format.distance(data.weekCompletedMeters)
-        let target = Format.distance(data.weekTargetMeters)
-        if let n = data.weekNumber {
-            return "\(done) of week \(n) done (target \(target))"
-        }
-        return "\(done) of \(target) done this week"
+        "\(Format.distance(data.weekCompletedMeters)) of \(Format.distance(data.weekTargetMeters)) done"
     }
 
-    private func stat(_ label: String, _ value: String, tint: Color = .primary) -> some View {
-        LabeledContent(label) {
-            Text(value).font(.title3).monospacedDigit().foregroundStyle(tint)
+    private func stat(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(.caption).foregroundStyle(.secondary)
+            Text(value).font(Brand.rounded(.title3, weight: .semibold)).monospacedDigit()
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .glassEffect(.regular, in: .rect(cornerRadius: 14))
     }
 }

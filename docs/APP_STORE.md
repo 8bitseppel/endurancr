@@ -380,7 +380,7 @@ Same as 1.2.0. To mention the calculator, add this line to the list of what endu
 
 ### Build
 
-1.3.0 (33). Build 32 was an archive of 1.2.0 that wasn't released; don't use it.
+1.3.0 (34). Build 32 was an unreleased 1.2.0 archive and 33 an earlier 1.3.0 one; use 34.
 
 ### Screenshots and App Preview
 
