@@ -320,7 +320,7 @@ Apple's overlay offers the full app. No HealthKit (App Clips can't use it), noth
 stored. Bundle ID `app.endurancr.Clip`, embedded in the app, so it ships with the build.
 
 In App Store Connect, on the 1.2.0 version page under App Clip:
-- **Header image:** `screenshots/appstore/appclip/card-3x2.png` (3000 x 2000, no text).
+- **Header image:** `screenshots/appstore/appclip/card-3x2.png` (1800 x 1200, no text; save the subtitle and action first, App Store Connect only takes the image for a saved language).
 - **Subtitle (56):** `Your training paces from one recent race, in a minute.`
 - **Action:** Open.
 - **Default experience:** used by the App Store, Messages and the Safari banner on

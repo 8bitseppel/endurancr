@@ -5,7 +5,8 @@ Writes screenshots/appstore/creative/:
   header-21x9.png    product page header, 3840 x 1646
   search-3x2.png     search results, 3840 x 2560
 and screenshots/appstore/appclip/card-3x2.png, the App Clip card header image
-(3000 x 2000, no text: the card shows the title and subtitle itself).
+(1800 x 1200, the size App Store Connect takes; no text: the card shows the title
+and subtitle itself).
 
 Run ./scripts/screenshots.sh first. Needs Pillow. The text is centered with the
 phones below it, so a header cropped at the sides still reads (Apple's advice is
@@ -135,8 +136,9 @@ def main():
     clip_out = SHOTS / "appstore" / "appclip"
     if (SHOTS / "clip-2-results.png").exists():
         clip_out.mkdir(parents=True, exist_ok=True)
-        clip_card().save(clip_out / "card-3x2.png", optimize=True)
-        print(f"    {(clip_out / 'card-3x2.png').relative_to(ROOT)} 3000x2000 RGB")
+        # Drawn at 3000 x 2000 for detail, saved at the 1800 x 1200 App Store Connect wants.
+        clip_card().resize((1800, 1200), Image.LANCZOS).save(clip_out / "card-3x2.png", optimize=True)
+        print(f"    {(clip_out / 'card-3x2.png').relative_to(ROOT)} 1800x1200 RGB")
     OUT.mkdir(parents=True, exist_ok=True)
     compose(3840, 1646, title_size=150, phone_height=1900, top=120).save(OUT / "header-21x9.png", optimize=True)
     compose(3840, 2560, title_size=190, phone_height=2700, top=190).save(OUT / "search-3x2.png", optimize=True)
