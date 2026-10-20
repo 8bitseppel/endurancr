@@ -47,10 +47,13 @@ final class PlanSync: NSObject {
     /// on every plan change.
     func publish(inputs: PlanInputs?, adapted: AdaptedWeeks?) {
         var context: [String: Any] = [:]
+        // "inputs" and "adapted" in terms older watches understand
+        // (`LegacyFormat`); "adaptedV2" as it is, for watches that read it.
         if let inputs, let data = try? JSONEncoder().encode(inputs) {
-            context["inputs"] = data
+            context["inputs"] = LegacyFormat.forOlderWatch(data)
             if let adapted, let data = try? JSONEncoder().encode(adapted) {
-                context["adapted"] = data
+                context["adapted"] = LegacyFormat.forOlderWatch(data)
+                context["adaptedV2"] = data
             }
         }
         pendingContext = context
@@ -92,7 +95,7 @@ extension PlanSync: WCSessionDelegate {
         // main actor for the flush/apply.
         let context = session.receivedApplicationContext
         let inputsData = context["inputs"] as? Data
-        let adaptedData = context["adapted"] as? Data
+        let adaptedData = (context["adaptedV2"] ?? context["adapted"]) as? Data
         // Catch up only on a real context: an empty one (a failed activation, or the
         // phone hasn't sent anything yet) would otherwise delete the watch's plan.
         let hasContext = error == nil && !context.isEmpty
@@ -105,7 +108,7 @@ extension PlanSync: WCSessionDelegate {
     nonisolated func session(_ session: WCSession,
                              didReceiveApplicationContext applicationContext: [String: Any]) {
         let inputsData = applicationContext["inputs"] as? Data
-        let adaptedData = applicationContext["adapted"] as? Data
+        let adaptedData = (applicationContext["adaptedV2"] ?? applicationContext["adapted"]) as? Data
         Task { @MainActor in self.apply(inputsData: inputsData, adaptedData: adaptedData) }
     }
 

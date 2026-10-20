@@ -17,6 +17,13 @@ public enum WorkoutType: String, Sendable, Codable, CaseIterable {
 
     /// Non-rest sessions count toward the weekly running-days budget.
     public var isRunning: Bool { self != .rest }
+
+    /// A type from a newer app version reads as an easy run instead of failing the
+    /// whole plan.
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = WorkoutType(rawValue: raw) ?? .easy
+    }
 }
 
 /// Where a week sits in the periodized build toward race day.
@@ -32,6 +39,12 @@ public enum TrainingPhase: String, Sendable, Codable {
     /// The days after the race: rest, then short easy runs (Daniels: an easy day for
     /// every 3 km raced).
     case recovery
+
+    /// A phase from a newer app version reads as a build week instead of failing.
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = TrainingPhase(rawValue: raw) ?? .build
+    }
 }
 
 /// The breakdown of a structured quality session (intervals, tempo) into a
