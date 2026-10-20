@@ -10,6 +10,8 @@ struct WorkoutStepsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
+            StepsBar(structure: structure)
+                .padding(.bottom, 4)
             ForEach(Array(Format.workoutSteps(structure, zones: zones).enumerated()), id: \.offset) { _, step in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(step.label)
@@ -24,5 +26,42 @@ struct WorkoutStepsView: View {
             }
         }
         .padding(.leading, 2)
+    }
+}
+
+/// The run's parts as one bar, each as long as its distance and in its pace's
+/// colour: warm-up, the reps with their jogs, cool-down.
+private struct StepsBar: View {
+    let structure: WorkoutStructure
+
+    private var parts: [(meters: Double, type: WorkoutType)] {
+        var parts: [(Double, WorkoutType)] = []
+        if structure.warmupMeters > 0 { parts.append((structure.warmupMeters, structure.recoveryType)) }
+        for rep in 0..<max(structure.reps, 1) where structure.workMeters > 0 {
+            parts.append((structure.workMeters, structure.workType))
+            if rep < structure.reps - 1, structure.recoveryMeters > 0 {
+                parts.append((structure.recoveryMeters, structure.recoveryType))
+            }
+        }
+        if structure.cooldownMeters > 0 { parts.append((structure.cooldownMeters, structure.recoveryType)) }
+        return parts
+    }
+
+    var body: some View {
+        let parts = self.parts
+        let total = max(parts.reduce(0) { $0 + $1.meters }, 1)
+        GeometryReader { geo in
+            let spacing: CGFloat = 2
+            let width = geo.size.width - spacing * CGFloat(max(parts.count - 1, 0))
+            HStack(spacing: spacing) {
+                ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(part.type.tint.opacity(part.type == structure.workType ? 1 : 0.4))
+                        .frame(width: max(2, width * part.meters / total))
+                }
+            }
+        }
+        .frame(height: 10)
+        .accessibilityHidden(true)
     }
 }

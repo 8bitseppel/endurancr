@@ -34,6 +34,7 @@ struct UnavailabilityView: View {
                 }
             }
         }
+        .brandList()
         .navigationTitle("Time Off")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -78,6 +79,7 @@ private struct AddUnavailabilityView: View {
                     DatePicker("To", selection: $end, in: start..., displayedComponents: .date)
                 }
             }
+            .brandList()
             .navigationTitle("Add Time Off")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

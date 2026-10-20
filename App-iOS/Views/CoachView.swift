@@ -181,7 +181,7 @@ struct CoachView: View {
                     .font(.system(size: 64, weight: .semibold))
                     .foregroundStyle(.tint)
                     .padding(26)
-                    .background(Color.accentColor.opacity(0.15), in: .circle)
+                    .glassEffect(.regular.tint(Color.accentColor.opacity(0.15)), in: .circle)
                     .accessibilityHidden(true)
 
                 VStack(spacing: 12) {
@@ -208,8 +208,10 @@ struct CoachView: View {
                         Text("Set your goal")
                             .font(.title3.weight(.semibold))
                             .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.glassProminent)
+                    .tint(Brand.buttonPurple)
                     .controlSize(.large)
 
                     Button("Work out your paces first") { showingPaces = true }
@@ -225,6 +227,7 @@ struct CoachView: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .defaultScrollAnchor(.center)
+        .background { BrandBackground() }
     }
 
     private func welcomePoint(_ symbol: String, _ text: String) -> some View {

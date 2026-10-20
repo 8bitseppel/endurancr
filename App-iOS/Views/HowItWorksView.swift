@@ -163,6 +163,7 @@ struct HowItWorksView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .brandList()
             .navigationTitle("How it works")
         }
     }

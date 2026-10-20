@@ -127,6 +127,13 @@ extension View {
         modifier(BrandCard(tint: tint, cornerRadius: cornerRadius, padding: padding))
     }
 
+    /// A list or form on the brand background, with the standard rows on top.
+    func brandList() -> some View {
+        self
+            .scrollContentBackground(.hidden)
+            .background { BrandBackground() }
+    }
+
     /// A small heading over a card, in capitals.
     func brandEyebrow() -> some View {
         self

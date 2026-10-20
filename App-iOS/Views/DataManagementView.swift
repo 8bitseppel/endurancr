@@ -61,6 +61,7 @@ struct DataManagementView: View {
                 Text("Deletes your goal and plan from this iPhone. Recorded runs in Apple Health are kept, so set a new goal or import a backup afterward.")
             }
         }
+        .brandList()
         .navigationTitle("Storage & Data")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

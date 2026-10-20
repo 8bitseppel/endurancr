@@ -28,6 +28,7 @@ struct AchievedGoalsView: View {
                 }
             }
         }
+        .brandList()
         .navigationTitle("Achieved goals")
     }
 

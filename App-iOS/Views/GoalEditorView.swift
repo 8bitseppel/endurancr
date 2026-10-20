@@ -160,6 +160,7 @@ struct GoalEditorView: View {
                     Section { Text(error).foregroundStyle(.red) }
                 }
             }
+            .brandList()
             .navigationTitle(isEditing ? "Edit Goal" : "New Plan")
             .navigationBarTitleDisplayMode(.inline)
             .demoAutoScroll()
@@ -513,6 +514,7 @@ private struct PickHealthRunView: View {
                 }
             }
         }
+        .brandList()
         .navigationTitle("Recent runs")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -600,6 +602,7 @@ private struct AddDraftVacationView: View {
                 }
             }
         }
+        .brandList()
         .navigationTitle("Add Time Off")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)

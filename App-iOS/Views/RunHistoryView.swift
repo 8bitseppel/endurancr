@@ -41,6 +41,7 @@ struct RunHistoryView: View {
                 }
             }
         }
+        .brandList()
         .navigationTitle("Recent runs")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -121,6 +122,7 @@ struct RunDetailView: View {
                 LabeledContent("Recorded by", value: workout.sourceRevision.source.name)
             }
         }
+        .brandList()
         .navigationTitle(Format.distance(distanceMeters))
         .navigationBarTitleDisplayMode(.inline)
         .task(id: workout.uuid) {
