@@ -64,7 +64,7 @@ struct PaceCalculatorView: View {
         // Worked out once per change of the inputs, not for every use below.
         let plan = self.plan
         return ZStack {
-            BrandBackground(animated: true)
+            BrandBackground(animated: true, vivid: true)
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 20) {

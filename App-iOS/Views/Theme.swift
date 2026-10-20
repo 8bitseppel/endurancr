@@ -38,6 +38,12 @@ extension WorkoutType {
 enum Brand {
     /// The deep purple of the background, for buttons with white titles.
     static let purple = Color(red: 0.42, green: 0.26, blue: 0.70)
+    /// The same purple for the app's buttons: as it is by day, muted at night.
+    static let buttonPurple = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.33, green: 0.24, blue: 0.50, alpha: 1)
+            : UIColor(red: 0.42, green: 0.26, blue: 0.70, alpha: 1)
+    })
 
     /// Rounded bold, for titles and numbers.
     static func rounded(_ style: Font.TextStyle, weight: Font.Weight = .bold) -> Font {
@@ -45,11 +51,13 @@ enum Brand {
     }
 }
 
-/// The background of every screen: a mesh of the app's purples and blues, dark at
-/// night and soft lilac by day. `animated` lets the middle drift slowly, as in the
-/// App Clip; the app's screens keep it still.
+/// The background of every screen: a mesh of the app's purples and blues, soft
+/// lilac by day and close to black at night. `vivid` is the bright night version of
+/// the pace calculator and App Clip, and `animated` lets its middle drift slowly;
+/// the app's screens keep it calm and still.
 struct BrandBackground: View {
     var animated = false
+    var vivid = false
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -63,13 +71,19 @@ struct BrandBackground: View {
                     [0, 0.5], [Float(0.5 + 0.15 * sin(t)), Float(0.45 + 0.12 * cos(t * 0.8))], [1, 0.5],
                     [0, 1], [0.5, 1], [1, 1],
                 ],
-                colors: colorScheme == .dark ? Self.dark : Self.light
+                colors: colorScheme == .light ? Self.light : (vivid ? Self.vividDark : Self.dark)
             )
         }
         .ignoresSafeArea()
     }
 
+    /// Close to black with a hint of aubergine, so the runs' colours stay calm.
     private static let dark: [Color] = [
+        Color(red: 0.03, green: 0.03, blue: 0.05), Color(red: 0.07, green: 0.05, blue: 0.10), Color(red: 0.03, green: 0.03, blue: 0.05),
+        Color(red: 0.05, green: 0.05, blue: 0.09), Color(red: 0.12, green: 0.09, blue: 0.17), Color(red: 0.04, green: 0.06, blue: 0.08),
+        Color(red: 0.03, green: 0.03, blue: 0.05), Color(red: 0.06, green: 0.04, blue: 0.08), Color(red: 0.03, green: 0.03, blue: 0.05),
+    ]
+    private static let vividDark: [Color] = [
         .black, Color(red: 0.16, green: 0.08, blue: 0.32), .black,
         Color(red: 0.10, green: 0.12, blue: 0.36), Color(red: 0.42, green: 0.26, blue: 0.70), Color(red: 0.06, green: 0.22, blue: 0.34),
         .black, Color(red: 0.12, green: 0.06, blue: 0.24), .black,
@@ -81,13 +95,27 @@ struct BrandBackground: View {
     ]
 }
 
+/// A glass card, tinted with a run's colour when it's about one run: clearly by
+/// day, only a hint at night, where bright colours on black glare.
+private struct BrandCard: ViewModifier {
+    let tint: Color?
+    let cornerRadius: CGFloat
+    let padding: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        let opacity = colorScheme == .dark ? 0.10 : 0.22
+        content
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(padding)
+            .glassEffect(tint.map { .regular.tint($0.opacity(opacity)) } ?? .regular, in: .rect(cornerRadius: cornerRadius))
+    }
+}
+
 extension View {
     /// A glass card, tinted with a run's colour when it's about one run.
     func brandCard(tint: Color? = nil, cornerRadius: CGFloat = 26, padding: CGFloat = 18) -> some View {
-        self
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(padding)
-            .glassEffect(tint.map { .regular.tint($0.opacity(0.22)) } ?? .regular, in: .rect(cornerRadius: cornerRadius))
+        modifier(BrandCard(tint: tint, cornerRadius: cornerRadius, padding: padding))
     }
 
     /// A small heading over a card, in capitals.

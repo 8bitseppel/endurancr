@@ -15,6 +15,7 @@ struct TodayView: View {
     @State private var showingGoalEditor = false
     @State private var showingDataManagement = false
     @State private var showDeleteConfirm = false
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         NavigationStack {
@@ -225,7 +226,7 @@ struct TodayView: View {
                     .padding(.vertical, 6)
             }
             .buttonStyle(.glassProminent)
-            .tint(Brand.purple)
+            .tint(Brand.buttonPurple)
             .controlSize(.large)
             Text("Records on iPhone with GPS. Start on your Apple Watch instead to include heart rate.")
                 .font(.footnote)
@@ -283,7 +284,7 @@ struct TodayView: View {
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)
                 .frame(width: 44, height: 44)
-                .background(workout.type.tint.gradient, in: .circle)
+                .background(workout.type.tint.opacity(colorScheme == .dark ? 0.55 : 1).gradient, in: .circle)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Next · \(nextDayName(workout.date))").brandEyebrow()
@@ -321,6 +322,9 @@ private struct WeekDayDot: View {
     private var status: PlanReview.Status? { review?.status }
     private var tint: Color { status == .extra ? .green : (workout?.type.tint ?? .gray) }
     private var isRun: Bool { workout?.type.isRunning ?? false }
+    @Environment(\.colorScheme) private var colorScheme
+    /// Softer at night, where full colours on black glare.
+    private var strength: Double { colorScheme == .dark ? 0.6 : 1 }
 
     var body: some View {
         VStack(spacing: 6) {
@@ -330,7 +334,7 @@ private struct WeekDayDot: View {
             ZStack {
                 switch status {
                 case .done?, .shorter?, .extra?:
-                    Circle().fill(tint.gradient)
+                    Circle().fill(tint.opacity(strength).gradient)
                     Image(systemName: status == .extra ? "plus" : "checkmark")
                         .font(.caption.weight(.bold)).foregroundStyle(.white)
                 case .missed?:
@@ -338,7 +342,7 @@ private struct WeekDayDot: View {
                     Image(systemName: "xmark").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
                 default:
                     if isRun {
-                        Circle().fill(tint.opacity(isToday ? 0.45 : 0.25))
+                        Circle().fill(tint.opacity((isToday ? 0.45 : 0.25) * strength))
                     } else {
                         Circle().fill(.secondary.opacity(0.35)).frame(width: 7, height: 7)
                     }
