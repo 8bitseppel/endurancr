@@ -37,8 +37,12 @@ python3 - <<'PY'
 from pathlib import Path
 from PIL import Image
 A = Path("screenshots/appstore")
-for p in sorted(A.glob("iphone-*.png")):
+for p in sorted(A.glob("iphone-*.png")) + sorted(A.glob("watch-*.png")):
+    # No alpha channel: App Store Connect can refuse screenshots that have one.
     im = Image.open(p).convert("RGB")
+    im.save(p)
+    if p.name.startswith("watch"):
+        continue
     # 6.5": scale to 1284 wide, trim to 2778. 6.3": scale to 2622 high, trim to 1206.
     w = 1284
     im.resize((w, round(im.height * w / im.width)), Image.LANCZOS).crop((0, 0, 1284, 2778)).save(A / "6.5-inch" / p.name)

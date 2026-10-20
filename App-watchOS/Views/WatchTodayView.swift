@@ -277,10 +277,8 @@ struct WatchTodayView: View {
     /// The workout's note when the plan adapted it, not the plan's standard
     /// description of the session type.
     static func adaptationNote(_ workout: PlannedWorkout) -> String? {
-        let standard = ["", "Easy run", "Long run, easy and conversational",
-                        "Long run, finish last third at marathon pace"]
-        guard !standard.contains(workout.notes), workout.structure == nil || workout.type == .easy else { return nil }
-        return workout.notes
+        guard !VDOTPlanGenerator.isStandardNote(workout.notes) else { return nil }
+        return PlanReview.reason(of: workout.notes)
     }
 
     private var state: TodayState {

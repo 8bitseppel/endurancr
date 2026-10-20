@@ -26,7 +26,8 @@ struct TodayView: View {
                             Label {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Extra run, \(Format.distance(day.ranMeters))").fontWeight(.semibold)
-                                    Text("It counts toward this week. \(day.effort == .easy ? "An easy one, good for your base." : "Keep the next easy days easy.")")
+                                    Text(["It counts toward this week.", Format.extraRunEffort(day.effort).map { $0 + "." }]
+                                            .compactMap { $0 }.joined(separator: " "))
                                         .font(.callout).foregroundStyle(.secondary)
                                 }
                             } icon: {

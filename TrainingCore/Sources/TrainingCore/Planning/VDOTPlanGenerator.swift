@@ -129,7 +129,7 @@ public struct VDOTPlanGenerator: PlanGenerator {
                 sessions.marathonPaceLongRun = isMarathonBuild && phase == .peak && !cutback
                     && (longTarget ?? 0) < peakLong - 1
                 if !isMaintenance, let trial = Self.timeTrial(for: goal.race, totalWeeks: total), trial.weeksOut == weeksOut,
-                   [.build, .peak].contains(phase) {
+                   [.build, .peak].contains(phase), !cutback {
                     // A lighter week around the race (Pfitzinger): no other hard
                     // session, and an easy long run.
                     sessions.timeTrialMeters = trial.meters
@@ -506,6 +506,17 @@ public struct VDOTPlanGenerator: PlanGenerator {
     /// not a sprint, about a minute easy between them).
     public static let stridesNote = "Easy run, then 6 × 20 s strides: quick and light, not a sprint, about a minute easy between them"
 
+    /// True for the notes the plan gives a session when it builds it, false for the
+    /// ones the adaptation writes when it changes a run ("Shorter, …", "Eased to easy …").
+    /// The watch shows only the second kind as a reason.
+    public static func isStandardNote(_ note: String) -> Bool {
+        let standard = ["", "Easy run", stridesNote, "Short shakeout with a few strides",
+                        "Recovery run: short and easy, only if your legs feel ready"]
+        let prefixes = ["Long run, easy and conversational", "Long run, the last ", "Race day.",
+                        "Threshold:", "Intervals:", "Speed:", "Marathon pace:", "Tune-up:"]
+        return standard.contains(note) || prefixes.contains { note.hasPrefix($0) }
+    }
+
     /// A new note for a run the plan changed, keeping its strides if it had them.
     public static func note(_ note: String, keepingStridesOf old: String) -> String {
         old.contains("6 × 20 s strides") ? note + ", then 6 × 20 s strides" : note
@@ -582,9 +593,15 @@ public struct VDOTPlanGenerator: PlanGenerator {
         var easyEach = n == 0 ? 0 : min(longDistance, remaining / Double(n))
         // A tune-up week is about 10% lighter: the race takes its own distance and
         // the easy runs share what's left.
-        if let trial = sessions.timeTrialMeters, n > 1 {
+        // Never longer than the week's long run, or it isn't held that week.
+        var trialMeters = sessions.timeTrialMeters
+        if let trial = trialMeters, Self.timeTrialStructure(distance: trial).totalMeters > longDistance {
+            qualityDays = qualityDays.filter { $0.value != .timeTrial }
+            trialMeters = nil
+        }
+        if let trial = trialMeters, n > 1 {
             let trialTotal = Self.timeTrialStructure(distance: trial).totalMeters
-            easyEach = min(longDistance, max(3_000, (0.9 * volume - longDistance - trialTotal) / Double(n - 1)))
+            easyEach = min(easyEach, max(3_000, (0.9 * volume - longDistance - trialTotal) / Double(n - 1)))
         }
 
         var workouts: [PlannedWorkout] = []
@@ -606,7 +623,7 @@ public struct VDOTPlanGenerator: PlanGenerator {
                 ))
             } else if otherDays.contains(offset) {
                 let type = qualityDays[offset] ?? .easy
-                if type == .timeTrial, let meters = sessions.timeTrialMeters {
+                if type == .timeTrial, let meters = trialMeters {
                     // Its own distance (the race plus warm-up and cool-down), at the
                     // race pace the current VDOT predicts.
                     let structure = Self.timeTrialStructure(distance: meters)
@@ -734,13 +751,14 @@ public struct VDOTPlanGenerator: PlanGenerator {
     /// The distance of the build's tune-up race or time trial, and how many weeks
     /// before race week it comes: a 10 km 6 weeks out for the marathon (before the
     /// long runs that peak 5 and 3 weeks out; Pfitzinger's first tune-up is 6 weeks out,
-    /// 8 to 15 km), 5 weeks out for the half, and a 5 km
+    /// 8 to 15 km), 5 weeks out for the half, and a 5 km 5 weeks out for a 10 km
+    /// (4 weeks out is a cutback week), never in a cutback week
     /// 4 weeks out for a 10 km. Only in plans long enough to have a build by then.
     static func timeTrial(for race: RaceDistance, totalWeeks: Int) -> (meters: Double, weeksOut: Int)? {
         switch race {
         case .marathon where totalWeeks >= 14: return (10_000, 6)
         case .halfMarathon where totalWeeks >= 10: return (10_000, 5)
-        case .tenK where totalWeeks >= 8: return (5_000, 4)
+        case .tenK where totalWeeks >= 8: return (5_000, 5)
         default: return nil
         }
     }
@@ -816,13 +834,14 @@ public struct VDOTPlanGenerator: PlanGenerator {
     /// races of over an hour take carbohydrate from early on, about 60 g an hour, up
     /// to 90 g from mixed sugars past about 2½ hours (Jeukendrup 2014), as practised
     /// on the long runs.
-    public static func raceDayAdvice(for race: RaceDistance, expectedSeconds: Double) -> String {
+    public static func raceDayAdvice(for race: RaceDistance, expectedSeconds: Double, withHeading: Bool = true) -> String {
+        let heading = withHeading ? "Race day. " : ""
         let pacing = "Start at your race pace, not faster, and keep it even."
-        guard expectedSeconds > 3_600 else { return "Race day. " + pacing }
+        guard expectedSeconds > 3_600 else { return heading + pacing }
         let carbs = expectedSeconds > 9_000
             ? "Take carbohydrate from early on: about 60 g an hour, up to 90 g from drinks and gels with mixed sugars, as you practised on your long runs."
             : "Take carbohydrate from early on, about 60 g an hour, as you practised on your long runs."
-        return "Race day. " + pacing + " " + carbs
+        return heading + pacing + " " + carbs
     }
 
     /// Daniels: an easy day for every 3 km raced, so about 14 days after a marathon and
@@ -853,6 +872,18 @@ public struct VDOTPlanGenerator: PlanGenerator {
                 days.swapAt(n, m)
             } else {
                 days[n] = (.rest, 0)
+            }
+        }
+        // No more runs in a calendar week than the athlete's days per week, counting
+        // the race week's runs too.
+        var runsInWeek: [Date: Int] = [:]
+        for week in weeks { runsInWeek[week.startDate, default: 0] += week.workouts.filter(\.type.isRunning).count }
+        for n in days.indices where days[n].type == .easy {
+            let weekStart = Self.startOfWeek(date(n), calendar: calendar)
+            if runsInWeek[weekStart, default: 0] >= goal.daysPerWeek {
+                days[n] = (.rest, 0)
+            } else {
+                runsInWeek[weekStart, default: 0] += 1
             }
         }
         for (n, day) in days.enumerated() {

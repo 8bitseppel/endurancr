@@ -83,12 +83,27 @@ struct ProgressDashboardView: View {
 
     /// Shown once race day arrives: confirm the goal is done and bank the summary.
     @ViewBuilder private func goalReachedSection(plan: TrainingPlan) -> some View {
-        if coordinator.raceDayReached {
+        if coordinator.raceDayReached, coordinator.goalSaved {
+            Section {
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Saved to your achieved goals").font(.headline)
+                        if let end = coordinator.recoveryEnd {
+                            Text("Your recovery days stay in the plan until \(end.formatted(.dateTime.weekday(.wide).day().month())). Set your next goal whenever you're ready.")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                    }
+                } icon: {
+                    Image(systemName: "trophy").foregroundStyle(.tint)
+                }
+            }
+        } else if coordinator.raceDayReached {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Race day reached", systemImage: "flag.checkered")
                         .font(.headline)
-                    Text("You've reached race day for \(plan.goal.displayName). Confirm it complete to save what you achieved.")
+                    Text(coordinator.recoveryEnd.map { "You've reached race day for \(plan.goal.displayName). Save what you achieved; the recovery days stay in your plan until \($0.formatted(.dateTime.weekday(.wide).day().month()))." }
+                         ?? "You've reached race day for \(plan.goal.displayName). Confirm it complete to save what you achieved.")
                         .font(.subheadline).foregroundStyle(.secondary)
                     Button {
                         showCompleteConfirm = true

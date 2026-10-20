@@ -51,13 +51,14 @@ segment 3-today    3  0.3 2.6
 segment 4-run      4  0.5 3.0 -demoScreen run
 segment 5-summary  3  0.3 2.4 -demoScreen summary
 segment 6-progress 10 2.4 5.4 -demoScreen progress -demoScroll YES
-segment 7-plan    10 2.4 5.4 -demoScreen plan -demoScroll YES -demoScrollPoints 1500
+segment 7-plan    10 2.4 5.0 -demoScreen plan -demoScroll YES -demoScrollPoints 1500
+segment 8-week     4  0.5 3.0 -demoScreen plan -demoPlanWeek 6
 
 echo "==> Joining"
 # 0.35 s crossfades between the parts, then a silent stereo track for the length.
 fade=0.35
 inputs=""; filter=""; offset=0; prev="0:v"; i=0
-for f in "$BUILD"/[1-7]-*.mp4; do
+for f in "$BUILD"/[1-8]-*.mp4; do
   inputs="$inputs -i $f"
   length=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$f")
   if [ "$i" -gt 0 ]; then

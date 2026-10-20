@@ -92,9 +92,10 @@ public enum WorkoutSteps {
         var drafts: [Draft] = []
 
         if s.warmupMeters > 0 {
+            // A long run's easy part before its marathon-pace finish isn't a warm-up.
             drafts.append(Draft(kind: .warmup, distance: s.warmupMeters,
                                 paceType: s.recoveryType, repNumber: nil, repTotal: nil,
-                                label: "Warm-up"))
+                                label: w.type == .longRun ? "Easy" : "Warm-up"))
         }
         for r in 1...max(1, s.reps) {
             // A single block is named for what it is ("Marathon pace"), not "Rep 1/1".
@@ -140,7 +141,7 @@ public enum WorkoutSteps {
         switch type {
         case .marathonPace: "Marathon pace"
         case .threshold: "Threshold"
-        case .timeTrial: "Time trial"
+        case .timeTrial: "Tune-up race"
         default: "Rep 1/1"
         }
     }

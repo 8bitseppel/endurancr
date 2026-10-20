@@ -236,6 +236,10 @@ struct GoalEditorView: View {
                             if editingDate == .start { withAnimation { editingDate = .race } }
                         }
                     })
+                // A sure way on, whatever the calendar shows (the month and year
+                // wheels, large text).
+                Button("Next: race day") { withAnimation { editingDate = .race } }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
             dateRow("Race day", date: raceDate, field: .race)
             if editingDate == .race {

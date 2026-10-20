@@ -46,12 +46,18 @@ extension CompletedRun {
         var kept: [CompletedRun] = []
         for run in real {
             let end = run.date.addingTimeInterval(run.durationSeconds)
-            let overlaps = kept.contains { k in
+            let overlap = kept.firstIndex { k in
                 let kEnd = k.date.addingTimeInterval(k.durationSeconds)
                 let shared = min(end, kEnd).timeIntervalSince(max(run.date, k.date))
                 return shared > 0.5 * min(run.durationSeconds, k.durationSeconds)
             }
-            if !overlaps { kept.append(run) }
+            if let i = overlap {
+                // The watch's heart rate stays with the run when the iPhone's GPS
+                // recording is the one that counts.
+                if kept[i].averageHeartRate == nil { kept[i].averageHeartRate = run.averageHeartRate }
+            } else {
+                kept.append(run)
+            }
         }
         return kept.sorted { $0.date < $1.date }
     }

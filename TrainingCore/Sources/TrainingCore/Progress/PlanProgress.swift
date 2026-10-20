@@ -78,8 +78,10 @@ public struct PlanProgress: Sendable, Equatable {
     ) -> PlanProgress {
         let engine = AdaptationEngine()
         let asOfDay = calendar.startOfDay(for: asOf)
-        // Progress counts up to race day; the recovery after it isn't part of the build.
-        let workouts = plan.weeksToRace.flatMap(\.workouts)
+        // Progress counts up to race day; the recovery after it isn't part of the build
+        // (a mid-week race has recovery days in its own week, so by date, not phase).
+        let raceDay = calendar.startOfDay(for: plan.goal.raceDate)
+        let workouts = plan.allWorkouts.filter { calendar.startOfDay(for: $0.date) <= raceDay }
 
         let daysUntil = max(0, calendar.dateComponents([.day], from: asOfDay,
             to: calendar.startOfDay(for: plan.goal.raceDate)).day ?? 0)
@@ -91,7 +93,7 @@ public struct PlanProgress: Sendable, Equatable {
             ?? plan.weeks.first.map { calendar.startOfDay(for: $0.startDate) } ?? asOfDay
         let runsInPlan = completedRuns.filter {
             let day = calendar.startOfDay(for: $0.date)
-            return day >= planStart && day <= asOfDay
+            return day >= planStart && day <= min(asOfDay, raceDay)
         }
         let completedDistance = runsInPlan.reduce(0) { $0 + $1.distanceMeters }
 

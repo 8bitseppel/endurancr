@@ -82,7 +82,7 @@ struct RunHistoryView: View {
             }
             .font(.caption).foregroundStyle(.secondary)
             if !counted.contains(Self.key(run(workout))) {
-                Text("Recorded at the same time as a longer run, so it counts once")
+                Text("Recorded at the same time as another recording, so the run counts once")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

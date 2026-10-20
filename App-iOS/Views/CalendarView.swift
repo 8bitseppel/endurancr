@@ -196,6 +196,7 @@ struct CalendarView: View {
         .frame(maxWidth: .infinity)
         .background(.background)
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 
     private func isCurrent(_ week: TrainingWeek) -> Bool {
@@ -339,13 +340,17 @@ private struct DayCard: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     if let tag {
-                        Label(tag.text, systemImage: tag.symbol)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(tag.tint)
+                        // The colour on the icon, the words in a readable colour.
+                        Label {
+                            Text(tag.text).foregroundStyle(.secondary)
+                        } icon: {
+                            Image(systemName: tag.symbol).foregroundStyle(tag.tint)
+                        }
+                        .font(.caption2.weight(.semibold))
                     }
                     Text(title)
                         .font(looksRest ? .subheadline : .body.weight(.medium))
-                        .foregroundStyle(looksRest ? .secondary : .primary)
+                        .foregroundStyle(looksRest || (isPast && !isDone) ? .secondary : .primary)
                         .strikethrough(isMissed)
                         .lineLimit(2)
                     if isExtra, let effort = extraEffortText {
@@ -367,12 +372,15 @@ private struct DayCard: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if let ran = ranText {
-                        Label(ran.text, systemImage: ran.symbol)
-                            .font(.caption)
-                            .foregroundStyle(ran.tint)
+                        Label {
+                            Text(ran.text).foregroundStyle(.secondary)
+                        } icon: {
+                            Image(systemName: ran.symbol).foregroundStyle(ran.tint)
+                        }
+                        .font(.caption)
                     } else if !isRest, let pace = workout.targetPaceSecPerKm {
                         if let was = review?.originalPace {
-                            (Text(Format.paceRange(pace)) + Text(", was \(Format.paceRange(was))").foregroundStyle(.tint))
+                            Text("\(Format.paceRange(pace))\(Text(", was \(Format.paceRange(was))").foregroundStyle(.tint))")
                                 .font(.caption).foregroundStyle(.secondary)
                         } else {
                             Text(Format.paceRange(pace))
@@ -435,9 +443,9 @@ private struct DayCard: View {
                     .strokeBorder(Color.accentColor.opacity(0.5), lineWidth: 1)
             }
         }
-        // Days behind you step back: a run done a little, a missed one (struck
-        // through) the most.
-        .opacity(!isPast ? 1 : isDone ? 0.9 : isMissed ? 0.5 : 0.65)
+        // Days behind you step back a little, except runs done; a missed one's title
+        // is struck through, and its status line stays readable.
+        .opacity(!isPast || isDone ? 1 : 0.8)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
         .accessibilityHint(isPast ? "In the past" : "")
@@ -448,15 +456,7 @@ private struct DayCard: View {
         return isRest && !workout.notes.isEmpty ? workout.notes : Format.workoutTitle(workout.type)
     }
 
-    /// How an extra run was run, from its pace: easy is just what a rest day can take.
-    private var extraEffortText: String? {
-        switch review?.effort {
-        case .easy?: "Easy pace, good for your base"
-        case .marathonPace?: "Steady pace, close to marathon pace"
-        case .threshold?, .interval?, .repetitionSpeed?: "A hard run on a rest day: keep the next easy days easy"
-        default: nil
-        }
-    }
+    private var extraEffortText: String? { review.flatMap { Format.extraRunEffort($0.effort) } }
 
     /// A short tag above the title: a change, or a milestone.
     private var tag: (text: String, symbol: String, tint: Color)? {
@@ -503,7 +503,7 @@ private struct DayCard: View {
         if isExtra, let extraEffortText { parts.append(extraEffortText) }
         if !isRest, let summary = Format.sessionSummary(workout) { parts.append(summary) }
         if let wasText { parts.append(wasText) }
-        if showsNoteInline { parts.append(workout.notes) }
+        if showsNoteInline { parts.append(PlanReview.reason(of: workout.notes)) }
         if !isPast, let was = review?.originalPace { parts.append("pace was \(Format.paceRange(was))") }
         if let ranText { parts.append(ranText.text) }
         return parts.joined(separator: ", ")
@@ -598,8 +598,8 @@ private struct RaceCard: View {
                 LabeledContent("Your target", value: GoalOutlook.format(target))
                     .font(.subheadline)
             }
-            Text(VDOTPlanGenerator.raceDayAdvice(for: goal.race, expectedSeconds: (outlook.raceDay.lowerBound + outlook.raceDay.upperBound) / 2)
-                    .replacingOccurrences(of: "Race day. ", with: ""))
+            Text(VDOTPlanGenerator.raceDayAdvice(for: goal.race, expectedSeconds: (outlook.raceDay.lowerBound + outlook.raceDay.upperBound) / 2,
+                                                 withHeading: false))
                 .font(.footnote).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Text("More in Progress.")

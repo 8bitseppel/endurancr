@@ -13,6 +13,9 @@ struct PaceCalculatorView: View {
     @State private var goal: RaceDistance = .marathon
     @State private var raceDate = Calendar.current.date(byAdding: .weekOfYear, value: 24, to: .now) ?? .now
     @State private var showsAppOverlay = false
+    /// The overlay comes up on its own once; after that only from the button.
+    @State private var hasOfferedApp = false
+    @ScaledMetric(relativeTo: .largeTitle) private var vdotSize: CGFloat = 76
 
     private static let distances: [RaceDistance] = [.fiveK, .tenK, .halfMarathon, .marathon]
 
@@ -39,7 +42,9 @@ struct PaceCalculatorView: View {
     }
 
     var body: some View {
-        ZStack {
+        // Worked out once per change of the inputs, not for every use below.
+        let plan = self.plan
+        return ZStack {
             BrandBackground()
             ScrollViewReader { proxy in
                 ScrollView {
@@ -106,9 +111,9 @@ struct PaceCalculatorView: View {
             }
             .pickerStyle(.segmented)
             HStack(spacing: 0) {
-                wheel($hours, range: 0..<6, unit: "h")
-                wheel($minutes, range: 0..<60, unit: "min")
-                wheel($seconds, range: 0..<60, unit: "s")
+                wheel($hours, range: 0..<6, unit: "h", label: "Hours")
+                wheel($minutes, range: 0..<60, unit: "min", label: "Minutes")
+                wheel($seconds, range: 0..<60, unit: "s", label: "Seconds")
             }
             .frame(height: 110)
             .accessibilityElement(children: .contain)
@@ -139,7 +144,7 @@ struct PaceCalculatorView: View {
             VStack(spacing: 4) {
                 Text("Your VDOT").font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.7))
                 Text(plan.vdot, format: .number.precision(.fractionLength(1)))
-                    .font(.system(size: 76, weight: .bold, design: .rounded))
+                    .font(.system(size: vdotSize, weight: .bold, design: .rounded))
                     .contentTransition(.numericText(value: plan.vdot))
                     .monospacedDigit()
                 if plan.enduranceHoldback > 0 {
@@ -178,7 +183,10 @@ struct PaceCalculatorView: View {
             .controlSize(.large)
             // Offer the app once you've read down to here, not over the results.
             .onScrollVisibilityChange(threshold: 0.8) { visible in
-                if visible, !Self.isScreenshot { showsAppOverlay = true }
+                if visible, !hasOfferedApp, !Self.isScreenshot {
+                    hasOfferedApp = true
+                    showsAppOverlay = true
+                }
             }
         }
         .foregroundStyle(.white)
@@ -268,8 +276,8 @@ struct PaceCalculatorView: View {
             .padding(.bottom, 80)   // room for the App Store overlay
     }
 
-    private func wheel(_ value: Binding<Int>, range: Range<Int>, unit: String) -> some View {
-        Picker(unit, selection: value) {
+    private func wheel(_ value: Binding<Int>, range: Range<Int>, unit: String, label: String) -> some View {
+        Picker(label, selection: value) {
             ForEach(range, id: \.self) { Text("\($0) \(unit)").tag($0) }
         }
         .pickerStyle(.wheel)

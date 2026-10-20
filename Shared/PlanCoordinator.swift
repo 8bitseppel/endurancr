@@ -26,12 +26,17 @@ final class PlanCoordinator {
     /// Every change is pushed to the watch, so a swap, a vacation or a fresh
     /// adaptation shows there too.
     private(set) var currentPlan: TrainingPlan? {
-        didSet { if !isLoading { syncToWatch() } }
+        didSet {
+            recomputeDerived()
+            if !isLoading { syncToWatch() }
+        }
     }
     /// Set while loading the stored inputs at launch: that plan isn't adapted yet,
     /// so it isn't pushed to the watch (which keeps the last adapted one).
     private var isLoading = false
-    private(set) var recentRuns: [CompletedRun] = []
+    private(set) var recentRuns: [CompletedRun] = [] {
+        didSet { recomputeDerived() }
+    }
     private(set) var restingHeartRates: [RestingHeartRateSample] = []
     private(set) var fatigue: FatigueAssessment?
     /// How training is going and what the plan does about it (`TrainingBuddy`).
@@ -72,11 +77,26 @@ final class PlanCoordinator {
 
     /// The plan as the user should see it: canonical schedule with the goal's
     /// unavailable periods blanked out from today forward.
-    var displayPlan: TrainingPlan? {
-        guard let plan = currentPlan else { return nil }
-        return adaptation.applyingUnavailability(
+    private(set) var displayPlan: TrainingPlan?
+    /// What the Plan tab shows on each day and week: what was run, what changed
+    /// from the plan built from the goal, and what each week is for.
+    private(set) var review: PlanReview?
+    private(set) var progress: PlanProgress?
+
+    /// Works out what the screens show once, when the plan or the runs change, not on
+    /// every redraw (a drag on the Plan tab redraws it many times a second).
+    private func recomputeDerived() {
+        guard let plan = currentPlan else {
+            displayPlan = nil; review = nil; progress = nil; goalSaved = false
+            return
+        }
+        goalSaved = UserDefaults.standard.bool(forKey: Self.savedKey(plan.goal))
+        let shown = adaptation.applyingUnavailability(
             plan: plan, periods: plan.goal.unavailablePeriods, asOf: .now, calendar: .current
         )
+        displayPlan = shown
+        review = PlanReview.make(plan: shown, original: regeneratedBasePlan(), completedRuns: recentRuns, asOf: .now, calendar: .current)
+        progress = PlanProgress.make(plan: shown, completedRuns: recentRuns, asOf: .now, calendar: .current)
     }
 
     /// The workout scheduled for `date` (defaults to today), if any.
@@ -84,7 +104,6 @@ final class PlanCoordinator {
         displayPlan?.allWorkouts.first { calendar.isDate($0.date, inSameDayAs: date) }
     }
 
-    /// A fresh progress snapshot for the dashboard.
     /// The honest look at the goal: finish-time ranges and how likely the target is.
     var outlook: GoalOutlook? {
         guard let plan = currentPlan, let buddy,
@@ -103,18 +122,6 @@ final class PlanCoordinator {
         pacing = nil
         try update(goal: goal, fitness: inputs.fitness)
         await refreshAdaptation()
-    }
-
-    /// What the Plan tab shows on each day and week: what was run, what changed
-    /// from the plan built from the goal, and what each week is for.
-    var review: PlanReview? {
-        guard let plan = displayPlan else { return nil }
-        return PlanReview.make(plan: plan, original: regeneratedBasePlan(), completedRuns: recentRuns, asOf: .now, calendar: .current)
-    }
-
-    var progress: PlanProgress? {
-        guard let plan = displayPlan else { return nil }
-        return PlanProgress.make(plan: plan, completedRuns: recentRuns, asOf: .now, calendar: .current)
     }
 
     /// Generates a fresh plan and replaces any existing one. Running days per week
@@ -256,12 +263,32 @@ final class PlanCoordinator {
     /// reached, weeks trained, distance run, workouts done) into a permanent local
     /// record, then clears the active plan so a new goal can be set. The achievement
     /// survives independently of the plan. No-op when there's nothing to complete.
+    /// Saves the goal as achieved. While recovery days are still to come the plan
+    /// stays, so they still show on Today and the watch; after that it's removed.
     func completeCurrentGoal() {
         guard let plan = currentPlan, let progress else { return }
         let achievement = GoalAchievement.make(plan: plan, progress: progress)
         context.insert(AchievedGoal(achievement: achievement))
         try? context.save()
-        deletePlan()
+        if let end = recoveryEnd, Calendar.current.startOfDay(for: end) > Calendar.current.startOfDay(for: .now) {
+            UserDefaults.standard.set(true, forKey: Self.savedKey(plan.goal))
+            goalSaved = true
+        } else {
+            deletePlan()
+        }
+    }
+
+    /// The last day of the recovery after the race, if the plan has one.
+    var recoveryEnd: Date? {
+        guard let plan = currentPlan else { return nil }
+        return plan.allWorkouts.map(\.date).max().flatMap { $0 > plan.goal.raceDate ? $0 : nil }
+    }
+
+    /// True once this goal is saved as achieved while its recovery days run on.
+    private(set) var goalSaved = false
+
+    private static func savedKey(_ goal: Goal) -> String {
+        "goalSaved-\(Int(goal.raceDate.timeIntervalSince1970))-\(goal.race.meters)"
     }
 
     /// Pulls recent runs and resting HR from HealthKit, regenerates the plan from

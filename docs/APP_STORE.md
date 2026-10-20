@@ -253,12 +253,12 @@ A Plan tab worth opening
 - Your 32 km runs and the start of the taper are marked, and the plan ends with your race and its outlook.
 
 Sessions from the training books
-- Marathon-pace runs: every other build week, and the last part of the peak long runs at marathon pace, as in Daniels, Pfitzinger, the Hansons and Hal Higdon.
+- Marathon-pace runs: every other build week, and the last part of the peak long runs at marathon pace, as in Jack Tupper Daniels, Pete Pfitzinger, the Hansons and Hal Higdon.
 - Strides: once or twice a week, an easy run ends with 6 × 20 s quick and light.
-- A tune-up race: a 10 km 6 weeks before the marathon. Run it all out and your paces follow the result.
+- A tune-up race: a 10 km 6 weeks before the marathon (in plans of 14 weeks or more), 5 weeks before a half. Run it all out and your paces follow the result.
 - Never more than two harder sessions a week, each within Jack Tupper Daniels' limits.
 - Race day tells you how to pace it and how much to eat and drink on the way.
-- After the race: rest, then short easy runs, an easy day for every 3 km you raced.
+- After the race: rest, then short easy runs, an easy day for every 3 km you raced. Saving your goal as achieved keeps them in your plan.
 
 Try it without installing
 - An App Clip: enter one recent race and your goal, and see your VDOT, your five training paces, a race-day range and the plan endurancr would build. Open it from endurancr.app/clip.
@@ -272,6 +272,42 @@ Also
 - The keyboard closes when you open a date in the goal form, and tapping today as the start date moves on to race day.
 - Race-week rest days show a rest icon instead of the vacation one.
 - The "Skip Christmas & New Year" switch is gone. To keep a day free, drag its run to another day in the calendar.
+
+### Description (4000)
+
+endurancr builds a running plan around one goal, records your runs on Apple Watch or iPhone, and adapts the plan to what you really ran, like a running buddy who isn't pushy. No account, no feed, no ads.
+
+SET ONE GOAL
+Pick a race, from 5K to the marathon, and its date. endurancr builds a full plan with the VDOT method from Jack Tupper Daniels, paced to the fitness you have now. It uses a recent run from Apple Health, or a race result you type in. A short race shows your speed, not your endurance, so marathon pace starts a little easier until your long runs prove it.
+
+TRAINING FROM THE BOOKS
+Easy runs, threshold runs, intervals and marathon-pace runs, never more than two hard sessions a week. Strides keep your legs quick. Long runs build to 32 km for the marathon. A tune-up race six weeks out sets your paces. Race day tells you how to pace it and what to eat and drink, and after the race the plan brings you back with rest and easy runs. Based on Jack Tupper Daniels, Pete Pfitzinger, the Hansons and Hal Higdon.
+
+A PLAN THAT FOLLOWS YOU
+Every run counts, even one on a rest day. Missed kilometres are never piled onto the days after. Ran less than planned? The coming weeks build from what you actually ran, at most 10% more each week. Back from a break? Your paces ease a little and you start with easy runs. Strong runs nudge your paces up a little at a time. Drag days to swap them when life gets in the way.
+
+THE WHOLE PLAN
+See what you ran on each day, what you missed, what changed and why, your new paces next to the old ones, and what each week is for, all the way to race day.
+
+AN HONEST OUTLOOK
+Progress shows a finish-time range for today and for race day, and tells you whether your target is on track, within reach, a stretch or unlikely, and why. If it's out of reach, it suggests a realistic time. It only changes your target if you tap it.
+
+RUN ON YOUR WRIST OR YOUR PHONE
+Start today's run on Apple Watch with heart rate, or on iPhone with GPS. The run screens show time, distance, your pace and the target pace. The watch's own Auto-Pause holds your run at a traffic light, and a run on the watch shows on your iPhone's Lock Screen, where you can pause and finish it. Every run is saved to Apple Health.
+
+TRY IT WITHOUT INSTALLING
+The endurancr App Clip works out your training paces from one recent race, right in Safari or from a link.
+
+NOTHING HIDDEN
+How it works explains every rule the plan follows, in plain words, with the books and studies behind it. endurancr is open source, so you can read every line that touches your data.
+
+PRIVATE BY DESIGN
+No account, no server, no analytics, no ads, no tracking. Your plan stays on your device, and your runs live in Apple Health.
+
+FREE
+No subscription and no in-app purchases.
+
+endurancr is a training aid, not medical advice. Talk to a doctor before you start a new training plan.
 
 ### App Clip (new in 1.2.0)
 
@@ -305,6 +341,6 @@ there. Re-record with `./scripts/app-preview.sh` after `./scripts/screenshots.sh
 
 ### Screenshots
 
-The iPhone Plan screenshot (`iphone-7-plan.png`) now shows what was run, the changed
+The iPhone Plan screenshots (`iphone-3-plan.png`, and the new `iphone-4-week.png` with last week) show what was run, the changed
 days and the overview. Re-take with `./scripts/screenshots.sh`, then
 `./scripts/publish-screenshots.sh`; everything in `screenshots/appstore/` is current.

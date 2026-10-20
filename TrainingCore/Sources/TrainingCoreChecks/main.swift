@@ -747,6 +747,9 @@ h.suite("A run on the start day, before the first scheduled run") {
     h.check(runs.count == 1 && runs[0].distanceMeters == 8_300, "the empty recordings don't count")
     h.check(CompletedRun.cleaned([raw[0], CompletedRun(date: evening.addingTimeInterval(20), distanceMeters: 8_100, durationSeconds: 54 * 60)]).count == 1,
             "a run recorded on the watch and the iPhone counts once")
+    let phone = CompletedRun(date: evening, distanceMeters: 8_400, durationSeconds: 55 * 60)
+    let watch = CompletedRun(date: evening, distanceMeters: 8_200, durationSeconds: 55 * 60, averageHeartRate: 150)
+    h.check(CompletedRun.cleaned([phone, watch]).first?.averageHeartRate == 150, "and keeps the watch's heart rate")
     let firstRun = plan.allWorkouts.first { $0.type.isRunning }!
     h.check(cal.component(.weekday, from: firstRun.date) == 4, "the first scheduled run is Wednesday")
 
@@ -774,6 +777,56 @@ h.suite("A run on the start day, before the first scheduled run") {
     dict.removeValue(forKey: "startDate")
     let old = try JSONDecoder().decode(TrainingPlan.self, from: JSONSerialization.data(withJSONObject: dict))
     h.check(old.startDate == nil && old.trainingStart(calendar: cal) == cal.startOfDay(for: firstRun.date), "older plans fall back to the first run")
+}
+
+h.suite("Review fixes: tune-up, marathon pace, recovery") {
+    let fitness = FitnessSnapshot(distanceMeters: 12_200, timeSeconds: 68 * 60 + 19, date: date(2026, 10, 3))
+    let gen = VDOTPlanGenerator(), engine = AdaptationEngine()
+    // 16-week marathon at 4 days, holding at the tune-up week: the race keeps 10 km.
+    let m = try gen.makePlan(goal: Goal(race: .marathon, raceDate: date(2027, 4, 25), daysPerWeek: 4),
+                             fitness: fitness, startDate: date(2027, 1, 4), calendar: cal)
+    if let trial = m.allWorkouts.first(where: { $0.type == .timeTrial }) {
+        let monday = VDOTPlanGenerator.startOfWeek(trial.date, calendar: cal)
+        let runs = m.allWorkouts.filter { $0.type.isRunning && $0.date < monday }
+            .map { CompletedRun(date: $0.date, distanceMeters: $0.distanceMeters * 0.8, durationSeconds: $0.distanceMeters * 0.8 / 1_000 * 420) }
+        let a = engine.adapt(plan: m, completedRuns: runs, asOf: monday, calendar: cal)
+        let t = a.allWorkouts.first { cal.isDate($0.date, inSameDayAs: trial.date) }!
+        h.check(t.type == .easy || (t.type == .timeTrial && t.structure?.workMeters == 10_000 && t.notes.hasPrefix("Tune-up")),
+                "a held-back tune-up keeps its 10 km race, or becomes an easy run (\(t.type) \(Int(t.structure?.workMeters ?? 0)))")
+    } else { h.check(false, "the 16-week plan has a tune-up") }
+    // 10 km plans of 8 to 10 weeks: the tune-up never longer than the long run, never in a cutback week.
+    for weeks in 8...10 {
+        for dpw in 3...6 {
+            let race = date(2027, 4, 25)
+            let p = try gen.makePlan(goal: Goal(race: .tenK, raceDate: race, daysPerWeek: dpw), fitness: fitness,
+                                     startDate: cal.date(byAdding: .day, value: -7 * weeks, to: race)!, calendar: cal)
+            for w in p.weeksToRace where w.workouts.contains(where: { $0.type == .timeTrial }) {
+                let trial = w.workouts.first { $0.type == .timeTrial }!.distanceMeters
+                let long = w.workouts.filter { $0.type == .longRun }.map(\.distanceMeters).max() ?? 0
+                h.check(trial <= long + 1, "10 km plan, \(weeks) weeks, \(dpw) days: tune-up \(Int(trial)) m within the long run \(Int(long)) m")
+            }
+        }
+    }
+    // Recovery: no more runs a week than the days per week.
+    let three = try gen.makePlan(goal: Goal(race: .marathon, raceDate: date(2027, 4, 25), daysPerWeek: 3), fitness: fitness,
+                                 startDate: date(2026, 10, 5), calendar: cal)
+    h.check(three.weeks.filter { $0.phase == .recovery }.allSatisfy { $0.workouts.filter(\.type.isRunning).count <= 3 },
+            "3 days a week: at most 3 recovery runs a week")
+    // Easing back after a break drops marathon-pace finishes from long runs.
+    let full = try gen.makePlan(goal: Goal(race: .marathon, raceDate: date(2027, 4, 25), daysPerWeek: 5), fitness: fitness,
+                                startDate: date(2026, 10, 5), calendar: cal)
+    if let mpLong = full.allWorkouts.first(where: { $0.type == .longRun && $0.structure?.workType == .marathonPace }) {
+        let back = cal.date(byAdding: .day, value: -6, to: mpLong.date)!
+        let before = full.allWorkouts.filter { $0.type.isRunning && $0.date < cal.date(byAdding: .day, value: -25, to: back)! }
+            .map { CompletedRun(date: $0.date, distanceMeters: $0.distanceMeters, durationSeconds: $0.distanceMeters / 1_000 * 400) }
+        let a = engine.adaptWithStatus(plan: full, completedRuns: before, asOf: back, calendar: cal)
+        let long = a.plan.allWorkouts.first { cal.isDate($0.date, inSameDayAs: mpLong.date) }!
+        h.check(!a.buddy.isEasingBack || long.structure == nil, "easing back, the long run has no marathon-pace finish")
+    }
+    // The watch sees the plan's own notes as standard, the adaptation's as reasons.
+    h.check(VDOTPlanGenerator.isStandardNote("Long run, easy and conversational. Practise your race-day drinks and gels on it.")
+            && VDOTPlanGenerator.isStandardNote(VDOTPlanGenerator.stridesNote)
+            && !VDOTPlanGenerator.isStandardNote("Shorter, the week's distance is nearly done"), "standard notes are told apart from changes")
 }
 
 h.suite("Target time: race-day pace, not training paces") {

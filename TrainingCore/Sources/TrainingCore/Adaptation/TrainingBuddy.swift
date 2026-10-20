@@ -389,6 +389,7 @@ public struct TrainingBuddy: Sendable {
         guard remaining > 0 else { return }
         let factor = max(0, cap - done) / remaining
         guard factor < 0.97 else { return }
+        let easyPace = week.workouts.compactMap { $0.type == .easy ? $0.targetPaceSecPerKm : nil }.first
         for i in future {
             let scaled = (week.workouts[i].distanceMeters * factor / 100).rounded() * 100
             if scaled < 2_000 {
@@ -398,9 +399,7 @@ public struct TrainingBuddy: Sendable {
                 week.workouts[i].structure = nil
                 week.workouts[i].notes = "Rest, an easier week"
             } else {
-                week.workouts[i].distanceMeters = scaled
-                week.workouts[i].structure = week.workouts[i].structure.map { Self.scaled($0, to: scaled) }
-                week.workouts[i].notes = VDOTPlanGenerator.note(note, keepingStridesOf: week.workouts[i].notes)
+                Self.shorten(&week.workouts[i], to: scaled, note: note, easyPace: easyPace)
             }
         }
     }
@@ -422,6 +421,12 @@ public struct TrainingBuddy: Sendable {
             for i in plan.weeks[w].workouts.indices {
                 let workout = plan.weeks[w].workouts[i]
                 let d = calendar.startOfDay(for: workout.date)
+                // Easy only: a long run's marathon-pace finish goes too.
+                if !onlyFirst, workout.type == .longRun, workout.structure?.workType == .marathonPace, d >= today, d < end {
+                    plan.weeks[w].workouts[i].structure = nil
+                    plan.weeks[w].workouts[i].notes = note
+                    continue
+                }
                 guard AdaptationEngine.qualityTypes.contains(workout.type), d >= today, d < end else { continue }
                 plan.weeks[w].workouts[i].type = .easy
                 plan.weeks[w].workouts[i].targetPaceSecPerKm = (easy * 0.97)...(easy * 1.03)
@@ -490,16 +495,53 @@ public struct TrainingBuddy: Sendable {
                   !off.contains(where: { $0.contains(d, calendar: calendar) }) else { continue }
             let cap = (longest * 1.10 / 100).rounded(.down) * 100
             if workout.distanceMeters > cap {
-                plan.weeks[w].workouts[i].distanceMeters = cap
-                plan.weeks[w].workouts[i].structure = workout.structure.map { Self.scaled($0, to: cap) }
-                plan.weeks[w].workouts[i].notes = VDOTPlanGenerator.note(
-                    "\(Self.km(cap)) for now, a step past your longest recent run", keepingStridesOf: workout.notes)
+                let easy = plan.paceZones.easySecPerKm
+                Self.shorten(&plan.weeks[w].workouts[i], to: cap,
+                             note: "\(Self.km(cap)) for now, a step past your longest recent run",
+                             easyPace: (easy * 0.97)...(easy * 1.03))
             }
             longest = max(longest, plan.weeks[w].workouts[i].distanceMeters)
         }
     }
 
     // MARK: Helpers
+
+    /// Shortens a run the buddy holds back, keeping what it's for:
+    /// - A tune-up race keeps its race distance and gives up warm-up and cool-down
+    ///   first (down to 1 km each); too short for that, it becomes an easy run.
+    /// - A long run with a marathon-pace finish is run easy when it's held back.
+    /// - Other structured runs scale their parts, a marathon-pace block in whole
+    ///   half kilometres.
+    /// Strides stay on the run (`VDOTPlanGenerator.note(_:keepingStridesOf:)`).
+    static func shorten(_ w: inout PlannedWorkout, to meters: Double, note: String, easyPace: ClosedRange<Double>?) {
+        let oldNotes = w.notes
+        w.distanceMeters = meters
+        if w.type == .timeTrial, var s = w.structure {
+            if meters >= s.workMeters + 2_000 {
+                let extra = meters - s.workMeters
+                s.warmupMeters = (extra * 0.55 / 100).rounded() * 100
+                s.cooldownMeters = extra - s.warmupMeters
+                w.structure = s
+                return   // still the tune-up, its note stays
+            }
+            w.type = .easy
+            w.structure = nil
+            w.targetPaceSecPerKm = easyPace ?? w.targetPaceSecPerKm
+            w.notes = "Easy for now, instead of the tune-up race"
+            return
+        }
+        if w.type == .longRun, w.structure?.workType == .marathonPace {
+            w.structure = nil
+        } else if var s = w.structure.map({ scaled($0, to: meters) }) {
+            if s.workType == .marathonPace, s.reps == 1 {
+                let block = max(500, (s.workMeters / 500).rounded(.down) * 500)
+                s.warmupMeters += s.workMeters - block
+                s.workMeters = block
+            }
+            w.structure = s
+        }
+        w.notes = VDOTPlanGenerator.note(note, keepingStridesOf: oldNotes)
+    }
 
     /// Kilometres run over kilometres planned for the last 14 days (fewer at the
     /// start of the plan), leaving out days blanked as time off. Nil until there are

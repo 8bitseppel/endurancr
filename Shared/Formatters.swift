@@ -93,6 +93,17 @@ enum Format {
         }
     }
 
+    /// How an extra run on a rest day went, from its effort (`PlanReview.effort`).
+    /// Shared by Today and the Plan tab.
+    static func extraRunEffort(_ effort: WorkoutType?) -> String? {
+        switch effort {
+        case .easy?: "Easy pace, good for your base"
+        case .marathonPace?: "Steady pace, close to marathon pace"
+        case .threshold?, .interval?, .repetitionSpeed?, .timeTrial?: "A hard run on a rest day: keep the next easy days easy"
+        default: nil
+        }
+    }
+
     static func workoutTitle(_ type: WorkoutType) -> String {
         switch type {
         case .rest: return "Rest"

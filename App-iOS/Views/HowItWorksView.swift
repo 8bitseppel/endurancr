@@ -66,7 +66,7 @@ struct HowItWorksView: View {
                 topic(
                     "A tune-up race",
                     icon: "flag.2.crossed",
-                    detail: "Daniels moves your paces up only when a race shows you're ready, and Pfitzinger puts tune-up races in the weeks before a marathon, the first one 6 weeks out. So the plan has one: a 10 km 6 weeks before race week for the marathon, 5 weeks before for the half, and a 5 km 4 weeks before a 10 km, in plans long enough for it. Run it all out, in a local race or on your own, with 2 km easy before and 1.5 km after. That week is about 10% lighter, with no other harder session. Your result counts in full: if it shows a higher VDOT, your paces follow it right away. Any other fast run counts by half, since it may not have been all out. Skipping the tune-up changes nothing."
+                    detail: "Daniels moves your paces up only when a race shows you're ready, and Pfitzinger puts tune-up races in the weeks before a marathon, the first one 6 weeks out. So the plan has one: a 10 km 6 weeks before race week for the marathon, 5 weeks before for the half, and a 5 km 5 weeks before a 10 km, in plans long enough for it and never in an easier cutback week. Run it all out, in a local race or on your own, with 2 km easy before and 1.5 km after. That week is lighter, with no other harder session, and its easy runs are shorter. Your result counts in full: if it shows a higher VDOT, your paces follow it right away. Any other fast run counts by half, since it may not have been all out. Skipping the tune-up changes nothing."
                 )
 
                 topic(

@@ -87,7 +87,7 @@ public struct GoalAchievement: Sendable, Equatable, Codable, Identifiable {
             weeksTrained: plan.weeksToRace.count,
             totalDistanceMeters: progress.completedDistanceMeters,
             workoutsCompleted: progress.workoutsCompleted,
-            workoutsPlanned: plan.allWorkouts.filter(\.type.isRunning).count
+            workoutsPlanned: plan.allWorkouts.filter { $0.type.isRunning && $0.date <= plan.goal.raceDate.addingTimeInterval(86_399) }.count
         )
     }
 }
