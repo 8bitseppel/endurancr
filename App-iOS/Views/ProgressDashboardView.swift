@@ -16,10 +16,13 @@ struct ProgressDashboardView: View {
     @State private var recorder = PhoneWorkoutManager.shared
     @State private var showLiveRun = false
     @State private var showCompleteConfirm = false
+    /// The sections whose "How it's worked out" is open.
+    @State private var openExplanations: Set<String> = []
 
     var body: some View {
         NavigationStack {
             List {
+                Group {
                 if let plan = coordinator.displayPlan, let progress = coordinator.progress {
                     countdownSection(plan: plan, progress: progress)
                     goalReachedSection(plan: plan)
@@ -55,7 +58,11 @@ struct ProgressDashboardView: View {
                         }
                     }
                 }
+                }
+                .listRowBackground(Brand.rowFill)
             }
+            .scrollContentBackground(.hidden)
+            .background { BrandBackground() }
             .navigationTitle("Progress")
             .demoAutoScroll()
             .refreshable { await coordinator.refreshAdaptation() }
@@ -179,7 +186,8 @@ struct ProgressDashboardView: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(progress.daysUntilRace)")
-                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                        .font(.system(size: 56, weight: .bold, design: .rounded))
+                        .monospacedDigit()
                         .contentTransition(.numericText())
                     Text("days to \(plan.goal.displayName)")
                         .font(.subheadline).foregroundStyle(.secondary)
@@ -251,7 +259,7 @@ struct ProgressDashboardView: View {
             } header: {
                 Text("\(plan.goal.race.displayName) outlook")
             } footer: {
-                Text("An estimate from your training, not a guarantee. A range, because predictions are never exact: for the marathon, about half of recreational runners finish 10 minutes or more slower than a formula from a shorter race says (Vickers & Vertosick 2016). Race day assumes training goes on like the last two weeks.")
+                explanation("outlook", "An estimate from your training, not a guarantee. A range, because predictions are never exact: for the marathon, about half of recreational runners finish 10 minutes or more slower than a formula from a shorter race says (Vickers & Vertosick 2016). Race day assumes training goes on like the last two weeks.")
             }
             .confirmationDialog(
                 "Change your target time?",
@@ -454,7 +462,7 @@ struct ProgressDashboardView: View {
         } header: {
             Text("Fitness")
         } footer: {
-            Text(fitnessFooter(plan))
+            explanation("fitness", fitnessFooter(plan))
         }
     }
 
@@ -489,7 +497,7 @@ struct ProgressDashboardView: View {
         } header: {
             Text("Weekly volume")
         } footer: {
-            Text("Each week's total km sets the run lengths. It starts around half your peak and rises ≤8% per week, with an easier cutback every 4th week and two taper weeks before race day. Peak volume scales with race distance (about \(peakVolumeText(plan)) here). Inside a week, the long run is the single longest run, a set share of the week's total, capped at \(Format.distance(VDOTPlanGenerator.longRunCap(for: plan.goal.race))) for a \(plan.goal.race.displayName), and the remaining km are split evenly across your other running days as easy/quality sessions.")
+            explanation("volume", "Each week's total km sets the run lengths. It starts around half your peak and rises ≤8% per week, with an easier cutback every 4th week and two taper weeks before race day. Peak volume scales with race distance (about \(peakVolumeText(plan)) here). Inside a week, the long run is the single longest run, a set share of the week's total, capped at \(Format.distance(VDOTPlanGenerator.longRunCap(for: plan.goal.race))) for a \(plan.goal.race.displayName), and the remaining km are split evenly across your other running days as easy/quality sessions.")
         }
     }
 
@@ -508,16 +516,65 @@ struct ProgressDashboardView: View {
     // MARK: Paces
 
     private func pacesSection(_ plan: TrainingPlan) -> some View {
-        Section {
-            LabeledContent("Easy", value: Format.pace(plan.paceZones.easySecPerKm))
-            LabeledContent("Marathon", value: Format.pace(plan.paceZones.marathonSecPerKm))
-            LabeledContent("Threshold", value: Format.pace(plan.paceZones.thresholdSecPerKm))
-            LabeledContent("Interval", value: Format.pace(plan.paceZones.intervalSecPerKm))
-            LabeledContent("Repetition", value: Format.pace(plan.paceZones.repetitionSecPerKm))
+        let zones = plan.paceZones
+        return Section {
+            // The calculator's tiles: each pace in its run's colour.
+            Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                GridRow {
+                    paceTile("Easy", zones.easySecPerKm, .easy)
+                    paceTile("Marathon", zones.marathonSecPerKm, .marathonPace)
+                }
+                GridRow {
+                    paceTile("Threshold", zones.thresholdSecPerKm, .threshold)
+                    paceTile("Interval", zones.intervalSecPerKm, .interval)
+                }
+                GridRow {
+                    paceTile("Repetition", zones.repetitionSecPerKm, .repetitionSpeed)
+                    Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
+                }
+            }
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets())
         } header: {
             Text("Paces (min/km)")
         } footer: {
-            Text("All five paces come from your VDOT (\(String(format: "%.1f", plan.vdot))\(plan.enduranceHoldback > 0 ? "; marathon pace from \(String(format: "%.1f", plan.raceVDOT)) until your long runs show the endurance" : "")). Easy builds aerobic base and is most of your volume; marathon is goal-race effort; threshold (\"comfortably hard\") lifts your lactate ceiling; interval develops top-end aerobic power; repetition sharpens speed and economy.")
+            explanation("paces", "All five paces come from your VDOT (\(String(format: "%.1f", plan.vdot))\(plan.enduranceHoldback > 0 ? "; marathon pace from \(String(format: "%.1f", plan.raceVDOT)) until your long runs show the endurance" : "")). Easy builds aerobic base and is most of your volume; marathon is goal-race effort; threshold (\"comfortably hard\") lifts your lactate ceiling; interval develops top-end aerobic power; repetition sharpens speed and economy.")
+        }
+    }
+
+    private func paceTile(_ title: String, _ secPerKm: Double, _ type: WorkoutType) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Circle().fill(type.tint).frame(width: 8, height: 8)
+                Text(title).font(.subheadline.weight(.semibold))
+            }
+            Text(Format.pace(secPerKm))
+                .font(Brand.rounded(.title2))
+                .monospacedDigit()
+        }
+        .brandCard(tint: type.tint, cornerRadius: 20, padding: 14)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// The long explanation under a section, folded away until asked for. Everything
+    /// the plan does stays explained, just not in the way.
+    private func explanation(_ id: String, _ text: String) -> some View {
+        let isOpen = openExplanations.contains(id)
+        return VStack(alignment: .leading, spacing: 6) {
+            Button {
+                withAnimation(.snappy) {
+                    if isOpen { openExplanations.remove(id) } else { openExplanations.insert(id) }
+                }
+            } label: {
+                Label(isOpen ? "Hide how it's worked out" : "How it's worked out",
+                      systemImage: isOpen ? "chevron.up.circle" : "info.circle")
+                    .font(.footnote.weight(.semibold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.tint)
+            if isOpen {
+                Text(text).transition(.opacity)
+            }
         }
     }
 
