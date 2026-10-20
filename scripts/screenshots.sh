@@ -108,6 +108,8 @@ rec  "$PHONE" app.endurancr progress iphone-6-progress 360 20
 shot "$PHONE" app.endurancr plan iphone-7-plan
 # Last week: runs done (highlighted), one missed (struck through), an extra run on a rest day.
 shot "$PHONE" app.endurancr plan iphone-8-week -demoPlanWeek 6
+# The pace calculator, on its results.
+shot "$PHONE" app.endurancr paces iphone-9-paces -clipResults
 
 echo "==> App Clip"
 xcrun simctl install "$PHONE" "$BUILD/Build/Products/Debug-iphonesimulator/EndurancrClip.app"

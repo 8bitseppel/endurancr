@@ -347,3 +347,36 @@ there. Re-record with `./scripts/app-preview.sh` after `./scripts/screenshots.sh
 The iPhone Plan screenshots (`iphone-3-plan.png`, and the new `iphone-4-week.png` with last week) show what was run, the changed
 days and the overview. Re-take with `./scripts/screenshots.sh`, then
 `./scripts/publish-screenshots.sh`; everything in `screenshots/appstore/` is current.
+
+## Version 1.3.0
+
+### Promotional text (170)
+
+Your paces in a minute: one recent race and your goal give your VDOT, your five training paces and the plan endurancr would build. Like it? Create it with one tap.
+
+### What's New (4000)
+
+The pace calculator, now in the app
+- The calculator from the App Clip is in endurancr too. Enter one recent race and your goal, and see your VDOT, your five training paces, a race-day range and the plan endurancr would build.
+- No plan yet? Open it from the welcome screen with "Work out your paces first", then tap Create this plan: the goal form opens with your race, race day and recent effort filled in.
+- Already training? Find it under Progress > Planning > Pace calculator, to check your paces for another race.
+
+Also
+- The App Clip's button is easier to read.
+
+### Description (4000)
+
+Same as 1.2.0. To mention the calculator, add this line to the list of what endurancr does:
+
+- A pace calculator: one recent race and your goal give your VDOT, your five paces and the plan endurancr would build, ready to start with one tap.
+
+### Build
+
+1.3.0 (33). Build 32 was an archive of 1.2.0 that wasn't released; don't use it.
+
+### Screenshots
+
+New: `iphone-5-paces.png`, the pace calculator. The others moved one place down
+(run, summary, goal, welcome are now 6 to 9). Upload all nine from
+`screenshots/appstore/` (and the 6.5" and 6.3" folders), in file name order. The App
+Preview video is unchanged from 1.2.0.
