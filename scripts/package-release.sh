@@ -16,6 +16,7 @@
 #   screenshots/watch/
 #   app-preview/iphone-6.9.mp4
 #   app-clip/card-3x2.png     the App Clip card header image
+#   product-page/             header (21:9) and search results (3:2) images
 #
 # Run ./scripts/screenshots.sh, ./scripts/publish-screenshots.sh and
 # ./scripts/app-preview.sh first; ./scripts/release.sh runs this after archiving.
@@ -29,7 +30,7 @@ A=screenshots/appstore
 
 rm -rf "$OUT"
 mkdir -p "$OUT/screenshots/6.9-inch" "$OUT/screenshots/6.5-inch" "$OUT/screenshots/6.3-inch" \
-  "$OUT/screenshots/watch" "$OUT/app-preview" "$OUT/app-clip"
+  "$OUT/screenshots/watch" "$OUT/app-preview" "$OUT/app-clip" "$OUT/product-page"
 
 cp $A/iphone-*.png "$OUT/screenshots/6.9-inch/"
 cp $A/6.5-inch/iphone-*.png "$OUT/screenshots/6.5-inch/"
@@ -37,6 +38,7 @@ cp $A/6.3-inch/iphone-*.png "$OUT/screenshots/6.3-inch/"
 cp $A/watch-*.png "$OUT/screenshots/watch/"
 cp $A/preview/iphone-6.9.mp4 "$OUT/app-preview/"
 cp $A/appclip/card-3x2.png "$OUT/app-clip/"
+cp $A/creative/header-21x9.png $A/creative/search-3x2.png "$OUT/product-page/"
 
 # The texts, from this version's section of docs/APP_STORE.md (the keywords and the
 # App Clip subtitle from wherever they were last set).
@@ -93,7 +95,10 @@ Everything for the $VERSION page in App Store Connect, as it was uploaded.
 5. **Apple Watch screenshots:** \`screenshots/watch/\`.
 6. **App Clip:** pick build $BUILD's clip, subtitle from \`app-clip-subtitle.txt\`, action
    Open, header image \`app-clip/card-3x2.png\` (save the subtitle and action first).
-7. Save, then Add for Review.
+7. **Product page header and search results:** \`product-page/header-21x9.png\` (21:9,
+   3840 x 1646) and \`product-page/search-3x2.png\` (3:2, 3840 x 2560), under the version
+   or in the Asset Library; check them in the product page preview, in Dark Mode too.
+8. Save, then Add for Review.
 
 Details and the reasons behind each text: docs/APP_STORE.md, "Version $VERSION".
 EOF

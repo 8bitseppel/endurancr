@@ -12,6 +12,9 @@ Everything for the 1.3.0 page in App Store Connect, as it was uploaded.
 5. **Apple Watch screenshots:** `screenshots/watch/`.
 6. **App Clip:** pick build 35's clip, subtitle from `app-clip-subtitle.txt`, action
    Open, header image `app-clip/card-3x2.png` (save the subtitle and action first).
-7. Save, then Add for Review.
+7. **Product page header and search results:** `product-page/header-21x9.png` (21:9,
+   3840 x 1646) and `product-page/search-3x2.png` (3:2, 3840 x 2560), under the version
+   or in the Asset Library; check them in the product page preview, in Dark Mode too.
+8. Save, then Add for Review.
 
 Details and the reasons behind each text: docs/APP_STORE.md, "Version 1.3.0".
