@@ -274,7 +274,6 @@ Also
 - The goal form and How it works now say clearly that training paces come from your current fitness, not your target time.
 - The keyboard closes when you open a date in the goal form, and tapping today as the start date moves on to race day.
 - Race-week rest days show a rest icon instead of the vacation one.
-- An Apple Watch that hasn't updated yet still shows your iPhone's plan, instead of falling back to its own.
 - The "Skip Christmas & New Year" switch is gone. To keep a day free, drag its run to another day in the calendar.
 
 ### Description (4000)

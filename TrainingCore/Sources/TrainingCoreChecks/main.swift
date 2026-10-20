@@ -829,30 +829,6 @@ h.suite("Review fixes: tune-up, marathon pace, recovery") {
             && !VDOTPlanGenerator.isStandardNote("Shorter, the week's distance is nearly done"), "standard notes are told apart from changes")
 }
 
-h.suite("Older watches get a plan they can read") {
-    // What a 1.1.0 watch knows: no tune-up type, no recovery phase.
-    enum OldType: String, Decodable { case rest, easy, longRun, marathonPace, threshold, interval, repetitionSpeed, raceDay }
-    enum OldPhase: String, Decodable { case base, build, peak, taper, raceWeek, maintenance }
-    struct OldStructure: Decodable { var workType: OldType; var recoveryType: OldType }
-    struct OldWorkout: Decodable { var type: OldType; var structure: OldStructure? }
-    struct OldWeek: Decodable { var phase: OldPhase; var workouts: [OldWorkout] }
-    struct OldGoal: Decodable { var skipHolidays: Bool? }
-    struct OldPlan: Decodable { var goal: OldGoal; var weeks: [OldWeek] }
-
-    let fitness = FitnessSnapshot(distanceMeters: 12_200, timeSeconds: 68 * 60 + 19, date: date(2026, 10, 3))
-    let plan = try VDOTPlanGenerator().makePlan(goal: Goal(race: .marathon, raceDate: date(2027, 4, 25), daysPerWeek: 5),
-                                                fitness: fitness, startDate: date(2026, 10, 5), calendar: cal)
-    let data = try JSONEncoder().encode(plan)
-    h.check((try? JSONDecoder().decode(OldPlan.self, from: data)) == nil, "as it is, an old watch can't read the new plan")
-    let old = try? JSONDecoder().decode(OldPlan.self, from: LegacyFormat.forOlderWatch(data))
-    h.check(old != nil, "in the older format, it can")
-    h.check(old?.goal.skipHolidays == false, "and it doesn't skip Christmas")
-    h.check(old?.weeks.count == plan.weeks.count, "with every week")
-    // New builds read values from later versions instead of failing.
-    let future = String(decoding: data, as: UTF8.self).replacingOccurrences(of: "\"timeTrial\"", with: "\"hillRepeats\"")
-    h.check((try? JSONDecoder().decode(TrainingPlan.self, from: Data(future.utf8))) != nil, "an unknown run type doesn't break this version")
-}
-
 h.suite("Target time: race-day pace, not training paces") {
     let fitness = FitnessSnapshot(distanceMeters: 12_200, timeSeconds: 68 * 60 + 19, date: date(2026, 10, 3))
     func plan(_ target: Double?) throws -> TrainingPlan {
