@@ -6,7 +6,9 @@
 #   ./scripts/release.sh --upload   archive, then upload to App Store Connect
 #
 # The archive lands in Xcode's Archives folder, so it also shows up in
-# Window > Organizer, where you can press Distribute App yourself.
+# Window > Organizer, where you can press Distribute App yourself. The texts,
+# screenshots, App Preview and App Clip card for the version go to releases/<version>/
+# (scripts/package-release.sh).
 set -eu
 
 cd "$(dirname "$0")/.."
@@ -44,6 +46,9 @@ echo "==> Archiving to $ARCHIVE"
 xcodebuild -project Endurancr.xcodeproj -scheme Endurancr -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$ARCHIVE" \
   -allowProvisioningUpdates -quiet archive
+
+echo "==> Collecting the App Store Connect uploads"
+./scripts/package-release.sh
 
 if [ "$UPLOAD" = 1 ]; then
   OPTIONS=$(mktemp -t endurancr-export).plist

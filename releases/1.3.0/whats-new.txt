@@ -1,0 +1,15 @@
+A fresh new look
+- endurancr has a new design, in light and dark: a calm purple background, glass cards and rounded numbers.
+- Every kind of run has its own colour, the same on Today, in the plan and in your paces: easy teal, long run cyan, marathon pace blue, threshold indigo, intervals purple, speed pink, race green.
+- Today shows your run big, with its pace and time, and under it your week: a circle for every day, filled once it's done, crossed out if you missed it.
+- Below that, your next run and how training is going.
+- In the plan, every day has a stripe in its run's colour. Runs with parts (intervals, tempo, a marathon-pace finish) show them as a bar in their colours.
+- Progress has a big countdown and your paces as coloured tiles. The longer explanations are one tap away under "How it's worked out".
+
+The pace calculator, now in the app
+- The calculator from the App Clip is in endurancr too. Enter one recent race and your goal, and see your VDOT, your five training paces, a race-day range and the plan endurancr would build.
+- No plan yet? Open it from the welcome screen with "Work out your paces first", then tap Create this plan: the goal form opens with your race, race day and recent effort filled in.
+- Already training? Find it under Progress > Planning > Pace calculator, to check your paces for another race.
+
+Also
+- The App Clip has the new look too, in light and dark.
