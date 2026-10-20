@@ -469,6 +469,7 @@ ul, ol { list-style: none; }
 }
 /* Light and dark of one screen, split by a handle that can be dragged. */
 .compare {
+  --pos: 20%;
   position: relative;
   border-radius: 34px;
   border: 7px solid #241030;

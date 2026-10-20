@@ -155,7 +155,7 @@
         <h2 class="section-head">From your goal to race day.</h2>
         <div class="gallery">
           <figure>
-            <div class="compare" style="--pos: 20%">
+            <div class="compare">
             <img src="screens/iphone-1-welcome.webp?v=b34" width="330" height="717" loading="lazy" alt="The start screen: Ready when you are, with a Set your goal button">
             <img class="compare-dark" src="screens/iphone-1-welcome-dark.webp?v=b34" width="330" height="717" loading="lazy" alt="" aria-hidden="true">
             <span class="compare-handle" aria-hidden="true"></span>
@@ -164,7 +164,7 @@
             <figcaption><b>Start with one goal</b>No account and no sign up. The app opens on one question: what are you training for?</figcaption>
           </figure>
           <figure>
-            <div class="compare" style="--pos: 20%">
+            <div class="compare">
             <video src="screens/iphone-2-goal.mp4?v=b34" poster="screens/iphone-2-goal.webp?v=b34" width="330" height="717" autoplay muted loop playsinline preload="metadata" aria-label="Scrolling through the goal form: race, dates, days per week, rest days, target time, recent effort and time off"></video>
             <video class="compare-dark" src="screens/iphone-2-goal-dark.mp4?v=b34" poster="screens/iphone-2-goal-dark.webp?v=b34" width="330" height="717" autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video>
             <span class="compare-handle" aria-hidden="true"></span>
@@ -173,7 +173,7 @@
             <figcaption><b>Set it up your way</b>Race and date, how many days you run, days you keep free, a target time, a recent effort for your pace, and time off.</figcaption>
           </figure>
           <figure>
-            <div class="compare" style="--pos: 20%">
+            <div class="compare">
             <img src="screens/iphone-3-today.webp?v=b34" width="330" height="717" loading="lazy" alt="Today: an easy run of 10.2 km at 6:30 to 6:54 per km">
             <img class="compare-dark" src="screens/iphone-3-today-dark.webp?v=b34" width="330" height="717" loading="lazy" alt="" aria-hidden="true">
             <span class="compare-handle" aria-hidden="true"></span>
@@ -182,7 +182,7 @@
             <figcaption><b>See today</b>One session, with its distance, target pace and a rough time.</figcaption>
           </figure>
           <figure>
-            <div class="compare" style="--pos: 20%">
+            <div class="compare">
             <img src="screens/iphone-4-run.webp?v=b34" width="330" height="717" loading="lazy" alt="A run in progress on iPhone: time, distance, current and target pace">
             <img class="compare-dark" src="screens/iphone-4-run-dark.webp?v=b34" width="330" height="717" loading="lazy" alt="" aria-hidden="true">
             <span class="compare-handle" aria-hidden="true"></span>
@@ -191,7 +191,7 @@
             <figcaption><b>Run</b>GPS on the iPhone, or the Apple Watch for heart rate too.</figcaption>
           </figure>
           <figure>
-            <div class="compare" style="--pos: 20%">
+            <div class="compare">
             <img src="screens/iphone-5-summary.webp?v=b34" width="330" height="717" loading="lazy" alt="Run complete: 10.0 km, saved to Health, 40.6 of 56.6 km done this week">
             <img class="compare-dark" src="screens/iphone-5-summary-dark.webp?v=b34" width="330" height="717" loading="lazy" alt="" aria-hidden="true">
             <span class="compare-handle" aria-hidden="true"></span>
@@ -200,7 +200,7 @@
             <figcaption><b>Done, saved to Health</b>How the run went and how much of the week is left.</figcaption>
           </figure>
           <figure>
-            <div class="compare" style="--pos: 20%">
+            <div class="compare">
             <video src="screens/iphone-6-progress.mp4?v=b34" poster="screens/iphone-6-progress.webp?v=b34" width="330" height="717" autoplay muted loop playsinline preload="metadata" aria-label="Scrolling through Progress: countdown, next workout, this week, sticking to the plan, fitness, weekly volume and paces"></video>
             <video class="compare-dark" src="screens/iphone-6-progress-dark.mp4?v=b34" poster="screens/iphone-6-progress-dark.webp?v=b34" width="330" height="717" autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video>
             <span class="compare-handle" aria-hidden="true"></span>
@@ -209,7 +209,7 @@
             <figcaption><b>Check where you stand</b>Days to race, this week, how closely you follow the plan, your fitness and your paces.</figcaption>
           </figure>
           <figure>
-            <div class="compare" style="--pos: 20%">
+            <div class="compare">
             <img src="screens/iphone-7-plan.webp?v=b34" width="330" height="717" loading="lazy" alt="Plan: this week with what changed and why">
             <img class="compare-dark" src="screens/iphone-7-plan-dark.webp?v=b34" width="330" height="717" loading="lazy" alt="" aria-hidden="true">
             <span class="compare-handle" aria-hidden="true"></span>
@@ -218,7 +218,7 @@
             <figcaption><b>The whole plan</b>What you ran on each day, what changed and why, and what each week is for, up to race day. Hold a day and drag it onto another to swap them.</figcaption>
           </figure>
           <figure>
-            <div class="compare" style="--pos: 20%">
+            <div class="compare">
             <img src="screens/iphone-8-week.webp?v=b34" width="330" height="717" loading="lazy" alt="Last week in the plan: runs done highlighted, a missed one struck through, an extra run on a rest day">
             <img class="compare-dark" src="screens/iphone-8-week-dark.webp?v=b34" width="330" height="717" loading="lazy" alt="" aria-hidden="true">
             <span class="compare-handle" aria-hidden="true"></span>
@@ -318,36 +318,6 @@
       </nav>
     </div>
   </footer>
-  <script>
-    // Light and dark side by side: the dark screenshot shows left of the handle.
-    // Drag anywhere on a screenshot (or use the arrow keys on its slider).
-    document.querySelectorAll(".compare").forEach((box) => {
-      const range = box.querySelector(".compare-range");
-      const set = (pct) => {
-        pct = Math.max(0, Math.min(100, pct));
-        box.style.setProperty("--pos", pct + "%");
-        range.value = Math.round(pct);
-      };
-      const fromPointer = (e) => {
-        const r = box.getBoundingClientRect();
-        set(((e.clientX - r.left) / r.width) * 100);
-      };
-      box.addEventListener("pointerdown", (e) => {
-        box.setPointerCapture(e.pointerId);
-        fromPointer(e);
-      });
-      box.addEventListener("pointermove", (e) => {
-        if (box.hasPointerCapture(e.pointerId)) fromPointer(e);
-      });
-      range.addEventListener("input", () => set(Number(range.value)));
-      // Keep the two videos of a screen in step.
-      const [light, dark] = box.querySelectorAll("video");
-      if (light && dark) {
-        light.addEventListener("timeupdate", () => {
-          if (Math.abs(dark.currentTime - light.currentTime) > 0.15) dark.currentTime = light.currentTime;
-        });
-      }
-    });
-  </script>
+  <script src="compare.js?v=b34" defer></script>
 </body>
 </html>
