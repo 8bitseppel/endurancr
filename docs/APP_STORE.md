@@ -370,7 +370,7 @@ The pace calculator, now in the app
 - Already training? Find it under Progress > Planning > Pace calculator, to check your paces for another race.
 
 Also
-- The App Clip's button is easier to read.
+- The App Clip has the new look too, in light and dark.
 
 ### Description (4000)
 
@@ -380,7 +380,7 @@ Same as 1.2.0. To mention the calculator, add this line to the list of what endu
 
 ### Build
 
-1.3.0 (34). Build 32 was an unreleased 1.2.0 archive and 33 an earlier 1.3.0 one; use 34.
+1.3.0 (35). Build 32 was an unreleased 1.2.0 archive, 33 and 34 earlier 1.3.0 ones; use 35.
 
 ### Screenshots and App Preview
 
@@ -389,3 +389,6 @@ is the pace calculator, and run, summary, goal and welcome are 6 to 9. Upload al
 from `screenshots/appstore/` (and the 6.5" and 6.3" folders), in file name order, and
 the new App Preview `screenshots/appstore/preview/iphone-6.9.mp4` (886 x 1920, about
 27 s). The website shows each screen in light and dark with a slider.
+
+The App Clip card image is new too (`screenshots/appstore/appclip/card-3x2.png`,
+1800 x 1200, the clip in its new look): replace it under App Clip on the 1.3.0 page.

@@ -64,7 +64,7 @@ struct PaceCalculatorView: View {
         // Worked out once per change of the inputs, not for every use below.
         let plan = self.plan
         return ZStack {
-            BrandBackground(animated: true, vivid: true)
+            BrandBackground()
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 20) {
@@ -92,7 +92,6 @@ struct PaceCalculatorView: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
         .appStoreOverlay(isPresented: $showsAppOverlay) {
             SKOverlay.AppClipConfiguration(position: .bottom)
         }
@@ -108,9 +107,9 @@ struct PaceCalculatorView: View {
         VStack(spacing: 10) {
             Image(systemName: "figure.run")
                 .font(.system(size: 34, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(.tint)
                 .frame(width: 72, height: 72)
-                .glassEffect(.regular.tint(.accentColor.opacity(0.4)), in: .circle)
+                .glassEffect(.regular.tint(Color.accentColor.opacity(0.15)), in: .circle)
                 .accessibilityHidden(true)
             Text("What pace should you train at?")
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
@@ -118,10 +117,9 @@ struct PaceCalculatorView: View {
                 .accessibilityAddTraits(.isHeader)
             Text("Your paces from one recent race, with the VDOT method of Jack Tupper Daniels.")
                 .font(.body)
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
-        .foregroundStyle(.white)
         .padding(.top, 8)
     }
 
@@ -141,7 +139,7 @@ struct PaceCalculatorView: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Time")
 
-            Divider().overlay(.white.opacity(0.2))
+            Divider()
 
             Text("Your goal").font(.headline)
             Picker("Goal race", selection: $goal) {
@@ -152,9 +150,7 @@ struct PaceCalculatorView: View {
                        in: (Calendar.current.date(byAdding: .day, value: VDOTPlanGenerator.minimumDays, to: .now) ?? .now)...,
                        displayedComponents: .date)
         }
-        .padding(18)
-        .glassEffect(.regular, in: .rect(cornerRadius: 26))
-        .foregroundStyle(.white)
+        .brandCard()
     }
 
     private func results(_ plan: TrainingPlan) -> some View {
@@ -164,20 +160,19 @@ struct PaceCalculatorView: View {
         return VStack(spacing: 16) {
             // VDOT, big.
             VStack(spacing: 4) {
-                Text("Your VDOT").font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.7))
+                Text("Your VDOT").brandEyebrow()
                 Text(plan.vdot, format: .number.precision(.fractionLength(1)))
                     .font(.system(size: vdotSize, weight: .bold, design: .rounded))
                     .contentTransition(.numericText(value: plan.vdot))
                     .monospacedDigit()
                 if plan.enduranceHoldback > 0 {
                     Text("Marathon pace uses \(plan.raceVDOT, format: .number.precision(.fractionLength(1))) until your long runs show the endurance.")
-                        .font(.footnote).foregroundStyle(.white.opacity(0.7))
+                        .font(.footnote).foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
-            .glassEffect(.regular.tint(.accentColor.opacity(0.25)), in: .rect(cornerRadius: 26))
+            .brandCard(tint: Brand.purple, cornerRadius: 30, padding: 22)
 
             // The five paces.
             GlassEffectContainer(spacing: 10) {
@@ -220,7 +215,6 @@ struct PaceCalculatorView: View {
                 EmptyView()
             }
         }
-        .foregroundStyle(.white)
     }
 
     private func actionButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
@@ -231,8 +225,8 @@ struct PaceCalculatorView: View {
                 .padding(.vertical, 6)
         }
         .buttonStyle(.glassProminent)
-        // The deep purple of the background, so the white title reads clearly.
-        .tint(Brand.purple)
+        // The app's button purple, so the white title reads clearly.
+        .tint(Brand.buttonPurple)
         .controlSize(.large)
     }
 
@@ -246,11 +240,9 @@ struct PaceCalculatorView: View {
                 .font(.system(.title2, design: .rounded, weight: .bold))
                 .monospacedDigit()
                 .contentTransition(.numericText(value: secPerKm))
-            Text(note).font(.caption).foregroundStyle(.white.opacity(0.7))
+            Text(note).font(.caption).foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .glassEffect(.regular.tint(color.opacity(0.18)), in: .rect(cornerRadius: 20))
+        .brandCard(tint: color, cornerRadius: 20, padding: 14)
         .accessibilityElement(children: .combine)
     }
 
@@ -265,11 +257,9 @@ struct PaceCalculatorView: View {
                 .monospacedDigit()
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
-            Text("If you train to the plan").font(.caption).foregroundStyle(.white.opacity(0.7))
+            Text("If you train to the plan").font(.caption).foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .glassEffect(.regular.tint(.green.opacity(0.18)), in: .rect(cornerRadius: 20))
+        .brandCard(tint: WorkoutType.raceDay.tint, cornerRadius: 20, padding: 14)
         .accessibilityElement(children: .combine)
     }
 
@@ -299,9 +289,7 @@ struct PaceCalculatorView: View {
             }
             .font(.subheadline)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .glassEffect(.regular, in: .rect(cornerRadius: 26))
+        .brandCard()
     }
 
     private func bullet(_ symbol: String, _ text: String) -> some View {
@@ -315,7 +303,7 @@ struct PaceCalculatorView: View {
     private var footer: some View {
         Text("Free, no account, no ads. Your runs stay in Apple Health.")
             .font(.footnote)
-            .foregroundStyle(.white.opacity(0.6))
+            .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
             .padding(.bottom, isClip ? 80 : 0)   // room for the App Store overlay
     }

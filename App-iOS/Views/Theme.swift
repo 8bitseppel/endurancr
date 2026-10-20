@@ -60,29 +60,21 @@ enum Brand {
     }
 }
 
-/// The background of every screen: a mesh of the app's purples and blues, soft
-/// lilac by day and close to black at night. `vivid` is the bright night version of
-/// the pace calculator and App Clip, and `animated` lets its middle drift slowly;
-/// the app's screens keep it calm and still.
+/// The background of every screen, the App Clip included: a still mesh of the
+/// app's purples and blues, soft lilac by day and close to black at night.
 struct BrandBackground: View {
-    var animated = false
-    var vivid = false
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: !animated || reduceMotion)) { context in
-            let t = animated && !reduceMotion ? context.date.timeIntervalSinceReferenceDate / 6 : 0
-            MeshGradient(
-                width: 3, height: 3,
-                points: [
-                    [0, 0], [0.5, 0], [1, 0],
-                    [0, 0.5], [Float(0.5 + 0.15 * sin(t)), Float(0.45 + 0.12 * cos(t * 0.8))], [1, 0.5],
-                    [0, 1], [0.5, 1], [1, 1],
-                ],
-                colors: colorScheme == .light ? Self.light : (vivid ? Self.vividDark : Self.dark)
-            )
-        }
+        MeshGradient(
+            width: 3, height: 3,
+            points: [
+                [0, 0], [0.5, 0], [1, 0],
+                [0, 0.5], [0.5, 0.45], [1, 0.5],
+                [0, 1], [0.5, 1], [1, 1],
+            ],
+            colors: colorScheme == .dark ? Self.dark : Self.light
+        )
         .ignoresSafeArea()
     }
 
@@ -91,11 +83,6 @@ struct BrandBackground: View {
         Color(red: 0.03, green: 0.03, blue: 0.05), Color(red: 0.07, green: 0.05, blue: 0.10), Color(red: 0.03, green: 0.03, blue: 0.05),
         Color(red: 0.05, green: 0.05, blue: 0.09), Color(red: 0.12, green: 0.09, blue: 0.17), Color(red: 0.04, green: 0.06, blue: 0.08),
         Color(red: 0.03, green: 0.03, blue: 0.05), Color(red: 0.06, green: 0.04, blue: 0.08), Color(red: 0.03, green: 0.03, blue: 0.05),
-    ]
-    private static let vividDark: [Color] = [
-        .black, Color(red: 0.16, green: 0.08, blue: 0.32), .black,
-        Color(red: 0.10, green: 0.12, blue: 0.36), Color(red: 0.42, green: 0.26, blue: 0.70), Color(red: 0.06, green: 0.22, blue: 0.34),
-        .black, Color(red: 0.12, green: 0.06, blue: 0.24), .black,
     ]
     private static let light: [Color] = [
         Color(red: 0.97, green: 0.96, blue: 0.99), Color(red: 0.92, green: 0.89, blue: 0.98), Color(red: 0.96, green: 0.97, blue: 0.99),

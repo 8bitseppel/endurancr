@@ -18,6 +18,5 @@ struct PaceCalculatorSheet: View {
                     .padding(.trailing, 16)
                     .padding(.top, 8)
             }
-            .preferredColorScheme(.dark)
     }
 }
