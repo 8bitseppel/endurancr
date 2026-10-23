@@ -1532,6 +1532,33 @@ h.suite("Workout steps") {
     h.check(abs((strideSteps.last!.startMeters + strideSteps.last!.distanceMeters) - 8_000) < 0.5,
             "the strides end where the run ends")
     h.check(WorkoutSteps.isGuided(strides) && !WorkoutSteps.isGuided(easy), "a run with strides is guided, a plain easy run isn't")
+    // Reps as they're run: the tracker times each rep between its start and end.
+    let t0 = Date(timeIntervalSince1970: 0)
+    var tracker = RepTracker(workout: interval, zones: zones)!
+    // 1600 m warm-up, 6 × 800 m with 400 m easy, at 5 m/s and reps 1 to 4 on pace
+    // (225 s/km), 5 and 6 at 245 s/km.
+    var d = 0.0, secs = 0.0
+    for step in tracker.steps {
+        let pace = step.kind == .work ? (step.repNumber! <= 4 ? 225.0 : 245.0) : 330.0
+        var covered = 0.0
+        while covered < step.distanceMeters {
+            covered += 10; d += 10; secs += pace / 100
+            tracker.update(distance: d, elapsed: secs, date: t0.addingTimeInterval(secs), heartRate: 160)
+        }
+    }
+    tracker.finish(distance: d, elapsed: secs, date: t0.addingTimeInterval(secs))
+    h.check(tracker.reps.count == 6 && tracker.reps.allSatisfy { abs($0.meters - 800) <= 10 }, "the tracker keeps six 800 m reps")
+    h.check(tracker.reps[0].verdict == .onPace && tracker.reps[5].verdict == .slower, "reps 1 to 4 on pace, 5 and 6 slower")
+    h.check(tracker.reps[0].averageHeartRate == 160, "a rep keeps its heart rate")
+    h.check(RepReport.summary(tracker.reps) == "4 of 6 reps on pace, target 3:45/km. Reps 5 and 6 slower, at 4:05 and 4:05/km.",
+            "the summary says how many reps were on pace and which were slower: \(RepReport.summary(tracker.reps) ?? "")")
+    h.check(!RepReport.isSlow(tracker.reps), "two slow reps of six don't make the session slow")
+    h.check(RepReport.decode(RepReport.encode(tracker.reps)) == tracker.reps, "reps survive the trip through Health's metadata")
+    let slowReps = tracker.reps.map { var r = $0; r.seconds = r.meters / 1_000 * 250; return r }
+    h.check(RepReport.isSlow(slowReps), "most reps slower makes the session slow")
+    h.check(RepTracker(workout: strides, zones: zones) == nil && RepTracker(workout: easy, zones: zones) == nil,
+            "strides and steady runs aren't timed")
+
     var shortStrides = strides
     shortStrides.distanceMeters = 2_500
     h.check(WorkoutSteps.steps(for: shortStrides, zones: zones).count == 1, "a run too short for strides stays one easy step")

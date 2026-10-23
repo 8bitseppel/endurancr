@@ -73,7 +73,9 @@ final class HealthKitService {
                 date: workout.startDate,
                 distanceMeters: distance,
                 durationSeconds: workout.duration,
-                averageHeartRate: hr
+                averageHeartRate: hr,
+                // The reps endurancr saved with an interval session (`RepReport`).
+                reps: RepReport.decode(workout.metadata?[RepReport.metadataKey] as? String)
             ))
         }
         return CompletedRun.cleaned(runs)

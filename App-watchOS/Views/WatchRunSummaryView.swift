@@ -18,6 +18,8 @@ struct WatchRunSummary: Identifiable {
     var weekNumber: Int?
     var weekCompletedMeters: Double
     var weekTargetMeters: Double
+    /// The reps of an interval session, as they were run.
+    var reps: [RepSplit] = []
 
     var averagePaceSecPerKm: Double {
         guard distanceMeters > 0 else { return 0 }
@@ -39,12 +41,21 @@ struct WatchRunSummary: Identifiable {
 struct WatchRunSummaryView: View {
     let summary: WatchRunSummary
     @Environment(\.dismiss) private var dismiss
-    @State private var page = Page.run
-    enum Page { case run, week }
+    @State private var page: Page = {
+        #if DEBUG
+        // `-demoRepsPage YES`: open on the reps, for screenshots.
+        if DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoRepsPage") { return .reps }
+        #endif
+        return .run
+    }()
+    enum Page { case run, reps, week }
 
     var body: some View {
         TabView(selection: $page) {
             runPage.tag(Page.run)
+            if !summary.reps.isEmpty {
+                ScrollView { repsPage }.tag(Page.reps)
+            }
             weekPage.tag(Page.week)
         }
         .tabViewStyle(.verticalPage)
@@ -89,7 +100,43 @@ struct WatchRunSummaryView: View {
         .padding(.horizontal, 4)
     }
 
-    /// Page 2: what's left this week, and Done.
+    /// Page 2 after an interval session: every rep's pace against its target.
+    private var repsPage: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("REPS").font(.caption2).foregroundStyle(.secondary)
+            ForEach(Array(summary.reps.enumerated()), id: \.offset) { _, rep in
+                HStack {
+                    Text(rep.total > 1 ? "\(rep.number)" : rep.label)
+                        .font(.footnote.weight(.semibold))
+                    Spacer()
+                    Text(rep.paceSecPerKm.map(Format.pace) ?? "--")
+                        .font(.system(.body, design: .rounded).weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(Self.tint(rep.verdict))
+                }
+                .accessibilityElement(children: .combine)
+            }
+            if let text = RepReport.summary(summary.reps) {
+                Text(text)
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+
+    /// Green on pace, orange slower, blue faster, as on the iPhone.
+    static func tint(_ verdict: RepSplit.Verdict?) -> Color {
+        switch verdict {
+        case .onPace?: .green
+        case .slower?: .orange
+        case .faster?: .blue
+        case nil: .primary
+        }
+    }
+
+    /// The last page: what's left this week, and Done.
     private var weekPage: some View {
         VStack(spacing: 10) {
             if summary.hasWeek {

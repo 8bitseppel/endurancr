@@ -464,12 +464,18 @@ public struct TrainingBuddy: Sendable {
                   let run = runs.first(where: { calendar.startOfDay(for: $0.date) == d && $0.distanceMeters > 0 }),
                   run.averagePaceSecPerKm < easyPace   // run hard at all, not as an easy day
             else { continue }
-            // The pace the whole session should average: work at the slow end of
-            // its target, warm-up, cool-down and recoveries at easy pace.
+            total += 1
+            // Recorded by endurancr: judged by its reps, more than half of them slower
+            // than their target.
+            if let reps = run.reps, !RepReport.judged(reps).isEmpty {
+                if RepReport.isSlow(reps) { slow += 1 }
+                continue
+            }
+            // Otherwise the pace the whole session should average: work at the slow
+            // end of its target, warm-up, cool-down and recoveries at easy pace.
             let work = w.structure.map { Double($0.reps) * $0.workMeters } ?? w.distanceMeters
             let rest = max(0, w.distanceMeters - work)
             let expected = (work * target.upperBound + rest * easyPace * 1.03) / w.distanceMeters
-            total += 1
             if run.averagePaceSecPerKm > expected * 1.03 { slow += 1 }
         }
         return slow >= 2 && Double(slow) >= Double(total) * 2 / 3

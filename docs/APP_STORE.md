@@ -425,3 +425,78 @@ the new App Preview `screenshots/appstore/preview/iphone-6.9.mp4` (886 x 1920, a
 
 The App Clip card image is new too (`screenshots/appstore/appclip/card-3x2.png`,
 1800 x 1200, the clip in its new look): replace it under App Clip on the 1.3.0 page.
+
+## Version 1.4.0
+
+### Promotional text (170)
+
+Intervals on your wrist: your Apple Watch guides every rep with a tap, its pace and a count, then shows honestly how each rep went against its target.
+
+### What's New (4000)
+
+Intervals on your wrist
+- On a day with intervals, a threshold run, a marathon-pace block, a tune-up race or strides, your Apple Watch guides you through the session. Its home screen says what's in it, and the button reads Start intervals.
+- About 100 m before a rep the watch taps your wrist: "Rep 3 of 6 in 100 m, get ready".
+- When the rep starts it taps again, differently: "Go, Rep 3 of 6, 1 km at 4:15/km".
+- When it's done a softer tap: "3 of 6 done, easy now". After the last one: "All 6 done".
+- Strides are guided the same way: six times about 100 m quick and light, with easy running between.
+- The paces come from your current fitness, so they change when your paces do.
+
+Every rep, honestly
+- endurancr saves every rep with the run in Apple Health: its distance, time, pace and heart rate, also as segments the Fitness app shows.
+- After the run, on the watch and the iPhone, and on that day in the plan, you see each rep against its target: green on pace, orange slower, blue faster than planned. In plain words too, like "4 of 6 reps on pace. Reps 5 and 6 slower."
+- The plan follows how your reps really went: when most reps of your hard sessions keep coming in slower than their target, the paces ease a little so they fit again.
+- How it works explains it all, with the rules behind it.
+
+### Description (4000)
+
+endurancr builds a running plan around one goal, records your runs on Apple Watch or iPhone, and adapts the plan to what you really ran, like a running buddy who isn't pushy. No account, no feed, no ads.
+
+SET ONE GOAL
+Pick a race, from 5K to the marathon, and its date. endurancr builds a full plan with the VDOT method from Jack Tupper Daniels, paced to the fitness you have now. It uses a recent run from Apple Health, or a race result you type in. A short race shows your speed, not your endurance, so marathon pace starts a little easier until your long runs prove it.
+
+TRAINING FROM THE BOOKS
+Easy runs, threshold runs, intervals and marathon-pace runs, never more than two hard sessions a week. Strides keep your legs quick. Long runs build to 32 km for the marathon. A tune-up race six weeks out sets your paces. Race day tells you how to pace it and what to eat and drink, and after the race the plan brings you back with rest and easy runs. Based on Jack Tupper Daniels, Pete Pfitzinger, the Hansons and Hal Higdon.
+
+A PLAN THAT FOLLOWS YOU
+Every run counts, even one on a rest day. Missed kilometres are never piled onto the days after. Ran less than planned? The coming weeks build from what you actually ran, at most 10% more each week. Back from a break? Your paces ease a little and you start with easy runs. Strong runs nudge your paces up a little at a time. Drag days to swap them when life gets in the way.
+
+THE WHOLE PLAN
+See what you ran on each day, what you missed, what changed and why, your new paces next to the old ones, and what each week is for, all the way to race day.
+
+AN HONEST OUTLOOK
+Progress shows a finish-time range for today and for race day, and tells you whether your target is on track, within reach, a stretch or unlikely, and why. If it's out of reach, it suggests a realistic time. It only changes your target if you tap it.
+
+A CALM LOOK, LIGHT AND DARK
+Every kind of run has its own colour, the same on Today, in the plan and in your paces. Today shows your run and your week at a glance, a circle for every day.
+
+INTERVALS ON YOUR WRIST
+On interval days your Apple Watch guides you through every rep: a tap and "get ready" just before it, "Go" with its distance and pace, and how many are done, each with its own tap you can tell apart without looking. Strides are guided too. Afterwards you see every rep against its target, the slower ones too, and the plan's paces follow how your reps really went.
+
+RUN ON YOUR WRIST OR YOUR PHONE
+Start today's run on Apple Watch with heart rate, or on iPhone with GPS. The run screens show time, distance, your pace and the target pace. The watch's own Auto-Pause holds your run at a traffic light, and a run on the watch shows on your iPhone's Lock Screen, where you can pause and finish it. Every run is saved to Apple Health.
+
+YOUR PACES IN A MINUTE
+The pace calculator turns one recent race into your VDOT, your five training paces, a race-day range and the plan endurancr would build, ready to start with one tap. It's in the app, and as an App Clip it opens without installing, right in Safari or from a link.
+
+NOTHING HIDDEN
+How it works explains every rule the plan follows, in plain words, with the books and studies behind it. endurancr is open source, so you can read every line that touches your data.
+
+PRIVATE BY DESIGN
+No account, no server, no analytics, no ads, no tracking. Your plan stays on your device, and your runs live in Apple Health.
+
+FREE
+No subscription and no in-app purchases.
+
+endurancr is a training aid, not medical advice. Talk to a doctor before you start a new training plan.
+
+### Build
+
+1.4.0 (36).
+
+### Screenshots
+
+The iPhone run summary (`iphone-7-summary.png`) now shows an interval session with its
+reps. Two new Apple Watch screenshots: `watch-4-intervals.png` (the card when a rep
+starts) and `watch-5-reps.png` (the reps after the run). Everything is in
+`releases/1.4.0/`. The App Preview and the App Clip card are unchanged from 1.3.0.

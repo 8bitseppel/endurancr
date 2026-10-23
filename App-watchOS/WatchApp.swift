@@ -89,20 +89,39 @@ private struct IntervalRunSimulation: View {
                                         cooldownMeters: 1_000, workType: .interval, recoveryType: .easy)
         )
 
+    @State private var summary: WatchRunSummary?
+
     var body: some View {
         NavigationStack {
-            LiveRunView(workout: workout, plannedWorkout: planned, zones: zones)
+            if let summary {
+                WatchRunSummaryView(summary: summary)
+            } else {
+                LiveRunView(workout: workout, plannedWorkout: planned, zones: zones)
+            }
         }
         .task {
             workout.isRunning = true
             workout.heartRate = 150
+            // The same tracker the real run uses. Reps 1 to 4 on pace, 5 and 6 15 s/km slower.
+            var tracker = RepTracker(workout: planned, zones: zones)
             while workout.distanceMeters < planned.distanceMeters {
                 try? await Task.sleep(for: .milliseconds(100))
                 let step = WorkoutSteps.activeStep(for: planned, zones: zones, distanceCovered: workout.distanceMeters)
+                let slower = step?.kind == .work && (step?.repNumber ?? 0) >= 5 ? 15.0 : 0
                 workout.distanceMeters += 4
-                workout.elapsedSeconds += 4 * (step?.targetPaceSecPerKm ?? 330) / 1_000
+                workout.elapsedSeconds += 4 * ((step?.targetPaceSecPerKm ?? 330) + slower) / 1_000
+                tracker?.update(distance: workout.distanceMeters, elapsed: workout.elapsedSeconds,
+                                date: .now, heartRate: workout.heartRate)
             }
+            tracker?.finish(distance: workout.distanceMeters, elapsed: workout.elapsedSeconds, date: .now)
+            let reps = tracker?.reps ?? []
             print("[sim] finished at \(Int(workout.distanceMeters)) m")
+            for rep in reps { print("[rep] \(rep.label) \(Int(rep.meters)) m \(rep.paceSecPerKm.map(Format.pace) ?? "--") \(rep.verdict.map { "\($0)" } ?? "")") }
+            print("[summary] \(RepReport.summary(reps) ?? "")")
+            workout.isRunning = false
+            summary = WatchRunSummary(distanceMeters: workout.distanceMeters, durationSeconds: workout.elapsedSeconds,
+                                      saved: true, weekNumber: nil, weekCompletedMeters: 0, weekTargetMeters: 0,
+                                      reps: reps)
         }
     }
 }
@@ -112,7 +131,7 @@ private extension WatchRunSummary {
         let run = DemoMode.finishedRun
         return WatchRunSummary(distanceMeters: run.meters, durationSeconds: run.seconds, saved: true,
                                weekNumber: run.week, weekCompletedMeters: run.weekDone,
-                               weekTargetMeters: run.weekTarget)
+                               weekTargetMeters: run.weekTarget, reps: DemoMode.reps)
     }
 }
 #endif

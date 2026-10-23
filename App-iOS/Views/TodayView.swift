@@ -98,7 +98,8 @@ struct TodayView: View {
                         saved: saved,
                         weekNumber: p?.currentWeekNumber,
                         weekCompletedMeters: weekCompleted,
-                        weekTargetMeters: p?.currentWeekPlannedMeters ?? 0
+                        weekTargetMeters: p?.currentWeekPlannedMeters ?? 0,
+                        reps: recorder.reps
                     )
                 }
             }

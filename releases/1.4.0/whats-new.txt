@@ -1,0 +1,13 @@
+Intervals on your wrist
+- On a day with intervals, a threshold run, a marathon-pace block, a tune-up race or strides, your Apple Watch guides you through the session. Its home screen says what's in it, and the button reads Start intervals.
+- About 100 m before a rep the watch taps your wrist: "Rep 3 of 6 in 100 m, get ready".
+- When the rep starts it taps again, differently: "Go, Rep 3 of 6, 1 km at 4:15/km".
+- When it's done a softer tap: "3 of 6 done, easy now". After the last one: "All 6 done".
+- Strides are guided the same way: six times about 100 m quick and light, with easy running between.
+- The paces come from your current fitness, so they change when your paces do.
+
+Every rep, honestly
+- endurancr saves every rep with the run in Apple Health: its distance, time, pace and heart rate, also as segments the Fitness app shows.
+- After the run, on the watch and the iPhone, and on that day in the plan, you see each rep against its target: green on pace, orange slower, blue faster than planned. In plain words too, like "4 of 6 reps on pace. Reps 5 and 6 slower."
+- The plan follows how your reps really went: when most reps of your hard sessions keep coming in slower than their target, the paces ease a little so they fit again.
+- How it works explains it all, with the rules behind it.

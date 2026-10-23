@@ -56,6 +56,10 @@ final class PhoneWorkoutManager: NSObject {
     /// Today's planned session + the athlete's paces, so the Live Activity can show
     /// step-aware targets that advance as each step's distance is covered. Nil = free run.
     private var plannedWorkout: PlannedWorkout?
+    /// Times each rep of an interval session, saved with the run (`RepSplit`).
+    private var repTracker: RepTracker?
+    /// The reps of the run just finished, for the summary.
+    private(set) var reps: [RepSplit] = []
     private var zones: PaceZones?
 
     // Live, observable metrics.
@@ -130,6 +134,8 @@ final class PhoneWorkoutManager: NSObject {
         self.targetPace = targetPace
         self.plannedWorkout = plannedWorkout
         self.zones = zones
+        repTracker = plannedWorkout.flatMap { w in zones.flatMap { RepTracker(workout: w, zones: $0) } }
+        reps = []
 
         let config = HKWorkoutConfiguration()
         config.activityType = .running
@@ -271,6 +277,7 @@ final class PhoneWorkoutManager: NSObject {
         saveState = .saving
         do {
             if !samples.isEmpty { try await builder.addSamples(samples) }
+            try await saveReps(to: builder, endingAt: end)
             try await builder.endCollection(at: end)
             if let workout = try await builder.finishWorkout() {
                 saveState = .saved
@@ -284,6 +291,20 @@ final class PhoneWorkoutManager: NSObject {
             saveState = .failed
         }
         isRunning = false
+    }
+
+    /// The reps go into Health twice: as Apple's workout segments, which the Fitness
+    /// app shows, and as one metadata entry endurancr reads back with their targets.
+    private func saveReps(to builder: HKWorkoutBuilder, endingAt date: Date) async throws {
+        repTracker?.finish(distance: distanceMeters, elapsed: elapsedSeconds, date: date)
+        reps = repTracker?.reps ?? []
+        repTracker = nil
+        guard let json = RepReport.encode(reps) else { return }
+        try await builder.addMetadata([RepReport.metadataKey: json])
+        try await builder.addWorkoutEvents(reps.map { rep in
+            HKWorkoutEvent(type: .segment, dateInterval: DateInterval(start: rep.start, end: max(rep.end, rep.start)),
+                           metadata: ["EndurancrRep": rep.label])
+        })
     }
 
     /// Runs `work` on the main actor, after anything queued before it.
@@ -300,6 +321,8 @@ final class PhoneWorkoutManager: NSObject {
             MainActor.assumeIsolated {
                 guard let self, !self.isPaused, let seg = self.segmentStart else { return }
                 self.elapsedSeconds = self.accumulatedSeconds + Date().timeIntervalSince(seg)
+                self.repTracker?.update(distance: self.distanceMeters, elapsed: self.elapsedSeconds,
+                                        date: Date(), heartRate: 0)
                 // No usable fix for 10 s (standing, or under cover): no pace, rather
                 // than the last running pace still showing as on target.
                 if let fix = self.lastFixDate, Date().timeIntervalSince(fix) > 10 {

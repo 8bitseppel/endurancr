@@ -10,6 +10,9 @@ public struct CompletedRun: Sendable, Equatable, Codable, Identifiable {
     public var averageHeartRate: Double?
     /// The planned workout this run fulfilled, if it was matched to the plan.
     public var plannedWorkoutID: UUID?
+    /// Each rep of an interval session as it was run, when endurancr recorded it
+    /// (`RepTracker`); `nil` for other runs and runs from other apps.
+    public var reps: [RepSplit]?
 
     public init(
         id: UUID = UUID(),
@@ -17,7 +20,8 @@ public struct CompletedRun: Sendable, Equatable, Codable, Identifiable {
         distanceMeters: Double,
         durationSeconds: Double,
         averageHeartRate: Double? = nil,
-        plannedWorkoutID: UUID? = nil
+        plannedWorkoutID: UUID? = nil,
+        reps: [RepSplit]? = nil
     ) {
         self.id = id
         self.date = date
@@ -25,6 +29,7 @@ public struct CompletedRun: Sendable, Equatable, Codable, Identifiable {
         self.durationSeconds = durationSeconds
         self.averageHeartRate = averageHeartRate
         self.plannedWorkoutID = plannedWorkoutID
+        self.reps = reps
     }
 
     /// Average pace in seconds per kilometer. Returns `.infinity` for a zero-distance run.
@@ -55,6 +60,7 @@ extension CompletedRun {
                 // The watch's heart rate stays with the run when the iPhone's GPS
                 // recording is the one that counts.
                 if kept[i].averageHeartRate == nil { kept[i].averageHeartRate = run.averageHeartRate }
+                if kept[i].reps == nil { kept[i].reps = run.reps }
             } else {
                 kept.append(run)
             }

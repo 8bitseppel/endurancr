@@ -65,12 +65,15 @@ struct WatchTodayView: View {
                 let saved = state == .saved
                 let prior = weekCompletedAtStart
                 let plan = currentPlan
+                let reps = workout.reps
                 Task {
-                    runSummary = await Self.makeSummary(
+                    var summary = await Self.makeSummary(
                         plan: plan, health: health,
                         distance: distance, duration: duration,
                         saved: saved, priorWeekCompleted: prior
                     )
+                    summary.reps = reps
+                    runSummary = summary
                 }
             }
             .onChange(of: workout.isRunning, initial: true) { _, running in

@@ -65,6 +65,10 @@ final class WorkoutManager: NSObject {
     private(set) var savedDistanceMeters: Double?
     /// Latest running speed (m/s) from the watch's sensors, for the live pace.
     private var currentSpeed: Double = 0
+    /// Times each rep of an interval session, saved with the run (`RepSplit`).
+    private var repTracker: RepTracker?
+    /// The reps of the run just finished, for the summary.
+    private(set) var reps: [RepSplit] = []
 
     /// The run's time at `date`, for a clock that ticks every second rather than
     /// only when HealthKit delivers new data. Paused time doesn't count.
@@ -98,6 +102,7 @@ final class WorkoutManager: NSObject {
         self.plannedWorkout = plannedWorkout
         self.zones = zones
         self.goalName = goalName
+        repTracker = plannedWorkout.flatMap { w in zones.flatMap { RepTracker(workout: w, zones: $0) } }
         RunContext(plannedWorkout: plannedWorkout, zones: zones, goalName: goalName).save()
         let config = HKWorkoutConfiguration()
         config.activityType = .running
@@ -141,6 +146,7 @@ final class WorkoutManager: NSObject {
         saveState = .idle
         savedDuration = nil
         savedDistanceMeters = nil
+        reps = []
     }
 
     /// Connects a new or recovered session: its live builder, a route builder and GPS.
@@ -251,6 +257,7 @@ final class WorkoutManager: NSObject {
             self.builder = nil
         }
         do {
+            try await saveReps(to: builder, endingAt: date)
             try await builder.endCollection(at: date)
             guard let workout = try await builder.finishWorkout() else {
                 saveState = .failed
@@ -266,6 +273,23 @@ final class WorkoutManager: NSObject {
             lastError = error.localizedDescription
             saveState = .failed
         }
+    }
+}
+
+extension WorkoutManager {
+    /// The reps go into Health twice: as Apple's workout segments, which the Fitness
+    /// app shows, and as one metadata entry endurancr reads back with their targets.
+    fileprivate func saveReps(to builder: HKWorkoutBuilder, endingAt date: Date) async throws {
+        repTracker?.finish(distance: distanceMeters, elapsed: elapsedSeconds, date: date)
+        reps = repTracker?.reps ?? []
+        repTracker = nil
+        guard let json = RepReport.encode(reps) else { return }
+        try await builder.addMetadata([RepReport.metadataKey: json])
+        let segments = reps.map { rep in
+            HKWorkoutEvent(type: .segment, dateInterval: DateInterval(start: rep.start, end: max(rep.end, rep.start)),
+                           metadata: ["EndurancrRep": rep.label])
+        }
+        try await builder.addWorkoutEvents(segments)
     }
 }
 
@@ -419,6 +443,7 @@ extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
                 }
             }
             elapsedSeconds = elapsed
+            repTracker?.update(distance: distanceMeters, elapsed: elapsed, date: Date(), heartRate: heartRate)
             sendToPhone()
         }
     }

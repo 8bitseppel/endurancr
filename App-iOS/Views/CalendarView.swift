@@ -386,6 +386,10 @@ private struct DayCard: View {
                             Image(systemName: ran.symbol).foregroundStyle(ran.tint)
                         }
                         .font(.caption)
+                        // How each rep went against its target, for an interval day.
+                        if let reps = review?.reps, !reps.isEmpty {
+                            RepsView(reps: reps).padding(.top, 2)
+                        }
                     } else if !isRest, let pace = workout.targetPaceSecPerKm {
                         if let was = review?.originalPace {
                             Text("\(Format.paceRange(pace))\(Text(", was \(Format.paceRange(was))").foregroundStyle(.tint))")
@@ -526,6 +530,7 @@ private struct DayCard: View {
         if showsNoteInline { parts.append(PlanReview.reason(of: workout.notes)) }
         if !isPast, let was = review?.originalPace { parts.append("pace was \(Format.paceRange(was))") }
         if let ranText { parts.append(ranText.text) }
+        if let reps = review?.reps, let summary = RepReport.summary(reps) { parts.append(summary) }
         return parts.joined(separator: ", ")
     }
 }

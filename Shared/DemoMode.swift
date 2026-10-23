@@ -108,6 +108,22 @@ enum DemoMode {
                 before + meters, week?.plannedVolumeMeters ?? 0)
     }
 
+    /// `-demoReps YES`: the finished run was an interval session, 6 × 800 m at
+    /// interval pace with the last two a little slow, for the summary screenshots.
+    static var reps: [RepSplit] {
+        guard isOn, UserDefaults.standard.bool(forKey: "demoReps") else { return [] }
+        let target = plan?.paceZones.intervalSecPerKm ?? 300
+        var start = Date.now.addingTimeInterval(-1_800)
+        return (1...6).map { n in
+            let pace = target + [-2, 1, 3, 2, 9, 14][n - 1]
+            let seconds = 0.8 * pace
+            defer { start = start.addingTimeInterval(seconds + 150) }
+            return RepSplit(label: "Rep \(n)/6", number: n, total: 6, meters: 800, seconds: seconds,
+                            targetPaceSecPerKm: target, averageHeartRate: 158 + Double(n) * 2,
+                            start: start, end: start.addingTimeInterval(seconds))
+        }
+    }
+
     /// Runs that followed the plan up to yesterday, a little off here and there.
     /// A few easy runs are skipped; long runs never are, since the app would
     /// move a missed one into this week. One easy run last week went fast, the

@@ -75,13 +75,19 @@ shot() {
   echo "    $OUT/$4.png"
 }
 
-# rec <device> <bundle id> <screen> <file name> <gif width> <gif fps>
+# rec <device> <bundle id> <screen> <file name> <gif width> <gif fps> [more launch arguments]
 # Takes the screenshot, then records the screen scrolling down and back up (the
 # watch's two-page screens turn to page 2 and back instead).
 rec() {
-  shot "$1" "$2" "$3" "$4"
-  xcrun simctl terminate "$1" "$2" 2>/dev/null || true
-  xcrun simctl launch "$1" "$2" -demo -demoScreen "$3" -demoScroll YES >/dev/null
+  d=$1; b=$2; scr=$3; f=$4; gw=$5; gf=$6; shift 6
+  shot "$d" "$b" "$scr" "$f" "$@"
+  xcrun simctl terminate "$d" "$b" 2>/dev/null || true
+  if [ "$scr" = "-" ]; then
+    xcrun simctl launch "$d" "$b" -demo -demoScroll YES "$@" >/dev/null
+  else
+    xcrun simctl launch "$d" "$b" -demo -demoScreen "$scr" -demoScroll YES "$@" >/dev/null
+  fi
+  set -- "$d" "$b" "$scr" "$f" "$gw" "$gf"
   sleep 2.5
   xcrun simctl io "$1" recordVideo --codec=h264 --force "$BUILD/$4.mov" >/dev/null 2>&1 &
   recorder=$!
@@ -103,7 +109,8 @@ shot "$PHONE" app.endurancr welcome iphone-1-welcome
 rec  "$PHONE" app.endurancr goal iphone-2-goal 360 20
 shot "$PHONE" app.endurancr - iphone-3-today
 shot "$PHONE" app.endurancr run iphone-4-run
-shot "$PHONE" app.endurancr summary iphone-5-summary
+# The run just finished was an interval session: its reps, two a little slow.
+shot "$PHONE" app.endurancr summary iphone-5-summary -demoReps YES
 rec  "$PHONE" app.endurancr progress iphone-6-progress 360 20
 shot "$PHONE" app.endurancr plan iphone-7-plan
 # Last week: runs done (highlighted), one missed (struck through), an extra run on a rest day.
@@ -118,7 +125,7 @@ shot "$PHONE" app.endurancr welcome iphone-1-welcome-dark
 rec  "$PHONE" app.endurancr goal iphone-2-goal-dark 360 20
 shot "$PHONE" app.endurancr - iphone-3-today-dark
 shot "$PHONE" app.endurancr run iphone-4-run-dark
-shot "$PHONE" app.endurancr summary iphone-5-summary-dark
+shot "$PHONE" app.endurancr summary iphone-5-summary-dark -demoReps YES
 rec  "$PHONE" app.endurancr progress iphone-6-progress-dark 360 20
 shot "$PHONE" app.endurancr plan iphone-7-plan-dark
 shot "$PHONE" app.endurancr plan iphone-8-week-dark -demoPlanWeek 6
@@ -141,7 +148,10 @@ echo "    $OUT/clip-1-calculator.png, $OUT/clip-2-results.png"
 echo "==> Apple Watch"
 rec "$WATCH" app.endurancr.watchkitapp - watch-1-today 312 25
 rec "$WATCH" app.endurancr.watchkitapp run watch-2-run 312 25
-rec "$WATCH" app.endurancr.watchkitapp summary watch-3-summary 312 25
+rec "$WATCH" app.endurancr.watchkitapp summary watch-3-summary 312 25 -demoReps YES
+# Intervals: the card when a rep starts, and the reps after the run.
+shot "$WATCH" app.endurancr.watchkitapp run watch-4-intervals -demoStepCard YES
+shot "$WATCH" app.endurancr.watchkitapp summary watch-5-reps -demoReps YES -demoRepsPage YES
 python3 scripts/watch-clock.py
 
 echo "==> Done"

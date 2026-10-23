@@ -102,7 +102,8 @@ extension RunSummaryData {
         let run = DemoMode.finishedRun
         return RunSummaryData(
             distanceMeters: run.meters, durationSeconds: run.seconds, saved: true,
-            weekNumber: run.week, weekCompletedMeters: run.weekDone, weekTargetMeters: run.weekTarget
+            weekNumber: run.week, weekCompletedMeters: run.weekDone, weekTargetMeters: run.weekTarget,
+            reps: DemoMode.reps
         )
     }
 }

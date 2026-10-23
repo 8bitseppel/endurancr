@@ -40,6 +40,8 @@ public struct PlanReview: Sendable, Equatable {
         /// `.easy`, `.marathonPace` (steady), `.threshold` or `.interval` (hard).
         /// `nil` without a run.
         public var effort: WorkoutType?
+        /// The reps as they were run, for an interval day recorded by endurancr.
+        public var reps: [RepSplit] = []
 
         public var isChanged: Bool { originalType != nil }
         /// Average pace of what was run (sec/km), `nil` without a run.
@@ -110,6 +112,7 @@ public struct PlanReview: Sendable, Equatable {
             }
 
             var day = Day(status: status, ranMeters: meters, ranSeconds: seconds)
+            day.reps = runsByDay[d]?.compactMap(\.reps).first ?? []
             if meters > 0 { day.effort = Self.effort(paceSecPerKm: seconds / (meters / 1_000), zones: plan.paceZones) }
             if let o = originalByDay[d], o.type != w.type || abs(o.distanceMeters - w.distanceMeters) >= 500 {
                 day.originalType = o.type

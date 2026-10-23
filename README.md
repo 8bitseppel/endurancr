@@ -59,7 +59,8 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   - No run is planned more than 10% longer than your longest of the last 30 days
     (Frandsen et al. 2025).
   - VDOT goes up by at most 1 point per 3 weeks, and down 1 when hard sessions
-    keep coming in slower than their targets.
+    keep coming in slower than their targets. A session recorded with endurancr is
+    judged by its reps (more than half over 5 s/km slower than the target).
 - An honest outlook: finish-time ranges for today and race day, and whether the
   target is on track, within reach, a stretch or unlikely, with a realistic time
   to switch to (only if you tap it). Marathon ranges account for weekly distance
@@ -90,6 +91,9 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   100 m", then "Go" with the rep's distance and pace from your current fitness, and "3 of
   6 done, easy now" after it, each with its own tap. Strides count as about 100 m quick
   and light with about 150 m easy between.
+- Every rep is saved with the run in Apple Health (as segments too), and the plan and
+  the run summary show each one against its target: on pace, slower or faster, with
+  its pace, in plain words.
 - A run on Apple Watch shows on the iPhone's Lock Screen too, through HealthKit workout
   mirroring, with Pause and Finish. Auto-pause comes from watchOS (Auto-Pause in the
   watch's Workout settings), and a double tap pauses or resumes.

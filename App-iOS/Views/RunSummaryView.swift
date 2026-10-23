@@ -16,6 +16,8 @@ struct RunSummaryData: Identifiable {
     var weekNumber: Int?
     var weekCompletedMeters: Double
     var weekTargetMeters: Double
+    /// The reps of an interval session, as they were run.
+    var reps: [RepSplit] = []
 
     var averagePaceSecPerKm: Double {
         guard distanceMeters > 0 else { return 0 }
@@ -55,6 +57,14 @@ struct RunSummaryView: View {
                     }
                     .brandCard(tint: .green, cornerRadius: 30, padding: 22)
                     .accessibilityElement(children: .combine)
+
+                    if !data.reps.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Your reps").brandEyebrow()
+                            RepsView(reps: data.reps)
+                        }
+                        .brandCard()
+                    }
 
                     if data.weekTargetMeters > 0 {
                         VStack(alignment: .leading, spacing: 10) {
