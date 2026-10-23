@@ -25,6 +25,16 @@ struct LiveRunView: View {
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
     @State private var page = Page.metrics
     enum Page { case metrics, controls }
+    /// The full-screen card at a step change, or just before a rep.
+    @State private var card: StepCard?
+    /// The rep already announced with "get ready", so it's announced once.
+    @State private var readiedStep: Int?
+
+    /// Every step of the session, in order; empty for a free run.
+    private var steps: [WorkoutStep] {
+        guard let plannedWorkout, let zones else { return [] }
+        return WorkoutSteps.steps(for: plannedWorkout, zones: zones)
+    }
 
     /// The step the athlete is currently in, given how far they've run.
     private var activeStep: WorkoutStep? {
@@ -67,17 +77,118 @@ struct LiveRunView: View {
             // Finished from the iPhone's Live Activity: close like Finish here.
             if !running { dismiss() }
         }
-        .onChange(of: activeStep?.index) { old, new in
-            // A new interval step began (e.g. warm-up -> first rep): a success tap so
-            // the athlete feels the transition without looking at the watch.
-            if old != nil, new != nil, old != new {
-                WKInterfaceDevice.current().play(.success)
+        .overlay {
+            if let card {
+                StepCardView(card: card)
+                    .onTapGesture { withAnimation { self.card = nil } }
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
+        .onChange(of: activeStep?.index) { old, new in
+            // A new step began: say what's next, full screen, with a tap you can tell
+            // apart without looking (a rep starts, a break starts, all reps done).
+            guard let old, let new, old != new, let step = activeStep else { return }
+            announce(step)
+        }
+        .onChange(of: workout.distanceMeters) { _, distance in
+            readyNextRep(at: distance)
+        }
+        #if DEBUG
+        .task {
+            // `-demoStepCard YES`: the card at the start of a rep, for screenshots.
+            if DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoStepCard"), let zones {
+                card = StepCard(title: "Rep 3 of 6", detail: "1 km at \(Format.pace(zones.intervalSecPerKm))",
+                                note: "Go", tint: .green, haptic: .start)
+            }
+        }
+        #endif
         .onChange(of: workout.isAutoPaused) { _, paused in
             // watchOS's Auto-Pause, felt at the traffic light without looking.
             WKInterfaceDevice.current().play(paused ? .stop : .start)
         }
+    }
+
+    // MARK: Step guidance
+
+    private func announce(_ step: WorkoutStep) {
+        // The last rep's easy part already said "All done"; the cool-down after it
+        // starts without another card.
+        if step.kind == .cooldown, step.index > 0, isLastRecovery(steps[step.index - 1]) { return }
+        let next = card(for: step)
+        WKInterfaceDevice.current().play(next.haptic)
+        show(next)
+    }
+
+    /// Just before a rep: "Rep 3 of 6 in 100 m", so it doesn't come as a surprise.
+    private func readyNextRep(at distance: Double) {
+        guard let step = activeStep, step.kind != .work,
+              step.index + 1 < steps.count else { return }
+        let rep = steps[step.index + 1]
+        guard rep.kind == .work, readiedStep != rep.index else { return }
+        let lead = min(100, step.distanceMeters / 2)
+        let left = step.startMeters + step.distanceMeters - distance
+        guard left <= lead else { return }
+        readiedStep = rep.index
+        WKInterfaceDevice.current().play(.notification)
+        // Rounded to 10 m: "in 70 m", not "in 74 m".
+        let meters = max(10, Int((left / 10).rounded()) * 10)
+        show(StepCard(title: "\(repTitle(rep)) in \(meters) m",
+                      detail: stepDetail(rep), note: "Get ready", tint: .yellow, haptic: .notification))
+    }
+
+    private func show(_ next: StepCard) {
+        #if DEBUG
+        if DemoMode.isOn { print("[step] at \(Int(workout.distanceMeters)) m, tap \(next.haptic.rawValue): \(next.note) | \(next.title) | \(next.detail)") }
+        #endif
+        withAnimation { card = next }
+        AccessibilityNotification.Announcement("\(next.title). \(next.detail). \(next.note)").post()
+        Task {
+            try? await Task.sleep(for: .seconds(5))
+            if card == next { withAnimation { card = nil } }
+        }
+    }
+
+    private func card(for step: WorkoutStep) -> StepCard {
+        switch step.kind {
+        case .work:
+            return StepCard(title: repTitle(step), detail: stepDetail(step), note: "Go", tint: .green, haptic: .start)
+        case .recovery where isLastRecovery(step):
+            // After the last rep: straight to the cool-down, counting its easy part in.
+            let cooldown = steps.last { $0.kind == .cooldown }?.distanceMeters ?? 0
+            // Strides end an easy run, which has no cool-down of its own.
+            return StepCard(title: cooldown > 0 ? "Cool-down" : "Easy to the end", detail: "\(Format.distanceCompact(step.distanceMeters + cooldown)) easy",
+                            note: "All \(step.repTotal ?? 1) done. Well run.", tint: .accentColor, haptic: .success)
+        case .recovery:
+            let done = step.repNumber.flatMap { n in step.repTotal.map { "\(n) of \($0) done" } } ?? "Done"
+            return StepCard(title: "Easy now", detail: stepDetail(step), note: done, tint: .accentColor, haptic: .directionDown)
+        case .cooldown:
+            let reps = steps.last { $0.kind == .work }?.repTotal ?? 1
+            return StepCard(title: "Cool-down", detail: stepDetail(step),
+                            note: reps > 1 ? "All \(reps) done. Well run." : "Done. Well run.",
+                            tint: .accentColor, haptic: .success)
+        case .warmup, .steady:
+            return StepCard(title: step.label.isEmpty ? "Run" : step.label, detail: stepDetail(step), note: "",
+                            tint: .accentColor, haptic: .click)
+        }
+    }
+
+    /// The easy part after the last rep, when nothing but easy running follows.
+    private func isLastRecovery(_ step: WorkoutStep) -> Bool {
+        step.kind == .recovery && step.repNumber == step.repTotal
+            && !steps.dropFirst(step.index + 1).contains { $0.kind == .work }
+    }
+
+    /// "Rep 3 of 6", "Stride 2 of 6", or the block's name ("Threshold").
+    private func repTitle(_ step: WorkoutStep) -> String {
+        guard let n = step.repNumber, let total = step.repTotal, total > 1 else { return step.label }
+        return "\(step.label.hasPrefix("Stride") ? "Stride" : "Rep") \(n) of \(total)"
+    }
+
+    /// "1 km at 4:15/km", "400 m easy".
+    private func stepDetail(_ step: WorkoutStep) -> String {
+        let distance = Format.distanceCompact(step.distanceMeters)
+        if step.kind == .recovery || step.kind == .cooldown || step.paceType == .easy { return "\(distance) easy" }
+        return "\(distance) at \(step.targetPaceSecPerKm.map(Format.pace) ?? "race effort")"
     }
 
     /// Page 1: everything needed while running, on one screen. It never scrolls,
@@ -265,5 +376,43 @@ extension View {
         #else
         self
         #endif
+    }
+}
+
+/// What the run screen says, full screen, at a step change.
+struct StepCard: Equatable {
+    var title: String
+    var detail: String
+    var note: String
+    var tint: Color
+    var haptic: WKHapticType
+}
+
+private struct StepCardView: View {
+    let card: StepCard
+
+    var body: some View {
+        VStack(spacing: 6) {
+            if !card.note.isEmpty {
+                Text(card.note)
+                    .font(.headline)
+                    .foregroundStyle(card.tint)
+            }
+            Text(card.title)
+                .font(.system(.title2, design: .rounded).weight(.bold))
+                .multilineTextAlignment(.center)
+            Text(card.detail)
+                .font(.system(.body, design: .rounded).weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+        }
+        .lineLimit(2)
+        .minimumScaleFactor(0.7)
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.ultraThickMaterial)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Closes")
     }
 }

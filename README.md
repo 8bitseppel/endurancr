@@ -85,6 +85,11 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   the iPhone at once counts once.
 - Swap days by dragging them in the plan; the watch shows the same adjusted days.
 - The plan shows what you ran on each past day (done, shorter or missed), what a changed day was and why, new paces next to the old ones with the reason, what each week is for, how far the week is, the 32 km runs and the taper, and ends with the race outlook.
+- Intervals, threshold and marathon-pace blocks, the tune-up race and strides are guided
+  on Apple Watch by distance: about 100 m before a rep it taps and shows "Rep 3 of 6 in
+  100 m", then "Go" with the rep's distance and pace from your current fitness, and "3 of
+  6 done, easy now" after it, each with its own tap. Strides count as about 100 m quick
+  and light with about 150 m easy between.
 - A run on Apple Watch shows on the iPhone's Lock Screen too, through HealthKit workout
   mirroring, with Pause and Finish. Auto-pause comes from watchOS (Auto-Pause in the
   watch's Workout settings), and a double tap pauses or resumes.

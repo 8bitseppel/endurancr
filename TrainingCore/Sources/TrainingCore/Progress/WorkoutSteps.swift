@@ -71,6 +71,9 @@ public enum WorkoutSteps {
     /// `.steady` step; a structured session becomes warm-up + reps×[work + recovery]
     /// + cool-down, with cumulative `startMeters` assigned in order.
     public static func steps(for w: PlannedWorkout, zones: PaceZones) -> [WorkoutStep] {
+        if w.structure == nil, hasStrides(w) {
+            return strideSteps(for: w, zones: zones)
+        }
         guard let s = w.structure else {
             return [WorkoutStep(
                 kind: .steady, index: 0, total: 1,
@@ -128,6 +131,54 @@ public enum WorkoutSteps {
             cumulative += d.distance
         }
         return steps
+    }
+
+    // MARK: Strides
+
+    /// Strides end an easy run: 6 × 20 s quick and light, about a minute easy between.
+    /// The watch follows distance, so each stride is the 100 m that 20 s at repetition
+    /// pace about covers, and each break the 150 m of a minute's easy jog after it.
+    public static let strideCount = 6
+    public static let strideMeters: Double = 100
+    public static let strideRecoveryMeters: Double = 150
+
+    /// An easy run with strides at the end, long enough to hold them after an easy part.
+    public static func hasStrides(_ w: PlannedWorkout) -> Bool {
+        w.notes.contains("6 × 20 s strides")
+            && w.distanceMeters >= Double(strideCount) * (strideMeters + strideRecoveryMeters) + 1_500
+    }
+
+    private static func strideSteps(for w: PlannedWorkout, zones: PaceZones) -> [WorkoutStep] {
+        let block = Double(strideCount) * (strideMeters + strideRecoveryMeters)
+        let total = 1 + strideCount * 2
+        var steps = [WorkoutStep(
+            kind: .warmup, index: 0, total: total,
+            distanceMeters: w.distanceMeters - block, startMeters: 0,
+            paceType: .easy, targetPaceSecPerKm: zones.easySecPerKm, label: "Easy"
+        )]
+        var start = w.distanceMeters - block
+        for r in 1...strideCount {
+            steps.append(WorkoutStep(
+                kind: .work, index: steps.count, total: total, repNumber: r, repTotal: strideCount,
+                distanceMeters: strideMeters, startMeters: start,
+                paceType: .repetitionSpeed, targetPaceSecPerKm: zones.repetitionSecPerKm,
+                label: "Stride \(r)/\(strideCount)"
+            ))
+            start += strideMeters
+            steps.append(WorkoutStep(
+                kind: .recovery, index: steps.count, total: total, repNumber: r, repTotal: strideCount,
+                distanceMeters: strideRecoveryMeters, startMeters: start,
+                paceType: .easy, targetPaceSecPerKm: zones.easySecPerKm,
+                label: "Easy \(r)/\(strideCount)"
+            ))
+            start += strideRecoveryMeters
+        }
+        return steps
+    }
+
+    /// Whether the run has steps to guide (reps, a block, strides), not just one pace.
+    public static func isGuided(_ w: PlannedWorkout) -> Bool {
+        w.structure != nil || hasStrides(w)
     }
 
     /// A time trial's pace is the race pace predicted for its distance, kept on the

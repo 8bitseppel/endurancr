@@ -139,9 +139,11 @@ struct WatchTodayView: View {
                     .font(.system(compact ? .title3 : .title2, design: .rounded).weight(.semibold))
                     .monospacedDigit()
                     .lineLimit(1).minimumScaleFactor(0.6)
-                Text(Format.paceRange(planned.targetPaceSecPerKm))
+                // A guided session says what it holds: "6 × 1 km", "With 6 × 20 s strides".
+                Text(Format.sessionSummary(planned) ?? Format.paceRange(planned.targetPaceSecPerKm))
                     .font(.footnote).monospacedDigit()
                     .foregroundStyle(.secondary)
+                    .lineLimit(1).minimumScaleFactor(0.8)
                 // Why the plan changed today, from the iPhone (e.g. shorter while
                 // easing back in after a break).
                 if let note = Self.adaptationNote(planned), !compact {
@@ -233,6 +235,13 @@ struct WatchTodayView: View {
         }
     }
 
+    /// "Start intervals" when the watch will guide reps; "Start Run" otherwise.
+    private var startTitle: String {
+        guard case .workout(let planned) = state, WorkoutSteps.isGuided(planned) else { return "Start Run" }
+        if let s = planned.structure, s.reps > 1 { return "Start intervals" }
+        return WorkoutSteps.hasStrides(planned) ? "Start Run" : "Start session"
+    }
+
     private var startButton: some View {
         Button {
             // A run is already going (e.g. the screen was left): back to it.
@@ -256,7 +265,7 @@ struct WatchTodayView: View {
                     .currentWeekCompletedMeters
             }
         } label: {
-            Label("Start Run", systemImage: "figure.run")
+            Label(startTitle, systemImage: "figure.run")
                 .fontWeight(.semibold)
                 .foregroundStyle(Self.plumInk)
                 .frame(maxWidth: .infinity)

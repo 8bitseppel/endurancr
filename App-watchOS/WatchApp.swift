@@ -37,6 +37,8 @@ struct EndurancrWatchApp: App {
             }
         case "summary":
             NavigationStack { WatchRunSummaryView(summary: .demo) }
+        case "intervals":
+            IntervalRunSimulation()
         default:
             WatchTodayView()
         }
@@ -68,6 +70,40 @@ private extension WorkoutManager {
         workout.routePointCount = 412
         workout.isRunning = true
         return workout
+    }
+}
+
+/// `-demoScreen intervals`: an interval session run at 40 m/s from the start, to
+/// check the step cards and taps in the Simulator (which has no real GPS distance).
+/// 1 km warm-up, 6 × 400 m with 200 m easy, 1 km cool-down (or strides, see below).
+private struct IntervalRunSimulation: View {
+    @State private var workout = WorkoutManager()
+    private let zones = DemoMode.plan.map { VDOTCalculator().paceZones(forVDOT: $0.vdot) }
+        ?? VDOTCalculator().paceZones(forVDOT: 45)
+    /// `-demoStrides YES` runs a 3.5 km easy run with strides instead.
+    private let planned = UserDefaults.standard.bool(forKey: "demoStrides")
+        ? PlannedWorkout(date: .now, type: .easy, distanceMeters: 3_500, notes: VDOTPlanGenerator.stridesNote)
+        : PlannedWorkout(
+            date: .now, type: .interval, distanceMeters: 5_600,
+            structure: WorkoutStructure(warmupMeters: 1_000, reps: 6, workMeters: 400, recoveryMeters: 200,
+                                        cooldownMeters: 1_000, workType: .interval, recoveryType: .easy)
+        )
+
+    var body: some View {
+        NavigationStack {
+            LiveRunView(workout: workout, plannedWorkout: planned, zones: zones)
+        }
+        .task {
+            workout.isRunning = true
+            workout.heartRate = 150
+            while workout.distanceMeters < planned.distanceMeters {
+                try? await Task.sleep(for: .milliseconds(100))
+                let step = WorkoutSteps.activeStep(for: planned, zones: zones, distanceCovered: workout.distanceMeters)
+                workout.distanceMeters += 4
+                workout.elapsedSeconds += 4 * (step?.targetPaceSecPerKm ?? 330) / 1_000
+            }
+            print("[sim] finished at \(Int(workout.distanceMeters)) m")
+        }
     }
 }
 

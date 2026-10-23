@@ -1520,6 +1520,22 @@ h.suite("Workout steps") {
     // Past the total distance clamps to the final cool-down step.
     let past = WorkoutSteps.activeStep(for: interval, zones: zones, distanceCovered: 999_999)
     h.check(past?.kind == .cooldown, "past the end returns the cool-down step")
+    // Strides: an easy part, then 6 × (100 m stride + 150 m easy), ending on the run's distance.
+    var strides = easy
+    strides.distanceMeters = 8_000
+    strides.notes = VDOTPlanGenerator.stridesNote
+    let strideSteps = WorkoutSteps.steps(for: strides, zones: zones)
+    h.check(strideSteps.count == 13 && strideSteps[0].label == "Easy" && strideSteps[1].label == "Stride 1/6",
+            "strides become an easy part and six strides")
+    h.check(strideSteps[1].paceType == .repetitionSpeed && strideSteps[2].kind == .recovery,
+            "a stride runs at repetition pace, then easy")
+    h.check(abs((strideSteps.last!.startMeters + strideSteps.last!.distanceMeters) - 8_000) < 0.5,
+            "the strides end where the run ends")
+    h.check(WorkoutSteps.isGuided(strides) && !WorkoutSteps.isGuided(easy), "a run with strides is guided, a plain easy run isn't")
+    var shortStrides = strides
+    shortStrides.distanceMeters = 2_500
+    h.check(WorkoutSteps.steps(for: shortStrides, zones: zones).count == 1, "a run too short for strides stays one easy step")
+
 }
 
 h.finish()

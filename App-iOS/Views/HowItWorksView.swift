@@ -155,6 +155,12 @@ struct HowItWorksView: View {
                     detail: "A run on Apple Watch also shows on your iPhone's Lock Screen as a Live Activity, through Apple's workout mirroring, with heart rate and Pause and Finish buttons that act on the watch. If the run starts while endurancr is closed on the iPhone, it appears the next time you open the app. Auto-pause is Apple's: turn on Auto-Pause in the watch's Workout settings and watchOS notices when you stop, at a traffic light for example, and when you move again. The run screen then shows Auto-paused and taps your wrist, and Apple Health keeps the pause with the workout. endurancr doesn't detect stops itself, so runs recorded on iPhone don't auto-pause. On the watch, double tap (pinch twice) to pause or resume."
                 )
 
+                topic(
+                    "Intervals on Apple Watch",
+                    icon: "timer",
+                    detail: "On a day with intervals, a threshold run, a marathon-pace block, a tune-up race or strides, the watch guides you through the session. Its home screen says what's in it (\"6 × 1 km\", \"With 6 × 20 s strides\") and the button reads Start intervals. During the run it follows your distance: the run screen shows the step you're in, like Rep 3/6 with its distance and pace, and the pace turns green within 5 s/km of the target. About 100 m before a rep it taps your wrist and shows \"Rep 3 of 6 in 100 m, get ready\". When the rep starts it taps again, differently, and shows \"Go, Rep 3 of 6, 1 km at 4:15/km\". When it's done you feel a softer tap and read \"3 of 6 done, easy now\", and after the last one \"All 6 done\" for the cool-down. Each card closes by itself after 5 seconds, or with a tap. Strides are counted by distance too: about 100 m quick and light each, the distance 20 s covers, then about 150 m easy. The paces always come from your current fitness, so they change when your paces do. On iPhone the Lock Screen shows the step, without taps."
+                )
+
                 sourcesSection
 
                 Section {
