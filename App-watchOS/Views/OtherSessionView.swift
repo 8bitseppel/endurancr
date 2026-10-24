@@ -41,6 +41,13 @@ struct OtherSessionView: View {
             }
         }
         .navigationTitle("Another session")
+        // Its own solid background, so the home screen doesn't show through the list.
+        .containerBackground(for: .navigation) {
+            ZStack {
+                Color.black
+                Rectangle().fill(Color.accentColor.opacity(0.25).gradient)
+            }
+        }
         .task { offers = await load() }
     }
 

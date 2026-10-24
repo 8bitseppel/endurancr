@@ -53,18 +53,6 @@ struct WatchTodayView: View {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { today = Calendar.current.startOfDay(for: .now) }
             }
-            .toolbar {
-                // Secondary only, so in the More button: the home screen stays today's
-                // run and Start.
-                if let plan = currentPlan, !workout.isRunning {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button { showOther = true } label: {
-                            Image(systemName: "ellipsis")
-                        }
-                        .accessibilityLabel("Start another session")
-                    }
-                }
-            }
             #if DEBUG
             .task { if DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoOffersOpen") { showOther = true } }
             #endif
@@ -153,6 +141,16 @@ struct WatchTodayView: View {
             header(compact: compact)
             Spacer(minLength: 0)
             startButton
+            // Secondary, so plain and small under Start: words rather than a bare
+            // More button, so it's clear what it opens.
+            if currentPlan != nil, !workout.isRunning {
+                Button("Another session") { showOther = true }
+                    .buttonStyle(.plain)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tint)
+                    .frame(maxWidth: .infinity, minHeight: compact ? 24 : 30)
+                    .contentShape(.rect)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 4)

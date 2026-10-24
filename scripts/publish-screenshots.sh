@@ -14,13 +14,13 @@ A=$S/appstore
 mkdir -p docs/screenshots "$A/6.5-inch" "$A/6.3-inch" website/screens
 
 for f in iphone-1-welcome.png iphone-2-goal.gif iphone-2-goal.png iphone-3-today.png iphone-4-run.png \
-         iphone-5-summary.png iphone-6-progress.gif iphone-6-progress.png iphone-7-plan.png iphone-8-week.png iphone-9-paces.png \
+         iphone-5-summary.png iphone-6-progress.gif iphone-6-progress.png iphone-7-plan.png iphone-8-week.png iphone-9-paces.png iphone-10-another.png \
          watch-1-today.png watch-2-run.gif watch-2-run.png watch-3-summary.gif watch-3-summary.png \
-         watch-4-intervals.png watch-5-reps.png; do
+         watch-4-intervals.png watch-5-reps.png watch-6-another.png; do
   cp "$S/$f" docs/screenshots/
 done
 
-# App Store order: Today, Progress, Plan, Last week, Paces, Run, Run complete, Goal, Welcome.
+# App Store order: Today, Progress, Plan, Last week, Paces, Run, Run complete, Goal, Welcome, Another session.
 rm -f $A/iphone-*.png $A/6.5-inch/iphone-*.png $A/6.3-inch/iphone-*.png
 cp $S/iphone-3-today.png    $A/iphone-1-today.png
 cp $S/iphone-6-progress.png $A/iphone-2-progress.png
@@ -31,11 +31,13 @@ cp $S/iphone-4-run.png      $A/iphone-6-run.png
 cp $S/iphone-5-summary.png  $A/iphone-7-summary.png
 cp $S/iphone-2-goal.png     $A/iphone-8-goal.png
 cp $S/iphone-1-welcome.png  $A/iphone-9-welcome.png
+cp $S/iphone-10-another.png $A/iphone-10-another.png
 cp $S/watch-1-today.png     $A/watch-1-today.png
 cp $S/watch-2-run.png       $A/watch-2-run.png
 cp $S/watch-3-summary.png   $A/watch-3-summary.png
 cp $S/watch-4-intervals.png $A/watch-4-intervals.png
 cp $S/watch-5-reps.png      $A/watch-5-reps.png
+cp $S/watch-6-another.png   $A/watch-6-another.png
 
 python3 - <<'PY'
 from pathlib import Path

@@ -117,6 +117,8 @@ shot "$PHONE" app.endurancr plan iphone-7-plan
 shot "$PHONE" app.endurancr plan iphone-8-week -demoPlanWeek 6
 # The pace calculator, on its results.
 shot "$PHONE" app.endurancr paces iphone-9-paces -clipResults
+# Another session: intervals offered today instead of the easy run.
+shot "$PHONE" app.endurancr - iphone-10-another -demoOffers offer -demoOffersOpen YES
 
 # The same in dark, for the light and dark slider on the website.
 echo "==> iPhone, dark"
@@ -130,6 +132,7 @@ rec  "$PHONE" app.endurancr progress iphone-6-progress-dark 360 20
 shot "$PHONE" app.endurancr plan iphone-7-plan-dark
 shot "$PHONE" app.endurancr plan iphone-8-week-dark -demoPlanWeek 6
 shot "$PHONE" app.endurancr paces iphone-9-paces-dark -clipResults
+shot "$PHONE" app.endurancr - iphone-10-another-dark -demoOffers offer -demoOffersOpen YES
 xcrun simctl ui "$PHONE" appearance light
 
 echo "==> App Clip"
@@ -152,6 +155,7 @@ rec "$WATCH" app.endurancr.watchkitapp summary watch-3-summary 312 25 -demoReps 
 # Intervals: the card when a rep starts, and the reps after the run.
 shot "$WATCH" app.endurancr.watchkitapp run watch-4-intervals -demoStepCard YES
 shot "$WATCH" app.endurancr.watchkitapp summary watch-5-reps -demoReps YES -demoRepsPage YES
+shot "$WATCH" app.endurancr.watchkitapp - watch-6-another -demoOffers offer -demoOffersOpen YES
 python3 scripts/watch-clock.py
 
 echo "==> Done"

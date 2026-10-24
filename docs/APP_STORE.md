@@ -448,10 +448,6 @@ Every rep, honestly
 - The plan follows how your reps really went: when most reps of your hard sessions keep coming in slower than their target, the paces ease a little so they fit again.
 - How it works explains it all, with the rules behind it.
 
-Intervals when you feel like it
-- Start another session, under Start run on Today or with ••• on the watch: this week's own hard session moved to today, an interval session of the plan's own size, or strides at the end of today's easy run.
-- Only what fits your fitness and your week: never two hard days side by side, at most two hard sessions a week, nothing hard the day after the long run or in the last 10 days before the race. When intervals don't fit, it says why.
-
 ### Description (4000)
 
 endurancr builds a running plan around one goal, records your runs on Apple Watch or iPhone, and adapts the plan to what you really ran, like a running buddy who isn't pushy. No account, no feed, no ads.
@@ -496,7 +492,7 @@ endurancr is a training aid, not medical advice. Talk to a doctor before you sta
 
 ### Build
 
-1.4.0 (37). Build 36 was an earlier 1.4.0 archive without Start another session; use 37.
+1.4.0 (36).
 
 ### Screenshots
 
@@ -504,3 +500,70 @@ The iPhone run summary (`iphone-7-summary.png`) now shows an interval session wi
 reps. Two new Apple Watch screenshots: `watch-4-intervals.png` (the card when a rep
 starts) and `watch-5-reps.png` (the reps after the run). Everything is in
 `releases/1.4.0/`. The App Preview and the App Clip card are unchanged from 1.3.0.
+
+## Version 1.5.0
+
+### Promotional text (170)
+
+Feel like intervals today? Start another session offers them when they fit your fitness and your week, and tells you honestly why when they don't.
+
+### What's New (4000)
+
+Intervals when you feel like it
+- Start another session: under Start run on Today, and under Start Run on your Apple Watch.
+- It lists what fits today: this week's own hard session moved to today (today's run takes its place, so nothing is done twice), an interval session of the plan's own size in a week with only one hard session, or strides at the end of today's easy run.
+- Only what fits your fitness and your week, by Jack Tupper Daniels' rules: never two hard days side by side, at most two hard sessions a week, nothing hard the day after the long run, the day before it or in the last 10 days before the race, and easy runs only while you ease back in after a break or when your resting heart rate is up.
+- When intervals don't fit, it tells you why, like "The day after the long run is for easy running."
+- Started on the watch, the change reaches your iPhone's plan too.
+
+### Description (4000)
+
+endurancr builds a running plan around one goal, records your runs on Apple Watch or iPhone, and adapts the plan to what you really ran, like a running buddy who isn't pushy. No account, no feed, no ads.
+
+SET ONE GOAL
+Pick a race, from 5K to the marathon, and its date. endurancr builds a full plan with the VDOT method from Jack Tupper Daniels, paced to the fitness you have now. It uses a recent run from Apple Health, or a race result you type in. A short race shows your speed, not your endurance, so marathon pace starts a little easier until your long runs prove it.
+
+TRAINING FROM THE BOOKS
+Easy runs, threshold runs, intervals and marathon-pace runs, never more than two hard sessions a week. Strides keep your legs quick. Long runs build to 32 km for the marathon. A tune-up race six weeks out sets your paces. Race day tells you how to pace it and what to eat and drink, and after the race the plan brings you back with rest and easy runs. Based on Jack Tupper Daniels, Pete Pfitzinger, the Hansons and Hal Higdon.
+
+A PLAN THAT FOLLOWS YOU
+Every run counts, even one on a rest day. Missed kilometres are never piled onto the days after. Ran less than planned? The coming weeks build from what you actually ran, at most 10% more each week. Back from a break? Your paces ease a little and you start with easy runs. Strong runs nudge your paces up a little at a time. Drag days to swap them when life gets in the way.
+
+THE WHOLE PLAN
+See what you ran on each day, what you missed, what changed and why, your new paces next to the old ones, and what each week is for, all the way to race day.
+
+AN HONEST OUTLOOK
+Progress shows a finish-time range for today and for race day, and tells you whether your target is on track, within reach, a stretch or unlikely, and why. If it's out of reach, it suggests a realistic time. It only changes your target if you tap it.
+
+A CALM LOOK, LIGHT AND DARK
+Every kind of run has its own colour, the same on Today, in the plan and in your paces. Today shows your run and your week at a glance, a circle for every day.
+
+INTERVALS ON YOUR WRIST
+On interval days your Apple Watch guides you through every rep: a tap and "get ready" just before it, "Go" with its distance and pace, and how many are done, each with its own tap you can tell apart without looking. Strides are guided too. Afterwards you see every rep against its target, the slower ones too, and the plan's paces follow how your reps really went. Feel like intervals on another day? Start another session offers them when they fit your fitness and your week, and says why when they don't.
+
+RUN ON YOUR WRIST OR YOUR PHONE
+Start today's run on Apple Watch with heart rate, or on iPhone with GPS. The run screens show time, distance, your pace and the target pace. The watch's own Auto-Pause holds your run at a traffic light, and a run on the watch shows on your iPhone's Lock Screen, where you can pause and finish it. Every run is saved to Apple Health.
+
+YOUR PACES IN A MINUTE
+The pace calculator turns one recent race into your VDOT, your five training paces, a race-day range and the plan endurancr would build, ready to start with one tap. It's in the app, and as an App Clip it opens without installing, right in Safari or from a link.
+
+NOTHING HIDDEN
+How it works explains every rule the plan follows, in plain words, with the books and studies behind it. endurancr is open source, so you can read every line that touches your data.
+
+PRIVATE BY DESIGN
+No account, no server, no analytics, no ads, no tracking. Your plan stays on your device, and your runs live in Apple Health.
+
+FREE
+No subscription and no in-app purchases.
+
+endurancr is a training aid, not medical advice. Talk to a doctor before you start a new training plan.
+
+### Build
+
+1.5.0 (38).
+
+### Screenshots
+
+New: `iphone-10-another.png` (Another session on iPhone, last in the order) and
+`watch-6-another.png` (on the watch). Everything is in `releases/1.5.0/`. The App
+Preview and the App Clip card are unchanged.
