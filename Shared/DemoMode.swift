@@ -124,6 +124,31 @@ enum DemoMode {
         }
     }
 
+    /// `-demoOffers offer`: "Another session" offers intervals and strides today;
+    /// `-demoOffers reason`: it says why not. For screenshots (the demo is in a base week).
+    static var sessionOffers: SessionOffers? {
+        guard isOn, let mode = UserDefaults.standard.string(forKey: "demoOffers"),
+              let plan, let today = todaysWorkout else { return nil }
+        if mode == "reason" {
+            return SessionOffers(offers: [], reason: "The day after the long run is for easy running.")
+        }
+        let week = plan.weeks.last { $0.startDate <= .now }
+        var strides = today
+        strides.notes = VDOTPlanGenerator.stridesNote
+        let intervals = SessionOffers.intervals(for: today, weekMeters: max(week?.plannedVolumeMeters ?? 50_000, 50_000),
+                                                zones: plan.paceZones)
+        let pace = Format.pace(plan.paceZones.intervalSecPerKm)
+        var offers: [SessionOffers.Offer] = []
+        if let intervals, let s = intervals.structure {
+            offers.append(.init(title: "Intervals",
+                                detail: "Instead of today's run · \(s.reps) × \(Int(s.workMeters)) m at \(pace)",
+                                workout: intervals, movesFrom: nil))
+        }
+        offers.append(.init(title: "Strides", detail: "Today's easy run, then 6 × 20 s quick and light",
+                            workout: strides, movesFrom: nil))
+        return SessionOffers(offers: offers, reason: nil)
+    }
+
     /// Runs that followed the plan up to yesterday, a little off here and there.
     /// A few easy runs are skipped; long runs never are, since the app would
     /// move a missed one into this week. One easy run last week went fast, the

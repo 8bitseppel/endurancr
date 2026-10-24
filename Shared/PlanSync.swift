@@ -25,6 +25,10 @@ final class PlanSync: NSObject {
     /// the today view reads from. Unused on iOS.
     var container: ModelContainer?
 
+    /// The iPhone sets this to apply a day swap the watch asks for, when a session
+    /// from later in the week was started today on the watch (`SessionOffers`).
+    var onSwapRequest: ((_ today: Date, _ from: Date) -> Void)?
+
     /// The last inputs the phone asked to publish, retained so we can (re)send once
     /// the session finishes activating. Unused on watchOS.
     private var pendingContext: [String: Any]?
@@ -65,6 +69,14 @@ final class PlanSync: NSObject {
         try? session.updateApplicationContext(context)
     }
 
+    // MARK: Watch -> Phone
+
+    /// Asks the iPhone to swap today with the day a session was moved from. Queued
+    /// by WatchConnectivity, so it arrives even when the iPhone isn't nearby now.
+    func requestSwap(today: Date, from: Date) {
+        session?.transferUserInfo(["swap": [today.timeIntervalSince1970, from.timeIntervalSince1970]])
+    }
+
     // MARK: Watch <- Phone
 
     /// Mirrors the phone's current inputs into the watch's own store, replacing
@@ -100,6 +112,12 @@ extension PlanSync: WCSessionDelegate {
             self.flush()                    // phone: (re)send once activated
             if hasContext { self.apply(inputsData: inputsData, adaptedData: adaptedData) } // watch: catch up
         }
+    }
+
+    nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
+        guard let days = userInfo["swap"] as? [Double], days.count == 2 else { return }
+        let today = Date(timeIntervalSince1970: days[0]), from = Date(timeIntervalSince1970: days[1])
+        Task { @MainActor in self.onSwapRequest?(today, from) }
     }
 
     nonisolated func session(_ session: WCSession,

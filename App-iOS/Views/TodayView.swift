@@ -16,6 +16,7 @@ struct TodayView: View {
     @State private var showingDataManagement = false
     @State private var showDeleteConfirm = false
     @Environment(\.colorScheme) private var colorScheme
+    @State private var showingOther = false
 
     var body: some View {
         NavigationStack {
@@ -104,6 +105,13 @@ struct TodayView: View {
                 }
             }
             .sheet(item: $runSummary) { RunSummaryView(data: $0) }
+            .sheet(isPresented: $showingOther) {
+                if let offers { OtherSessionSheet(offers: offers, onStart: start) }
+            }
+            #if DEBUG
+            // `-demoOffersOpen YES`: "Another session" open, for screenshots.
+            .task { if DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoOffersOpen") { showingOther = true } }
+            #endif
             .sheet(isPresented: $showingGoalEditor) { GoalEditorView(coordinator: coordinator) }
             .sheet(isPresented: $showingDataManagement) {
                 NavigationStack { DataManagementView(coordinator: coordinator) }
@@ -234,7 +242,35 @@ struct TodayView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
+            if offers != nil {
+                Button("Start another session") { showingOther = true }
+                    .font(.subheadline.weight(.medium))
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 2)
+            }
         }
+    }
+
+    /// "Another session": offered when there's something to offer or a reason to give.
+    private var offers: SessionOffers? {
+        #if DEBUG
+        if let demo = DemoMode.sessionOffers { return demo }
+        #endif
+        guard let offers = coordinator.sessionOffers, !offers.offers.isEmpty || offers.reason != nil else { return nil }
+        return offers
+    }
+
+    private func start(_ offer: SessionOffers.Offer) {
+        showingOther = false
+        coordinator.adopt(offer)
+        recorder.start(
+            goalName: coordinator.currentPlan?.goal.displayName ?? "",
+            workoutTitle: Format.workoutTitle(offer.workout.type),
+            targetPace: offer.workout.targetPaceSecPerKm,
+            plannedWorkout: offer.workout,
+            zones: coordinator.currentPlan?.paceZones
+        )
+        showLiveRun = true
     }
 
     /// This week at a glance: a circle for every day, in the run's colour.

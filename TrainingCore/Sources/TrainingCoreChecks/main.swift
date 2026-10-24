@@ -1565,4 +1565,96 @@ h.suite("Workout steps") {
 
 }
 
+// MARK: Another session
+
+h.suite("Another session") {
+    let plan = try marathonPlan()
+    let all = plan.allWorkouts
+    let on = { (d: Date) in all.first { cal.isDate($0.date, inSameDayAs: d) } }
+    let hard: Set<WorkoutType> = [.threshold, .interval, .repetitionSpeed, .marathonPace, .longRun, .timeTrial]
+    let shift = { (d: Date, n: Int) in cal.date(byAdding: .day, value: n, to: d)! }
+    let offers = { (d: Date, runs: [CompletedRun], easing: Bool) in
+        SessionOffers.make(plan: plan, runs: runs, isEasingBack: easing, isFatigued: false, asOf: d, calendar: cal)
+    }
+
+    // A free-standing easy day (nothing hard the day before or after) in a build or
+    // peak week with one hard session: an interval session of the plan's size is offered.
+    var found: (easy: PlannedWorkout, week: TrainingWeek)?
+    for week in plan.weeks where [.build, .peak].contains(week.phase) && found == nil
+        && week.workouts.filter({ [.threshold, .interval, .repetitionSpeed, .marathonPace, .timeTrial].contains($0.type) }).count == 1 {
+        for e in week.workouts where e.type == .easy {
+            let before = on(shift(e.date, -1)), after = on(shift(e.date, 1))
+            if !(before.map { hard.contains($0.type) } ?? false), !(after.map { hard.contains($0.type) } ?? false),
+               !week.workouts.contains(where: { [.threshold, .interval].contains($0.type) && $0.date > e.date }) {
+                found = (e, week); break
+            }
+        }
+    }
+    h.check(found != nil, "the plan has a free-standing easy day in a build or peak week with one hard session")
+    if let (easy, week) = found {
+        let o = offers(easy.date, [], false)
+        let s = o.offers.first?.workout.structure
+        h.check(o.reason == nil && o.offers.first?.title == "Intervals" && o.offers.first?.movesFrom == nil,
+                "an interval session is offered instead of today's run: \(o.offers.first?.detail ?? o.reason ?? "")")
+        if let s {
+            let work = Double(s.reps) * s.workMeters
+            h.check(work <= min(10_000, 0.08 * week.plannedVolumeMeters) + 0.5 && (3...6).contains(s.reps),
+                    "within Daniels' limit: \(s.reps) × \(Int(s.workMeters)) m, at most 8% of the week or 10 km")
+            let repMinutes = s.workMeters / 1_000 * plan.paceZones.intervalSecPerKm / 60
+            h.check(repMinutes >= 1.5 && repMinutes <= 5, "each rep takes up to 5 minutes at interval pace")
+        }
+        h.check(offers(easy.date, [], true).reason == "While you ease back in after a break, it's easy runs only.",
+                "no intervals while easing back in after a break")
+        let fast = CompletedRun(date: shift(easy.date, -1), distanceMeters: 8_000,
+                                durationSeconds: 8 * plan.paceZones.thresholdSecPerKm)
+        h.check(offers(easy.date, [fast], false).reason == "The day after a hard session is for easy running.",
+                "the day after a hard run is easy")
+    }
+
+    // Moving this week's session must not put two hard days side by side: on the
+    // day after Tuesday's threshold run, Thursday's intervals aren't moved to it.
+    if let week = plan.weeks.first(where: { w in w.workouts.filter { [.threshold, .interval].contains($0.type) }.count == 2 }),
+       let first = week.workouts.first(where: { [.threshold, .interval].contains($0.type) }),
+       let next = on(shift(first.date, 1)), next.type == .easy {
+        let ran = CompletedRun(date: first.date, distanceMeters: first.distanceMeters, durationSeconds: first.distanceMeters / 1_000 * 300)
+        h.check(offers(next.date, [ran], false).offers.allSatisfy { $0.movesFrom == nil && $0.title != "Intervals" },
+                "no hard session the day after one")
+    }
+
+    // The day after the long run.
+    let buildLongRuns = plan.weeks.filter { [.build, .peak].contains($0.phase) }.flatMap(\.workouts).filter { $0.type == .longRun }
+    if let long = buildLongRuns.first,
+       let next = on(shift(long.date, 1)) {
+        let ran = CompletedRun(date: long.date, distanceMeters: long.distanceMeters, durationSeconds: long.distanceMeters / 1_000 * 360)
+        h.check(offers(next.date, [ran], false).reason == "The day after the long run is for easy running.",
+                "the day after the long run is easy")
+    }
+
+    // Base weeks: no intervals, with the reason.
+    if let base = plan.weeks.first(where: { $0.phase == .base && $0.index > 0 }),
+       let e = base.workouts.first(where: { w in
+           w.type == .easy && on(shift(w.date, 1))?.type != .longRun
+               && !(on(shift(w.date, -1)).map { hard.contains($0.type) } ?? false)
+       }) {
+        h.check(offers(e.date, [], false).reason?.contains("base weeks") == true, "in base weeks intervals aren't offered, and it says why")
+    }
+
+    // The last 10 days before the race.
+    let close = shift(plan.goal.raceDate, -6)
+    if on(close) != nil {
+        h.check(offers(close, [], false).reason?.contains("last 10 days") == true, "no extra hard session in the last 10 days")
+    }
+
+    // Two hard sessions already this week.
+    if let (easy, week) = found {
+        let weekStart = week.startDate
+        let fastRun = { (d: Date) in CompletedRun(date: d, distanceMeters: 8_000, durationSeconds: 8 * plan.paceZones.thresholdSecPerKm) }
+        let early = [fastRun(weekStart), fastRun(shift(weekStart, 1))].filter { $0.date < shift(easy.date, -1) }
+        if early.count == 2 {
+            h.check(offers(easy.date, early, false).reason?.contains("two hard sessions") == true,
+                    "at most two hard sessions a week")
+        }
+    }
+}
+
 h.finish()

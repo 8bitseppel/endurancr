@@ -49,6 +49,12 @@ final class PlanCoordinator {
         self.context = context
         self.health = health
         loadLatest()
+        // A session from later in the week started today on the watch: move it here
+        // too, unless it's already been moved (the request would swap it back).
+        PlanSync.shared.onSwapRequest = { [weak self] today, from in
+            guard let self, let session = self.workout(on: from), SessionOffers.isHard(session.type) else { return }
+            self.swapDays(today, from)
+        }
     }
 
     private func loadLatest() {
@@ -335,6 +341,18 @@ final class PlanCoordinator {
 
     /// Swaps the sessions on two days (a run with a rest day, or two runs) and
     /// persists the swap so it survives regeneration and syncs to the watch.
+    /// What else can be started today, and why intervals aren't offered when they aren't.
+    var sessionOffers: SessionOffers? {
+        guard let plan = displayPlan else { return nil }
+        return SessionOffers.make(plan: plan, runs: recentRuns, isEasingBack: buddy?.isEasingBack ?? false,
+                                  isFatigued: fatigue?.isFatigued ?? false, asOf: .now)
+    }
+
+    /// Starts `offer` today: a session from later in the week swaps its day with today.
+    func adopt(_ offer: SessionOffers.Offer) {
+        if let from = offer.movesFrom { swapDays(.now, from) }
+    }
+
     func swapDays(_ a: Date, _ b: Date) {
         let cal = Calendar.current
         guard var inputs, !cal.isDate(a, inSameDayAs: b),

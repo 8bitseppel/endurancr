@@ -91,6 +91,12 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   100 m", then "Go" with the rep's distance and pace from your current fitness, and "3 of
   6 done, easy now" after it, each with its own tap. Strides count as about 100 m quick
   and light with about 150 m easy between.
+- Start another session: this week's hard session moved to today (swapping the days),
+  an interval session of the plan's size in a week with only one, or strides. Only when
+  it fits: not in base weeks, not the day after a hard session or the long run, not the
+  day before the long run, never two hard days side by side, not in the last 10 days
+  before the race, not while easing back or with a raised resting heart rate, and at
+  most two hard sessions a week. The list says why when it's not offered.
 - Every rep is saved with the run in Apple Health (as segments too), and the plan and
   the run summary show each one against its target: on pace, slower or faster, with
   its pace, in plain words.

@@ -34,6 +34,8 @@ struct WatchTodayView: View {
     @State private var weekProgress: PlanProgress?
     /// Why a run couldn't start, e.g. no Health access.
     @State private var startError: String?
+    /// "Another session", from the More button.
+    @State private var showOther = false
 
     var body: some View {
         NavigationStack {
@@ -50,6 +52,32 @@ struct WatchTodayView: View {
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { today = Calendar.current.startOfDay(for: .now) }
+            }
+            .toolbar {
+                // Secondary only, so in the More button: the home screen stays today's
+                // run and Start.
+                if let plan = currentPlan, !workout.isRunning {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { showOther = true } label: {
+                            Image(systemName: "ellipsis")
+                        }
+                        .accessibilityLabel("Start another session")
+                    }
+                }
+            }
+            #if DEBUG
+            .task { if DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoOffersOpen") { showOther = true } }
+            #endif
+            .sheet(isPresented: $showOther) {
+                if let plan = currentPlan {
+                    NavigationStack {
+                        OtherSessionView(plan: plan) { offer in
+                            showOther = false
+                            start(offer.workout, zones: plan.paceZones)
+                            if let from = offer.movesFrom { PlanSync.shared.requestSwap(today: .now, from: from) }
+                        }
+                    }
+                }
             }
             .navigationDestination(isPresented: $showLiveRun) {
                 LiveRunView(workout: workout, plannedWorkout: runWorkout, zones: runZones)
@@ -245,28 +273,39 @@ struct WatchTodayView: View {
         return WorkoutSteps.hasStrides(planned) ? "Start Run" : "Start session"
     }
 
+    /// Starts a session other than today's planned one, from "Another session".
+    private func start(_ planned: PlannedWorkout, zones: PaceZones) {
+        runWorkout = planned
+        runZones = zones
+        beginRun()
+    }
+
+    private func beginRun() {
+        guard workout.start(plannedWorkout: runWorkout, zones: runZones,
+                            goalName: currentPlan?.goal.name ?? "") else {
+            startError = workout.lastError ?? "The run couldn't start."
+            return
+        }
+        showLiveRun = true
+        // Record this week's completed volume *before* the run so the post-run
+        // summary has a true prior baseline (the run isn't in HealthKit yet).
+        let plan = currentPlan
+        Task {
+            guard let plan else { weekCompletedAtStart = 0; return }
+            let since = plan.weeks.first?.startDate
+                ?? Calendar.current.date(byAdding: .month, value: -1, to: .now)!
+            let runs = await health.fetchRuns(since: since)
+            weekCompletedAtStart = PlanProgress.make(plan: plan, completedRuns: runs, asOf: .now)
+                .currentWeekCompletedMeters
+        }
+    }
+
     private var startButton: some View {
         Button {
             // A run is already going (e.g. the screen was left): back to it.
             if workout.isRunning { showLiveRun = true; return }
             captureToday()
-            guard workout.start(plannedWorkout: runWorkout, zones: runZones,
-                                goalName: currentPlan?.goal.name ?? "") else {
-                startError = workout.lastError ?? "The run couldn't start."
-                return
-            }
-            showLiveRun = true
-            // Record this week's completed volume *before* the run so the post-run
-            // summary has a true prior baseline (the run isn't in HealthKit yet).
-            let plan = currentPlan
-            Task {
-                guard let plan else { weekCompletedAtStart = 0; return }
-                let since = plan.weeks.first?.startDate
-                    ?? Calendar.current.date(byAdding: .month, value: -1, to: .now)!
-                let runs = await health.fetchRuns(since: since)
-                weekCompletedAtStart = PlanProgress.make(plan: plan, completedRuns: runs, asOf: .now)
-                    .currentWeekCompletedMeters
-            }
+            beginRun()
         } label: {
             Label(startTitle, systemImage: "figure.run")
                 .fontWeight(.semibold)
