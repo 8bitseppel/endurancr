@@ -560,7 +560,7 @@ endurancr is a training aid, not medical advice. Talk to a doctor before you sta
 
 ### Build
 
-1.5.0 (40). Builds 38 and 39 were earlier 1.5.0 archives; use 40.
+1.5.0 (41). Builds 38 to 40 were earlier 1.5.0 archives; use 41.
 
 ### Screenshots
 

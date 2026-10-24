@@ -59,7 +59,12 @@ struct WatchRunSummaryView: View {
             weekPage.tag(Page.week)
         }
         .tabViewStyle(.verticalPage)
-        .demoTurnPages($page, through: summary.reps.isEmpty ? [.week] : [.reps, .week])
+        // Every page in turn, from wherever it opens: run, reps, week, round again.
+        .demoTurnPages($page, through: {
+            let all: [Page] = summary.reps.isEmpty ? [.run, .week] : [.run, .reps, .week]
+            let start = all.firstIndex(of: page) ?? 0
+            return Array(all[start...] + all[..<start])
+        }())
         .navigationTitle("Run complete")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { WKInterfaceDevice.current().play(.success) }

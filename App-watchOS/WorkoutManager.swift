@@ -70,6 +70,11 @@ final class WorkoutManager: NSObject {
     /// The reps of the run just finished, for the summary.
     private(set) var reps: [RepSplit] = []
 
+    #if DEBUG
+    /// The demo's running speed, so its live pace reads as on target.
+    func setDemoSpeed(_ metersPerSecond: Double) { currentSpeed = metersPerSecond }
+    #endif
+
     /// The run's time at `date`, for a clock that ticks every second rather than
     /// only when HealthKit delivers new data. Paused time doesn't count.
     func elapsedTime(at date: Date) -> TimeInterval {

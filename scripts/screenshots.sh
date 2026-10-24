@@ -149,12 +149,13 @@ clip -clipResults; xcrun simctl io "$PHONE" screenshot --type=png "$OUT/clip-2-r
 echo "    $OUT/clip-1-calculator.png, $OUT/clip-2-results.png"
 
 echo "==> Apple Watch"
-rec "$WATCH" app.endurancr.watchkitapp - watch-1-today 312 25
+# Home, then a turn of the Crown to Another session and back.
+rec "$WATCH" app.endurancr.watchkitapp - watch-1-today 312 25 -demoOffers offer
 rec "$WATCH" app.endurancr.watchkitapp run watch-2-run 312 25
 rec "$WATCH" app.endurancr.watchkitapp summary watch-3-summary 312 25 -demoReps YES
 # Intervals: the card when a rep starts, and the reps after the run.
-shot "$WATCH" app.endurancr.watchkitapp run watch-4-intervals -demoStepCard YES
-shot "$WATCH" app.endurancr.watchkitapp summary watch-5-reps -demoReps YES -demoRepsPage YES
+rec  "$WATCH" app.endurancr.watchkitapp run watch-4-intervals 312 25 -demoStepCard YES
+rec  "$WATCH" app.endurancr.watchkitapp summary watch-5-reps 312 25 -demoReps YES -demoRepsPage YES
 shot "$WATCH" app.endurancr.watchkitapp - watch-6-another -demoOffers offer -demoOffersOpen YES
 python3 scripts/watch-clock.py
 

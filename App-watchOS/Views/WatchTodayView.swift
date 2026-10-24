@@ -61,6 +61,7 @@ struct WatchTodayView: View {
                 }
             }
             .tabViewStyle(.verticalPage)
+            .demoTurnPage($homePage, to: .another)
             .containerBackground(Color.accentColor.opacity(0.45).gradient, for: .navigation)
             .task(id: "\(storedPlans.first?.updatedAt.timeIntervalSince1970 ?? 0)-\(today.timeIntervalSince1970)") {
                 await loadWeekProgress()

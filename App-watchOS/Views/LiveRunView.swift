@@ -50,7 +50,7 @@ struct LiveRunView: View {
             controlsPage.tag(Page.controls)
         }
         .tabViewStyle(.verticalPage)
-        .demoTurnPage($page, to: .controls)
+        .demoTurnPage($page, to: .controls, unless: UserDefaults.standard.bool(forKey: "demoStepCard"))
         .navigationTitle(workout.isAutoPaused ? "Auto-paused" : workout.isPaused ? "Paused" : "Running")
         .navigationBarTitleDisplayMode(.inline)
         // Leaving the screen would leave the run recording with no way back to it;
@@ -95,11 +95,22 @@ struct LiveRunView: View {
         }
         #if DEBUG
         .task {
-            // `-demoStepCard YES`: the card at the start of a rep, for screenshots.
-            if DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoStepCard"), let zones {
-                card = StepCard(title: "Rep 3 of 6", detail: "1 km at \(Format.pace(zones.intervalSecPerKm))",
-                                note: "Go", tint: .green, haptic: .start)
-            }
+            // `-demoStepCard YES`: rep 3 of an interval session. The still shows "Go";
+            // with `-demoScroll` it plays get ready, Go, the run screen, then page 2.
+            guard DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoStepCard"),
+                  let rep = steps.first(where: { $0.kind == .work && $0.repNumber == 3 }) else { return }
+            let go = card(for: rep)
+            guard UserDefaults.standard.bool(forKey: "demoScroll") else { card = go; return }
+            card = StepCard(title: "\(repTitle(rep)) in 100 m", detail: stepDetail(rep), note: "Get ready",
+                            tint: .yellow, haptic: .notification)
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation { card = go }
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation { card = nil }
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation { page = .controls }
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation { page = .metrics }
         }
         #endif
         .onChange(of: workout.isAutoPaused) { _, paused in
@@ -369,7 +380,7 @@ extension View {
         task {
             guard DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoScroll") else { return }
             let first = page.wrappedValue
-            for next in pages {
+            for next in pages where next != first {
                 try? await Task.sleep(for: .seconds(3.5))
                 withAnimation { page.wrappedValue = next }
             }
@@ -381,10 +392,10 @@ extension View {
         #endif
     }
 
-    func demoTurnPage<Page: Hashable>(_ page: Binding<Page>, to second: Page) -> some View {
+    func demoTurnPage<Page: Hashable>(_ page: Binding<Page>, to second: Page, unless skip: Bool = false) -> some View {
         #if DEBUG
         task {
-            guard DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoScroll") else { return }
+            guard DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoScroll"), !skip else { return }
             let first = page.wrappedValue
             try? await Task.sleep(for: .seconds(4))
             withAnimation { page.wrappedValue = second }

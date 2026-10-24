@@ -30,6 +30,12 @@ struct EndurancrWatchApp: App {
     private var root: some View {
         #if DEBUG
         switch DemoMode.screen {
+        case "run" where UserDefaults.standard.bool(forKey: "demoStepCard"):
+            // An interval session at the start of rep 3, for the intervals video.
+            NavigationStack {
+                LiveRunView(workout: .demoIntervals, plannedWorkout: WorkoutManager.demoIntervalWorkout,
+                            zones: DemoMode.plan?.paceZones)
+            }
         case "run":
             NavigationStack {
                 LiveRunView(workout: .demo, plannedWorkout: DemoMode.todaysWorkout,
@@ -123,6 +129,28 @@ private struct IntervalRunSimulation: View {
                                       saved: true, weekNumber: nil, weekCompletedMeters: 0, weekTargetMeters: 0,
                                       reps: reps)
         }
+    }
+}
+
+private extension WorkoutManager {
+    /// 2 km warm-up, 6 × 1 km with 400 m easy, 2 km cool-down.
+    static let demoIntervalWorkout = PlannedWorkout(
+        date: .now, type: .interval, distanceMeters: 2_000 + 6 * 1_400 + 2_000,
+        structure: WorkoutStructure(warmupMeters: 2_000, reps: 6, workMeters: 1_000, recoveryMeters: 400,
+                                    cooldownMeters: 2_000, workType: .interval, recoveryType: .easy)
+    )
+
+    /// Just past the start of rep 3, on its pace.
+    static var demoIntervals: WorkoutManager {
+        let workout = WorkoutManager()
+        let pace = DemoMode.plan?.paceZones.intervalSecPerKm ?? 300
+        workout.distanceMeters = 2_000 + 2 * 1_400 + 60
+        workout.elapsedSeconds = 2 * 360 + 2 * (pace + 0.4 * 360) + 0.06 * pace
+        workout.heartRate = 168
+        workout.setDemoSpeed(1_000 / (pace - 1))
+        workout.routePointCount = 640
+        workout.isRunning = true
+        return workout
     }
 }
 
