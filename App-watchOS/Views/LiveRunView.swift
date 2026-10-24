@@ -363,6 +363,24 @@ extension View {
     /// In demo screen recordings, moves to the second page and back the way the
     /// watch does when the Crown is turned: it sets the page and lets the paged
     /// view run its own transition (the blur from page to page). Nothing otherwise.
+    /// Like `demoTurnPage`, through every page in turn, then back to the first.
+    func demoTurnPages<Page: Hashable>(_ page: Binding<Page>, through pages: [Page]) -> some View {
+        #if DEBUG
+        task {
+            guard DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoScroll") else { return }
+            let first = page.wrappedValue
+            for next in pages {
+                try? await Task.sleep(for: .seconds(3.5))
+                withAnimation { page.wrappedValue = next }
+            }
+            try? await Task.sleep(for: .seconds(3.5))
+            withAnimation { page.wrappedValue = first }
+        }
+        #else
+        self
+        #endif
+    }
+
     func demoTurnPage<Page: Hashable>(_ page: Binding<Page>, to second: Page) -> some View {
         #if DEBUG
         task {

@@ -1,29 +1,16 @@
-// Light and dark side by side: the dark screenshot shows left of the handle.
-// Drag anywhere on a screenshot (or use the arrow keys on its slider).
-document.querySelectorAll(".compare").forEach((box) => {
-  const range = box.querySelector(".compare-range");
-  const set = (pct) => {
-    pct = Math.max(0, Math.min(100, pct));
-    box.style.setProperty("--pos", pct + "%");
-    range.value = Math.round(pct);
-  };
-  const fromPointer = (e) => {
-    const r = box.getBoundingClientRect();
-    set(((e.clientX - r.left) / r.width) * 100);
-  };
-  box.addEventListener("pointerdown", (e) => {
-    box.setPointerCapture(e.pointerId);
-    fromPointer(e);
-  });
-  box.addEventListener("pointermove", (e) => {
-    if (box.hasPointerCapture(e.pointerId)) fromPointer(e);
-  });
-  range.addEventListener("input", () => set(Number(range.value)));
-  // Keep the two videos of a screen in step.
-  const [light, dark] = box.querySelectorAll("video");
-  if (light && dark) {
-    light.addEventListener("timeupdate", () => {
-      if (Math.abs(dark.currentTime - light.currentTime) > 0.15) dark.currentTime = light.currentTime;
+// The Light / Dark switch above the screens: shows every screenshot in light or dark.
+// Light is the default; the dark ones sit on top and fade in.
+const section = document.getElementById("screens");
+const buttons = section.querySelectorAll(".mode-toggle button");
+buttons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const dark = button.dataset.mode === "dark";
+    section.classList.toggle("show-dark", dark);
+    buttons.forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
+    // The visible one of each pair of videos plays; they stay in step.
+    section.querySelectorAll(".compare").forEach((box) => {
+      const [light, darkVideo] = box.querySelectorAll("video");
+      if (light && darkVideo) darkVideo.currentTime = light.currentTime;
     });
-  }
+  });
 });

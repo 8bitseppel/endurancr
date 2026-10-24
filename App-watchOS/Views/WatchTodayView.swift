@@ -35,17 +35,32 @@ struct WatchTodayView: View {
     /// Why a run couldn't start, e.g. no Health access.
     @State private var startError: String?
     /// "Another session", from the More button.
-    @State private var showOther = false
+    @State private var homePage = HomePage.today
+    enum HomePage { case today, another }
 
     var body: some View {
         NavigationStack {
             // Everything that matters, Start included, on one screen. Only very large
             // text sizes fall back to scrolling.
-            ViewThatFits(in: .vertical) {
-                home(compact: false)
-                home(compact: true)
-                ScrollView { home(compact: false) }
+            // Page 1 is today's run and Start, nothing else. "Another session" is the
+            // page below, a turn of the Crown away, as on the run screen.
+            TabView(selection: $homePage) {
+                ViewThatFits(in: .vertical) {
+                    home(compact: false)
+                    home(compact: true)
+                    ScrollView { home(compact: false) }
+                }
+                .tag(HomePage.today)
+                if let plan = currentPlan, !workout.isRunning {
+                    OtherSessionView(plan: plan) { offer in
+                        homePage = .today
+                        start(offer.workout, zones: plan.paceZones)
+                        if let from = offer.movesFrom { PlanSync.shared.requestSwap(today: .now, from: from) }
+                    }
+                    .tag(HomePage.another)
+                }
             }
+            .tabViewStyle(.verticalPage)
             .containerBackground(Color.accentColor.opacity(0.45).gradient, for: .navigation)
             .task(id: "\(storedPlans.first?.updatedAt.timeIntervalSince1970 ?? 0)-\(today.timeIntervalSince1970)") {
                 await loadWeekProgress()
@@ -54,19 +69,8 @@ struct WatchTodayView: View {
                 if phase == .active { today = Calendar.current.startOfDay(for: .now) }
             }
             #if DEBUG
-            .task { if DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoOffersOpen") { showOther = true } }
+            .task { if DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoOffersOpen") { homePage = .another } }
             #endif
-            .sheet(isPresented: $showOther) {
-                if let plan = currentPlan {
-                    NavigationStack {
-                        OtherSessionView(plan: plan) { offer in
-                            showOther = false
-                            start(offer.workout, zones: plan.paceZones)
-                            if let from = offer.movesFrom { PlanSync.shared.requestSwap(today: .now, from: from) }
-                        }
-                    }
-                }
-            }
             .navigationDestination(isPresented: $showLiveRun) {
                 LiveRunView(workout: workout, plannedWorkout: runWorkout, zones: runZones)
             }
@@ -141,16 +145,6 @@ struct WatchTodayView: View {
             header(compact: compact)
             Spacer(minLength: 0)
             startButton
-            // Secondary, so plain and small under Start: words rather than a bare
-            // More button, so it's clear what it opens.
-            if currentPlan != nil, !workout.isRunning {
-                Button("Another session") { showOther = true }
-                    .buttonStyle(.plain)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.tint)
-                    .frame(maxWidth: .infinity, minHeight: compact ? 24 : 30)
-                    .contentShape(.rect)
-            }
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 4)

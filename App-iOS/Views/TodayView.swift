@@ -245,8 +245,8 @@ struct TodayView: View {
             if offers != nil {
                 Button("Start another session") { showingOther = true }
                     .font(.subheadline.weight(.medium))
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 2)
+                    .frame(maxWidth: .infinity, minHeight: 44)   // a full tap target for one line of text
+                    .contentShape(.rect)
             }
         }
     }

@@ -29,10 +29,12 @@ struct OtherSessionSheet: View {
                                 }
                                 Spacer(minLength: 0)
                                 Image(systemName: "play.fill").foregroundStyle(.tint)
+                                    .accessibilityHidden(true)
                             }
                             .brandCard(tint: offer.workout.type.tint)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityHint("Starts this run now")
                     }
                     if let reason = offers.reason {
                         Label(reason, systemImage: "info.circle")

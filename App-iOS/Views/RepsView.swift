@@ -20,6 +20,13 @@ struct RepsView: View {
                             .monospacedDigit()
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
+                        // Not by colour alone: how far off target, in words.
+                        Text(Self.offset(rep) ?? " ")
+                            .font(.caption2)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                     .frame(maxWidth: 56)
                 }
@@ -33,6 +40,14 @@ struct RepsView: View {
             }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    /// "+9 s" slower or "−12 s" faster than the target per km, for a rep off target.
+    static func offset(_ rep: RepSplit) -> String? {
+        guard let pace = rep.paceSecPerKm, let target = rep.targetPaceSecPerKm,
+              rep.verdict == .slower || rep.verdict == .faster else { return nil }
+        let delta = Int((pace - target).rounded())
+        return delta > 0 ? "+\(delta) s" : "\u{2212}\(-delta) s"
     }
 
     static func tint(_ verdict: RepSplit.Verdict?) -> Color {

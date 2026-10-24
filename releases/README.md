@@ -7,7 +7,7 @@ the details and reasons behind each text are in `docs/APP_STORE.md`.
 
 | Version | Build | Date | What changed |
 |---|---|---|---|
-| [1.5.0](1.5.0/UPLOAD.md) | 38 | 2026-10-24 | Start another session: intervals when they fit your week, and why when not |
+| [1.5.0](1.5.0/UPLOAD.md) | 40 | 2026-10-24 | Start another session: intervals when they fit your week, and why when not |
 | [1.4.0](1.4.0/UPLOAD.md) | 36 | 2026-10-23 | Intervals guided on Apple Watch, every rep saved and shown against its target |
 | [1.3.0](1.3.0/UPLOAD.md) | 35 | 2026-10-20 | A new look in light and dark, run colours, the pace calculator in the app |
 | [1.2.0](1.2.0/UPLOAD.md) | 31 | 2026-10-20 | Plan tab with what you ran and why it changed, sessions from the training books, App Clip |

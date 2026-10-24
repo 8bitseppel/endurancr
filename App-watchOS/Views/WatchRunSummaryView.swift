@@ -54,12 +54,12 @@ struct WatchRunSummaryView: View {
         TabView(selection: $page) {
             runPage.tag(Page.run)
             if !summary.reps.isEmpty {
-                ScrollView { repsPage }.tag(Page.reps)
+                repsPage.tag(Page.reps)
             }
             weekPage.tag(Page.week)
         }
         .tabViewStyle(.verticalPage)
-        .demoTurnPage($page, to: .week)
+        .demoTurnPages($page, through: summary.reps.isEmpty ? [.week] : [.reps, .week])
         .navigationTitle("Run complete")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { WKInterfaceDevice.current().play(.success) }
@@ -100,30 +100,50 @@ struct WatchRunSummaryView: View {
         .padding(.horizontal, 4)
     }
 
-    /// Page 2 after an interval session: every rep's pace against its target.
+    /// Page 2 after an interval session, readable at a glance: how many reps were on
+    /// pace, a bar per rep in its colour, and which were off, in words (not by colour
+    /// alone). Every rep's pace is on the iPhone, after the run and in the plan.
     private var repsPage: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("REPS").font(.caption2).foregroundStyle(.secondary)
-            ForEach(Array(summary.reps.enumerated()), id: \.offset) { _, rep in
-                HStack {
-                    Text(rep.total > 1 ? "\(rep.number)" : rep.label)
-                        .font(.footnote.weight(.semibold))
-                    Spacer()
-                    Text(rep.paceSecPerKm.map(Format.pace) ?? "--")
-                        .font(.system(.body, design: .rounded).weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(Self.tint(rep.verdict))
+        let judged = RepReport.judged(summary.reps)
+        let onPace = judged.filter { $0.verdict == .onPace }.count
+        let off = judged.filter { $0.verdict == .slower || $0.verdict == .faster }
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("REPS ON PACE").font(.caption2).foregroundStyle(.secondary)
+            Text("\(onPace) of \(judged.count)")
+                .font(.system(.largeTitle, design: .rounded).weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(onPace == judged.count ? .green : .primary)
+            HStack(spacing: 3) {
+                ForEach(Array(judged.enumerated()), id: \.offset) { _, rep in
+                    Capsule().fill(Self.tint(rep.verdict)).frame(height: 8)
                 }
-                .accessibilityElement(children: .combine)
             }
-            if let text = RepReport.summary(summary.reps) {
-                Text(text)
-                    .font(.caption2).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 2)
-            }
+            .accessibilityHidden(true)
+            Text(offLine(off))
+                .font(.footnote).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.horizontal, 4)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// "Slower: 5 (+9 s), 6 (+14 s)", or that every rep was on pace.
+    private func offLine(_ off: [RepSplit]) -> String {
+        guard !off.isEmpty else { return "Every rep on target. Well run." }
+        let slower = off.filter { $0.verdict == .slower }.map { "\($0.number) (\(Self.offset($0) ?? ""))" }
+        let faster = off.filter { $0.verdict == .faster }.map { "\($0.number) (\(Self.offset($0) ?? ""))" }
+        return [slower.isEmpty ? nil : "Slower: " + slower.joined(separator: ", "),
+                faster.isEmpty ? nil : "Faster: " + faster.joined(separator: ", ")]
+            .compactMap { $0 }.joined(separator: ". ")
+    }
+
+    /// "+9 s" slower or "−12 s" faster per km, for a rep off target.
+    static func offset(_ rep: RepSplit) -> String? {
+        guard let pace = rep.paceSecPerKm, let target = rep.targetPaceSecPerKm,
+              rep.verdict == .slower || rep.verdict == .faster else { return nil }
+        let delta = Int((pace - target).rounded())
+        return delta > 0 ? "+\(delta) s" : "\u{2212}\(-delta) s"
     }
 
     /// Green on pace, orange slower, blue faster, as on the iPhone.

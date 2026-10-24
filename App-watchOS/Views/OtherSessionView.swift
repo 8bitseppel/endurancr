@@ -3,8 +3,8 @@ import TrainingCore
 
 /// "Another session": what can be started today instead of today's run (this week's
 /// hard session moved to today, an interval session of the plan's size, strides), and
-/// why intervals aren't offered when they aren't. Opened from the More button on the
-/// home screen, so the home screen stays one run and one Start.
+/// why intervals aren't offered when they aren't. The home screen's second page, a
+/// turn of the Crown below today's run, so the home screen stays one run and one Start.
 struct OtherSessionView: View {
     let plan: TrainingPlan
     let onStart: (SessionOffers.Offer) -> Void
@@ -13,6 +13,11 @@ struct OtherSessionView: View {
 
     var body: some View {
         List {
+            Text("Another session")
+                .font(.headline)
+                .foregroundStyle(.tint)
+                .listRowBackground(Color.clear)
+                .accessibilityAddTraits(.isHeader)
             if let offers {
                 ForEach(offers.offers) { offer in
                     Button { onStart(offer) } label: {
@@ -40,14 +45,7 @@ struct OtherSessionView: View {
                 ProgressView()
             }
         }
-        .navigationTitle("Another session")
-        // Its own solid background, so the home screen doesn't show through the list.
-        .containerBackground(for: .navigation) {
-            ZStack {
-                Color.black
-                Rectangle().fill(Color.accentColor.opacity(0.25).gradient)
-            }
-        }
+
         .task { offers = await load() }
     }
 

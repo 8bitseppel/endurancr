@@ -510,7 +510,7 @@ Feel like intervals today? Start another session offers them when they fit your 
 ### What's New (4000)
 
 Intervals when you feel like it
-- Start another session: under Start run on Today, and under Start Run on your Apple Watch.
+- Start another session: under Start run on Today, and on your Apple Watch a turn of the Crown below today's run.
 - It lists what fits today: this week's own hard session moved to today (today's run takes its place, so nothing is done twice), an interval session of the plan's own size in a week with only one hard session, or strides at the end of today's easy run.
 - Only what fits your fitness and your week, by Jack Tupper Daniels' rules: never two hard days side by side, at most two hard sessions a week, nothing hard the day after the long run, the day before it or in the last 10 days before the race, and easy runs only while you ease back in after a break or when your resting heart rate is up.
 - When intervals don't fit, it tells you why, like "The day after the long run is for easy running."
@@ -560,7 +560,7 @@ endurancr is a training aid, not medical advice. Talk to a doctor before you sta
 
 ### Build
 
-1.5.0 (38).
+1.5.0 (40). Builds 38 and 39 were earlier 1.5.0 archives; use 40.
 
 ### Screenshots
 
