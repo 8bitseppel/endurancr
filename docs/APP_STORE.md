@@ -448,6 +448,10 @@ Every rep, honestly
 - The plan follows how your reps really went: when most reps of your hard sessions keep coming in slower than their target, the paces ease a little so they fit again.
 - How it works explains it all, with the rules behind it.
 
+Intervals when you feel like it
+- Start another session, under Start run on Today or with ••• on the watch: this week's own hard session moved to today, an interval session of the plan's own size, or strides at the end of today's easy run.
+- Only what fits your fitness and your week: never two hard days side by side, at most two hard sessions a week, nothing hard the day after the long run or in the last 10 days before the race. When intervals don't fit, it says why.
+
 ### Description (4000)
 
 endurancr builds a running plan around one goal, records your runs on Apple Watch or iPhone, and adapts the plan to what you really ran, like a running buddy who isn't pushy. No account, no feed, no ads.
@@ -492,7 +496,7 @@ endurancr is a training aid, not medical advice. Talk to a doctor before you sta
 
 ### Build
 
-1.4.0 (36).
+1.4.0 (37). Build 36 was an earlier 1.4.0 archive without Start another session; use 37.
 
 ### Screenshots
 
