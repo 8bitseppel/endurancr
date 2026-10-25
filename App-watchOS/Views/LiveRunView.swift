@@ -91,8 +91,16 @@ struct LiveRunView: View {
             guard let old, let new, old != new, let step = activeStep else { return }
             announce(step)
         }
-        .onChange(of: workout.distanceMeters) { _, distance in
+        .onChange(of: workout.distanceMeters) { old, distance in
             readyNextRep(at: distance)
+            // The planned distance reached: one tap and a note, nothing more.
+            if let planned = plannedWorkout, planned.distanceMeters > 0,
+               old < planned.distanceMeters, distance >= planned.distanceMeters {
+                WKInterfaceDevice.current().play(.success)
+                show(StepCard(title: "Plan done",
+                              detail: "\(Format.workoutTitle(planned.type)), \(Format.distance(planned.distanceMeters))",
+                              note: "", tint: .green, haptic: .success))
+            }
         }
         #if DEBUG
         .task {
@@ -267,13 +275,34 @@ struct LiveRunView: View {
             }
             GridRow {
                 detail("Climb", "\(Int(workout.elevationGainMeters.rounded())) m")
-                detail("Cadence", workout.cadence > 0 ? "\(Int(workout.cadence.rounded()))" : "--")
+                toGo
             }
         }
         .lineLimit(1)
         .minimumScaleFactor(0.6)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.horizontal, 4)
+    }
+
+    /// What's left of today's run, with the time it'll be done at today's pace; once
+    /// the planned distance is run, "Done", then how far beyond it. A free run has no
+    /// target, so its cadence shows instead.
+    @ViewBuilder private var toGo: some View {
+        if let planned = plannedWorkout?.distanceMeters, planned > 0 {
+            let left = planned - workout.distanceMeters
+            if left > 0 {
+                let pace = workout.averagePaceSecPerKm
+                let done = pace > 0 ? Date.now.addingTimeInterval(left / 1_000 * pace) : nil
+                detail(done.map { "To go \($0.formatted(date: .omitted, time: .shortened))" } ?? "To go",
+                       Format.distance(left))
+            } else if -left < 500 {
+                detail("Plan", "Done", tint: .green)
+            } else {
+                detail("Beyond plan", "+" + Format.distance(-left), tint: .green)
+            }
+        } else {
+            detail("Cadence", workout.cadence > 0 ? "\(Int(workout.cadence.rounded()))" : "--")
+        }
     }
 
     private func detail(_ label: String, _ value: String, tint: Color = .primary) -> some View {

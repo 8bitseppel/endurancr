@@ -70,7 +70,13 @@ private extension WorkoutManager {
         // Two thirds into today's run, right on its target pace.
         let planned = DemoMode.todaysWorkout
         let pace = planned?.targetPaceSecPerKm.map { ($0.lowerBound + $0.upperBound) / 2 } ?? 363
-        workout.distanceMeters = ((planned?.distanceMeters ?? 9_600) * 0.66 / 10).rounded() * 10
+        // `-demoToGo done` / `beyond`: at the planned distance, or 6 km past it.
+        let share: Double = switch UserDefaults.standard.string(forKey: "demoToGo") {
+        case "done": 1.01
+        case "beyond": 1 + 6_000 / (planned?.distanceMeters ?? 9_600)
+        default: 0.66
+        }
+        workout.distanceMeters = ((planned?.distanceMeters ?? 9_600) * share / 10).rounded() * 10
         workout.elapsedSeconds = (workout.distanceMeters / 1_000 * pace).rounded()
         workout.heartRate = 142
         workout.averageHeartRate = 139
