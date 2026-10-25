@@ -32,6 +32,8 @@ struct WatchTodayView: View {
     @State private var weekCompletedAtStart: Double = 0
     // This week's planned vs. completed volume for the home screen ring.
     @State private var weekProgress: PlanProgress?
+    /// What was run today, once there's a run, from the same plan review as on iPhone.
+    @State private var todayReview: PlanReview.Day?
     /// Why a run couldn't start, e.g. no Health access.
     @State private var startError: String?
     /// "Another session", from the More button.
@@ -154,6 +156,26 @@ struct WatchTodayView: View {
     @ViewBuilder
     private func header(compact: Bool) -> some View {
         switch state {
+        case .workout(let planned) where (todayReview?.ranMeters ?? 0) > 0:
+            // Run already: what was run, against what was planned. Start stays.
+            let day = todayReview!
+            VStack(alignment: .leading, spacing: 0) {
+                Label(day.status == .done ? "Done today" : "Run today",
+                      systemImage: day.status == .done ? "checkmark.circle.fill" : "circle.lefthalf.filled")
+                    .font(.headline)
+                    .foregroundStyle(day.status == .done ? .green : .orange)
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                Text(Format.distance(day.ranMeters))
+                    .font(.system(compact ? .title3 : .title2, design: .rounded).weight(.semibold))
+                    .monospacedDigit()
+                    .lineLimit(1).minimumScaleFactor(0.6)
+                Text("\(Format.workoutTitle(planned.type)), planned \(Format.distance(planned.distanceMeters))")
+                    .font(.footnote).foregroundStyle(.secondary)
+                    .lineLimit(2).minimumScaleFactor(0.8)
+            }
+            .accessibilityElement(children: .combine)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            weekRing(compact: compact)
         case .workout(let planned):
             VStack(alignment: .leading, spacing: 0) {
                 Text(Format.workoutTitle(planned.type))
@@ -245,6 +267,7 @@ struct WatchTodayView: View {
             ?? Calendar.current.date(byAdding: .month, value: -1, to: .now)!
         let runs = await health.fetchRuns(since: since)
         weekProgress = PlanProgress.make(plan: plan, completedRuns: runs, asOf: .now)
+        todayReview = PlanReview.make(plan: plan, original: nil, completedRuns: runs, asOf: .now).day(.now)
     }
 
     /// Captures today's session and its paces so the run screen can show step-aware

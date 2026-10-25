@@ -1,0 +1,9 @@
+More while you run
+- On Apple Watch, turn the Crown during a run for a second page: average pace, the time for your last kilometre, heart rate and its average, metres climbed and your cadence.
+- The climb is saved to Apple Health as the run's elevation gain.
+
+Finish on purpose
+- Hold Finish for a second to end a run, on the watch and the iPhone. A ring fills around it, and the run ends when it's full, so a brush of the wrist or a touch in your pocket doesn't end it.
+
+Done today
+- Once today's run is done, Today and the watch home screen say so, with what you ran against what was planned. Start stays there for a second run.

@@ -78,17 +78,11 @@ struct PhoneLiveRunView: View {
                     }
                     .buttonStyle(.glassProminent)
                     .tint(Brand.buttonPurple)
-                    Button(role: .destructive) {
+                    // Held for a second, so a touch in the pocket doesn't end the run.
+                    PhoneHoldToFinishButton {
                         recorder.end()
                         dismiss()
-                    } label: {
-                        Label("Finish run", systemImage: "stop.fill")
-                            .font(.title3.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
                     }
-                    .buttonStyle(.glass)
-                    .foregroundStyle(.red)
                 }
                 .controlSize(.large)
                 .padding(.top, 4)
@@ -154,5 +148,45 @@ struct PhoneLiveRunView: View {
         case .some(false): return .orange
         case .none: return .primary
         }
+    }
+}
+
+/// Finish run, held for a second: a ring fills around the button while it's held, and
+/// the run ends when it's full. Letting go early does nothing. VoiceOver gets a plain
+/// Finish action, as holding is hard there.
+struct PhoneHoldToFinishButton: View {
+    let onFinish: () -> Void
+    @State private var holding = false
+    @State private var progress: CGFloat = 0
+
+    var body: some View {
+        Label(holding ? "Keep holding" : "Hold to finish run", systemImage: "stop.fill")
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(.red)
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .glassEffect(.regular.tint(.red.opacity(holding ? 0.25 : 0.1)), in: .capsule)
+            .overlay {
+                Capsule()
+                    .trim(from: 0, to: progress)
+                    .stroke(.red, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+            }
+            .contentShape(.capsule)
+            .onLongPressGesture(minimumDuration: 1, maximumDistance: 30) {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                onFinish()
+            } onPressingChanged: { pressing in
+                holding = pressing
+                if pressing {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(.linear(duration: 1)) { progress = 1 }
+                } else {
+                    withAnimation(.easeOut(duration: 0.2)) { progress = 0 }
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Finish run")
+            .accessibilityHint("Hold for one second to finish")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { onFinish() }
     }
 }

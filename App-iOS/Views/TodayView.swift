@@ -154,8 +154,46 @@ struct TodayView: View {
         return parts.joined(separator: " · ")
     }
 
-    /// Today's run, big, in its colour.
+    /// Today's run, big, in its colour. Once it's run: what was run today.
+    @ViewBuilder
     private func todayCard(_ workout: PlannedWorkout) -> some View {
+        if workout.type.isRunning, let day = coordinator.review?.day(.now), day.ranMeters > 0 {
+            doneCard(workout, day: day)
+        } else {
+            plannedCard(workout)
+        }
+    }
+
+    /// Today's run done (or begun): the distance run, against what was planned. Start
+    /// run stays below, for a second run.
+    private func doneCard(_ workout: PlannedWorkout, day: PlanReview.Day) -> some View {
+        let done = day.status == .done
+        return VStack(alignment: .leading, spacing: 14) {
+            Label {
+                Text(done ? "Done today" : "Run today")
+            } icon: {
+                Image(systemName: done ? "checkmark.circle.fill" : "circle.lefthalf.filled")
+                    .foregroundStyle(done ? .green : .orange)
+            }
+            .brandEyebrow()
+            Text(Format.distance(day.ranMeters))
+                .font(.system(size: 56, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+            Text("\(Format.workoutTitle(workout.type)), planned \(Format.distance(workout.distanceMeters))")
+                .font(.callout).foregroundStyle(.secondary)
+            HStack(spacing: 10) {
+                if let pace = day.ranPaceSecPerKm { metric("Pace", Format.pace(pace)) }
+                metric("Time", Format.duration(day.ranSeconds))
+            }
+            if !day.reps.isEmpty { RepsView(reps: day.reps) }
+        }
+        .brandCard(tint: done ? .green : workout.type.tint, cornerRadius: 30, padding: 22)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func plannedCard(_ workout: PlannedWorkout) -> some View {
         let tint = workout.type.tint
         let extra = workout.type == .rest ? coordinator.review?.day(.now).flatMap { $0.ranMeters > 0 ? $0 : nil } : nil
         return VStack(alignment: .leading, spacing: 14) {

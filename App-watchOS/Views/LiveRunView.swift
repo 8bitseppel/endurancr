@@ -24,7 +24,7 @@ struct LiveRunView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
     @State private var page = Page.metrics
-    enum Page { case metrics, controls }
+    enum Page { case metrics, details, controls }
     /// The full-screen card at a step change, or just before a rep.
     @State private var card: StepCard?
     /// The rep already announced with "get ready", so it's announced once.
@@ -47,10 +47,11 @@ struct LiveRunView: View {
     var body: some View {
         TabView(selection: $page) {
             metricsPage.tag(Page.metrics)
+            detailsPage.tag(Page.details)
             controlsPage.tag(Page.controls)
         }
         .tabViewStyle(.verticalPage)
-        .demoTurnPage($page, to: .controls, unless: UserDefaults.standard.bool(forKey: "demoStepCard"))
+        .demoTurnPages($page, through: UserDefaults.standard.bool(forKey: "demoStepCard") ? [] : [.details, .controls])
         .navigationTitle(workout.isAutoPaused ? "Auto-paused" : workout.isPaused ? "Paused" : "Running")
         .navigationBarTitleDisplayMode(.inline)
         // Leaving the screen would leave the run recording with no way back to it;
@@ -107,6 +108,8 @@ struct LiveRunView: View {
             withAnimation { card = go }
             try? await Task.sleep(for: .seconds(3))
             withAnimation { card = nil }
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation { page = .details }
             try? await Task.sleep(for: .seconds(3))
             withAnimation { page = .controls }
             try? await Task.sleep(for: .seconds(3))
@@ -249,7 +252,43 @@ struct LiveRunView: View {
         }
     }
 
-    /// Page 2: the controls and GPS.
+    /// Page 2: the rest worth knowing mid-run, two columns, no scrolling: the averages,
+    /// the last kilometre, heart rate, climb and cadence. Page 1 stays the four numbers
+    /// that matter most.
+    private var detailsPage: some View {
+        Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
+            GridRow {
+                detail("Avg pace", workout.averagePaceSecPerKm > 0 ? Format.pace(workout.averagePaceSecPerKm) : "--")
+                detail("Last km", workout.lastKmSeconds.map(Format.duration) ?? "--")
+            }
+            GridRow {
+                detail("Heart rate", workout.heartRate > 0 ? "\(Int(workout.heartRate))" : "--", tint: .red)
+                detail("Avg HR", workout.averageHeartRate > 0 ? "\(Int(workout.averageHeartRate))" : "--")
+            }
+            GridRow {
+                detail("Climb", "\(Int(workout.elevationGainMeters.rounded())) m")
+                detail("Cadence", workout.cadence > 0 ? "\(Int(workout.cadence.rounded()))" : "--")
+            }
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.horizontal, 4)
+    }
+
+    private func detail(_ label: String, _ value: String, tint: Color = .primary) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(label.uppercased()).font(.caption2).foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(.title3, design: .rounded).weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(tint)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Page 3: the controls and GPS.
     private var controlsPage: some View {
         VStack(spacing: 8) {
             controls
@@ -293,14 +332,10 @@ struct LiveRunView: View {
             .tint(workout.isPaused ? .green : .yellow)
             .controlSize(.large)
 
-            Button(role: .destructive) {
+            // Held for a second, so a brush of the wrist doesn't end the run.
+            HoldToFinishButton {
                 workout.end()   // the screen closes when the run stops (onChange above)
-            } label: {
-                Label("Finish", systemImage: "stop.fill")
-                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.glass)
-            .controlSize(.large)
         }
     }
 
@@ -443,5 +478,44 @@ private struct StepCardView: View {
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Closes")
+    }
+}
+
+/// Finish, held for a second: a ring fills around the button while it's held, and the
+/// run ends when it's full, with a tap on the wrist. Letting go early does nothing.
+/// VoiceOver gets a plain Finish action, as holding is hard there.
+struct HoldToFinishButton: View {
+    let onFinish: () -> Void
+    @State private var holding = false
+    @State private var progress: CGFloat = 0
+
+    var body: some View {
+        Label(holding ? "Keep holding" : "Hold to finish", systemImage: "stop.fill")
+            .font(.headline)
+            .frame(maxWidth: .infinity, minHeight: 50)
+            .background(.red.opacity(holding ? 0.45 : 0.3), in: .capsule)
+            .overlay {
+                Capsule()
+                    .trim(from: 0, to: progress)
+                    .stroke(.red, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+            }
+            .contentShape(.capsule)
+            .onLongPressGesture(minimumDuration: 1, maximumDistance: 20) {
+                WKInterfaceDevice.current().play(.success)
+                onFinish()
+            } onPressingChanged: { pressing in
+                holding = pressing
+                if pressing {
+                    WKInterfaceDevice.current().play(.click)
+                    withAnimation(.linear(duration: 1)) { progress = 1 }
+                } else {
+                    withAnimation(.easeOut(duration: 0.2)) { progress = 0 }
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Finish run")
+            .accessibilityHint("Hold for one second to finish")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { onFinish() }
     }
 }

@@ -154,7 +154,7 @@ enum DemoMode {
     /// move a missed one into this week. One easy run last week went fast, the
     /// kind of good day that makes the paces a little faster. Last week one easy
     /// run was missed and an easy 5 km was run on its rest day instead.
-    static var runs: [CompletedRun] {
+    private static var plannedRuns: [CompletedRun] {
         if let recent = recentRun { return [recent] }
         guard let plan else { return [] }
         let calendar = Calendar.current
@@ -183,6 +183,20 @@ enum DemoMode {
             )
         }
     }
+    /// The runs so far. With `-demoDoneToday YES` today's run is done too, longer than
+    /// planned, for the "Done today" screens.
+    static var runs: [CompletedRun] {
+        var runs = plannedRuns
+        if isOn, UserDefaults.standard.bool(forKey: "demoDoneToday"), let today = todaysWorkout {
+            let meters = (today.distanceMeters * 1.6 / 100).rounded() * 100
+            let pace = today.targetPaceSecPerKm.map { ($0.lowerBound + $0.upperBound) / 2 } ?? 360
+            runs.append(CompletedRun(date: Calendar.current.startOfDay(for: .now).addingTimeInterval(7 * 3600),
+                                     distanceMeters: meters, durationSeconds: meters / 1_000 * pace,
+                                     averageHeartRate: 146))
+        }
+        return runs
+    }
+
 
     /// The single run set with `-demoRecentRun`, if any.
     static var recentRun: CompletedRun? {

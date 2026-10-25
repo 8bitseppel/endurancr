@@ -42,6 +42,8 @@ final class HealthKitService {
         ]
         #if os(watchOS)
         types.insert(HKQuantityType(.heartRate))
+        // The run's steps, for the cadence on the second run page.
+        types.insert(HKQuantityType(.stepCount))
         #endif
         return types
     }

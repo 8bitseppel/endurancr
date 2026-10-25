@@ -73,6 +73,11 @@ private extension WorkoutManager {
         workout.distanceMeters = ((planned?.distanceMeters ?? 9_600) * 0.66 / 10).rounded() * 10
         workout.elapsedSeconds = (workout.distanceMeters / 1_000 * pace).rounded()
         workout.heartRate = 142
+        workout.averageHeartRate = 139
+        workout.elevationGainMeters = 46
+        workout.cadence = 172
+        workout.lastKmSeconds = (pace - 4).rounded()
+        workout.setDemoSpeed(1_000 / pace)
         workout.routePointCount = 412
         workout.isRunning = true
         return workout

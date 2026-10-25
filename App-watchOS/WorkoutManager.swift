@@ -45,6 +45,18 @@ final class WorkoutManager: NSObject {
     /// watch's Workout settings), until they move again.
     var isAutoPaused = false
     var heartRate: Double = 0
+    // The second run page: the run's averages, climb, cadence and last km.
+    var averageHeartRate: Double = 0
+    /// Metres climbed, from the GPS altitude (barometer included on the watch).
+    var elevationGainMeters: Double = 0
+    /// Steps per minute over the last 30 seconds; 0 until there's enough.
+    var cadence: Double = 0
+    /// Time for the last full kilometre; `nil` before the first.
+    var lastKmSeconds: Double?
+    private var lastAltitude: Double?
+    private var stepWindow: [(seconds: Double, steps: Double)] = []
+    private var nextKmMark: Double = 1_000
+    private var lastKmMarkSeconds: Double = 0
     var activeEnergyKcal: Double = 0
     var distanceMeters: Double = 0
     var elapsedSeconds: TimeInterval = 0
@@ -142,6 +154,14 @@ final class WorkoutManager: NSObject {
         isPaused = false
         isAutoPaused = false
         heartRate = 0
+        averageHeartRate = 0
+        elevationGainMeters = 0
+        cadence = 0
+        lastKmSeconds = nil
+        lastAltitude = nil
+        stepWindow = []
+        nextKmMark = 1_000
+        lastKmMarkSeconds = 0
         activeEnergyKcal = 0
         distanceMeters = 0
         elapsedSeconds = 0
@@ -158,7 +178,9 @@ final class WorkoutManager: NSObject {
     @discardableResult
     private func attach(_ session: HKWorkoutSession) -> HKLiveWorkoutBuilder {
         let builder = session.associatedWorkoutBuilder()
-        builder.dataSource = HKLiveWorkoutDataSource(healthStore: store, workoutConfiguration: session.workoutConfiguration)
+        let dataSource = HKLiveWorkoutDataSource(healthStore: store, workoutConfiguration: session.workoutConfiguration)
+        dataSource.enableCollection(for: HKQuantityType(.stepCount), predicate: nil)
+        builder.dataSource = dataSource
         session.delegate = self
         builder.delegate = self
         self.session = session
@@ -263,6 +285,10 @@ final class WorkoutManager: NSObject {
         }
         do {
             try await saveReps(to: builder, endingAt: date)
+            // The climb, as Apple Health's own elevation gain for the run.
+            if elevationGainMeters > 0 {
+                try await builder.addMetadata([HKMetadataKeyElevationAscended: HKQuantity(unit: .meter(), doubleValue: elevationGainMeters)])
+            }
             try await builder.endCollection(at: date)
             guard let workout = try await builder.finishWorkout() else {
                 saveState = .failed
@@ -318,14 +344,18 @@ private struct RunContext: Codable {
 
 /// One statistic the live builder collected, read where HealthKit delivered it.
 private enum LiveMetric: Sendable {
-    case heartRate(Double), energy(Double), distance(Double), speed(Double)
+    case heartRate(Double, average: Double?), energy(Double), distance(Double), speed(Double), steps(Double)
 
     init?(_ statistics: HKStatistics?) {
         guard let statistics else { return nil }
         switch statistics.quantityType {
         case HKQuantityType(.heartRate):
-            guard let bpm = statistics.mostRecentQuantity()?.doubleValue(for: .count().unitDivided(by: .minute())) else { return nil }
-            self = .heartRate(bpm)
+            let unit = HKUnit.count().unitDivided(by: .minute())
+            guard let bpm = statistics.mostRecentQuantity()?.doubleValue(for: unit) else { return nil }
+            self = .heartRate(bpm, average: statistics.averageQuantity()?.doubleValue(for: unit))
+        case HKQuantityType(.stepCount):
+            guard let steps = statistics.sumQuantity()?.doubleValue(for: .count()) else { return nil }
+            self = .steps(steps)
         case HKQuantityType(.activeEnergyBurned):
             guard let kcal = statistics.sumQuantity()?.doubleValue(for: .kilocalorie()) else { return nil }
             self = .energy(kcal)
@@ -419,6 +449,13 @@ extension WorkoutManager: CLLocationManagerDelegate {
                 Self.onMain { if let message { self?.lastError = message } }
             }
             routePointCount += filtered.count
+            // Climb: rises of more than 1 m, so GPS noise on the flat doesn't add up.
+            for location in filtered where location.verticalAccuracy >= 0 && location.verticalAccuracy <= 10 {
+                guard let last = lastAltitude else { lastAltitude = location.altitude; continue }
+                let rise = location.altitude - last
+                if rise > 1 { elevationGainMeters += rise; lastAltitude = location.altitude }
+                else if rise < -1 { lastAltitude = location.altitude }
+            }
         }
     }
 
@@ -441,13 +478,27 @@ extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
             guard let self else { return }
             for metric in metrics {
                 switch metric {
-                case .heartRate(let bpm): heartRate = bpm
+                case .heartRate(let bpm, let average):
+                    heartRate = bpm
+                    if let average { averageHeartRate = average }
+                case .steps(let steps):
+                    stepWindow.append((elapsed, steps))
+                    stepWindow.removeAll { elapsed - $0.seconds > 30 }
+                    if let first = stepWindow.first, elapsed - first.seconds >= 10 {
+                        cadence = (steps - first.steps) / (elapsed - first.seconds) * 60
+                    }
                 case .energy(let kcal): activeEnergyKcal = kcal
                 case .distance(let meters): distanceMeters = meters
                 case .speed(let speed): currentSpeed = speed
                 }
             }
             elapsedSeconds = elapsed
+            // Each full kilometre: the time it took.
+            while distanceMeters >= nextKmMark {
+                lastKmSeconds = elapsed - lastKmMarkSeconds
+                lastKmMarkSeconds = elapsed
+                nextKmMark += 1_000
+            }
             repTracker?.update(distance: distanceMeters, elapsed: elapsed, date: Date(), heartRate: heartRate)
             sendToPhone()
         }
