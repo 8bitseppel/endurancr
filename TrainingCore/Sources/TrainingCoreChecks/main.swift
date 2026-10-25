@@ -1547,6 +1547,10 @@ h.suite("Workout steps") {
         }
     }
     tracker.finish(distance: d, elapsed: secs, date: t0.addingTimeInterval(secs))
+    var midRep = RepTracker(workout: interval, zones: zones)!
+    midRep.update(distance: 1_600, elapsed: 528, date: t0, heartRate: 0)
+    midRep.update(distance: 2_000, elapsed: 618, date: t0, heartRate: 0)
+    h.check(abs((midRep.currentPace(distance: 2_000, elapsed: 618) ?? 0) - 225) < 0.5, "the pace of the rep in progress so far")
     h.check(tracker.reps.count == 6 && tracker.reps.allSatisfy { abs($0.meters - 800) <= 10 }, "the tracker keeps six 800 m reps")
     h.check(tracker.reps[0].verdict == .onPace && tracker.reps[5].verdict == .slower, "reps 1 to 4 on pace, 5 and 6 slower")
     h.check(tracker.reps[0].averageHeartRate == 160, "a rep keeps its heart rate")

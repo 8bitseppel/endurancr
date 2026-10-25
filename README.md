@@ -97,8 +97,10 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   day before the long run, never two hard days side by side, not in the last 10 days
   before the race, not while easing back or with a raised resting heart rate, and at
   most two hard sessions a week. The list says why when it's not offered.
-- A second watch page during the run: average pace, last kilometre, heart rate and
-  its average, climb (also saved as the run's elevation gain) and cadence.
+- A second watch page during the run: average pace and heart rate, last kilometre and
+  the one in progress (the rep in progress during intervals), climb (also saved as the
+  run's elevation gain), and what's left with the time you'd be done, then Plan done
+  with one tap at the planned distance and how far beyond it.
 - Hold Finish for a second to end a run, on the watch and the iPhone, so it isn't
   ended by accident.
 - Once today's run is done, Today and the watch say "Done today" with what was run

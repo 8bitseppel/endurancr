@@ -1,5 +1,7 @@
 More while you run
-- On Apple Watch, turn the Crown during a run for a second page: average pace, the time for your last kilometre, heart rate and its average, metres climbed and your cadence.
+- On Apple Watch, turn the Crown during a run for a second page: average pace and heart rate, your last kilometre and the one you're in, metres climbed, and what's left with the time you'll be done.
+- During intervals it shows the pace of the rep you're running, the one it's judged by.
+- At the planned distance the watch taps once: Plan done. Run on and it shows how far beyond the plan you are.
 - The climb is saved to Apple Health as the run's elevation gain.
 
 Finish on purpose

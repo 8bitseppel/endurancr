@@ -53,6 +53,28 @@ final class WorkoutManager: NSObject {
     var cadence: Double = 0
     /// Time for the last full kilometre; `nil` before the first.
     var lastKmSeconds: Double?
+    /// The pace of the kilometre in progress so far, once 100 m of it are run.
+    var thisKmPaceSecPerKm: Double? {
+        #if DEBUG
+        if let demoThisKm { return demoThisKm }
+        #endif
+        let meters = distanceMeters - (nextKmMark - 1_000)
+        let seconds = elapsedSeconds - lastKmMarkSeconds
+        return meters >= 100 && seconds > 0 ? seconds / (meters / 1_000) : nil
+    }
+
+    /// During a rep: its average pace so far (`RepTracker`), the fairest "am I on pace".
+    var thisRepPaceSecPerKm: Double? {
+        #if DEBUG
+        if let demoThisRep { return demoThisRep }
+        #endif
+        return repTracker?.currentPace(distance: distanceMeters, elapsed: elapsedSeconds)
+    }
+
+    #if DEBUG
+    var demoThisKm: Double?
+    var demoThisRep: Double?
+    #endif
     private var lastAltitude: Double?
     private var stepWindow: [(seconds: Double, steps: Double)] = []
     private var nextKmMark: Double = 1_000

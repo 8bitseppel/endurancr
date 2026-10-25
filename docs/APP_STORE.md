@@ -572,12 +572,14 @@ Preview and the App Clip card are unchanged.
 
 ### Promotional text (170)
 
-More on your wrist: a second run page with your averages, last km, climb and cadence, and a Finish you hold for a second, so no run ends by accident.
+More on your wrist: a second run page with your averages, this km, climb and what is left, and a Finish you hold for a second, so no run ends by accident.
 
 ### What's New (4000)
 
 More while you run
-- On Apple Watch, turn the Crown during a run for a second page: average pace, the time for your last kilometre, heart rate and its average, metres climbed and your cadence.
+- On Apple Watch, turn the Crown during a run for a second page: average pace and heart rate, your last kilometre and the one you're in, metres climbed, and what's left with the time you'll be done.
+- During intervals it shows the pace of the rep you're running, the one it's judged by.
+- At the planned distance the watch taps once: Plan done. Run on and it shows how far beyond the plan you are.
 - The climb is saved to Apple Health as the run's elevation gain.
 
 Finish on purpose
@@ -612,7 +614,7 @@ INTERVALS ON YOUR WRIST
 On interval days your Apple Watch guides you through every rep: a tap and "get ready" just before it, "Go" with its distance and pace, and how many are done, each with its own tap you can tell apart without looking. Strides are guided too. Afterwards you see every rep against its target, the slower ones too, and the plan's paces follow how your reps really went. Feel like intervals on another day? Start another session offers them when they fit your fitness and your week, and says why when they don't.
 
 RUN ON YOUR WRIST OR YOUR PHONE
-Start today's run on Apple Watch with heart rate, or on iPhone with GPS. The run screens show time, distance, your pace and the target pace, and on the watch a second page adds your averages, the last kilometre, climb and cadence. Finish is held for a second, so a run never ends by accident. The watch's own Auto-Pause holds your run at a traffic light, and a run on the watch shows on your iPhone's Lock Screen, where you can pause and finish it. Every run is saved to Apple Health.
+Start today's run on Apple Watch with heart rate, or on iPhone with GPS. The run screens show time, distance, your pace and the target pace, and on the watch a second page adds your averages, this kilometre, climb and what is left. Finish is held for a second, so a run never ends by accident. The watch's own Auto-Pause holds your run at a traffic light, and a run on the watch shows on your iPhone's Lock Screen, where you can pause and finish it. Every run is saved to Apple Health.
 
 YOUR PACES IN A MINUTE
 The pace calculator turns one recent race into your VDOT, your five training paces, a race-day range and the plan endurancr would build, ready to start with one tap. It's in the app, and as an App Clip it opens without installing, right in Safari or from a link.
@@ -630,7 +632,7 @@ endurancr is a training aid, not medical advice. Talk to a doctor before you sta
 
 ### Build
 
-1.6.0 (42).
+1.6.0 (43). Build 42 was an earlier 1.6.0 archive with cadence in place of To go; use 43.
 
 ### Screenshots
 

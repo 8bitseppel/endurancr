@@ -261,17 +261,23 @@ struct LiveRunView: View {
     }
 
     /// Page 2: the rest worth knowing mid-run, two columns, no scrolling: the averages,
-    /// the last kilometre, heart rate, climb and cadence. Page 1 stays the four numbers
-    /// that matter most.
+    /// the last kilometre and the one in progress (the rep in progress during intervals),
+    /// the climb and what's left of the plan. Page 1 stays the numbers that matter most.
     private var detailsPage: some View {
         Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
             GridRow {
                 detail("Avg pace", workout.averagePaceSecPerKm > 0 ? Format.pace(workout.averagePaceSecPerKm) : "--")
-                detail("Last km", workout.lastKmSeconds.map(Format.duration) ?? "--")
+                detail("Avg HR", workout.averageHeartRate > 0 ? "\(Int(workout.averageHeartRate))" : "--")
             }
             GridRow {
-                detail("Heart rate", workout.heartRate > 0 ? "\(Int(workout.heartRate))" : "--", tint: .red)
-                detail("Avg HR", workout.averageHeartRate > 0 ? "\(Int(workout.averageHeartRate))" : "--")
+                detail("Last km", workout.lastKmSeconds.map(Format.duration) ?? "--")
+                // During a rep: the rep's pace so far; otherwise the kilometre in progress.
+                if activeStep?.kind == .work, !(activeStep?.label.hasPrefix("Stride") ?? false) {
+                    detail("This rep", workout.thisRepPaceSecPerKm.map(Format.pace) ?? "--",
+                           tint: paceTint(target: activeStep?.targetPaceSecPerKm, pace: workout.thisRepPaceSecPerKm))
+                } else {
+                    detail("This km", workout.thisKmPaceSecPerKm.map(Format.pace) ?? "--")
+                }
             }
             GridRow {
                 detail("Climb", "\(Int(workout.elevationGainMeters.rounded())) m")
@@ -342,10 +348,11 @@ struct LiveRunView: View {
         .padding(.vertical, 4)
     }
 
-    private func paceTint(target: Double?) -> Color {
-        guard let target, workout.paceSecPerKm > 0 else { return .green }
+    private func paceTint(target: Double?, pace: Double? = nil) -> Color {
+        let pace = pace ?? workout.paceSecPerKm
+        guard let target, pace > 0 else { return .green }
         // Within ±5 s/km of the step target reads as on-pace.
-        return abs(workout.paceSecPerKm - target) <= 5 ? .green : .orange
+        return abs(pace - target) <= 5 ? .green : .orange
     }
 
     private var controls: some View {

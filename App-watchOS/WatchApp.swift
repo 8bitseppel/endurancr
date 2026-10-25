@@ -83,6 +83,7 @@ private extension WorkoutManager {
         workout.elevationGainMeters = 46
         workout.cadence = 172
         workout.lastKmSeconds = (pace - 4).rounded()
+        workout.demoThisKm = pace - 9
         workout.setDemoSpeed(1_000 / pace)
         workout.routePointCount = 412
         workout.isRunning = true
@@ -158,7 +159,11 @@ private extension WorkoutManager {
         workout.distanceMeters = 2_000 + 2 * 1_400 + 60
         workout.elapsedSeconds = 2 * 360 + 2 * (pace + 0.4 * 360) + 0.06 * pace
         workout.heartRate = 168
+        workout.averageHeartRate = 156
+        workout.elevationGainMeters = 22
+        workout.lastKmSeconds = (pace + 0.4 * 360).rounded()
         workout.setDemoSpeed(1_000 / (pace - 1))
+        workout.demoThisRep = pace - 2
         workout.routePointCount = 640
         workout.isRunning = true
         return workout

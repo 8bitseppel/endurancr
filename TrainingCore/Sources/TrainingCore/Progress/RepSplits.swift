@@ -93,6 +93,16 @@ public struct RepTracker: Sendable {
         }
     }
 
+    /// The average pace of the rep in progress so far, once 50 m of it are run; `nil`
+    /// between reps.
+    public func currentPace(distance: Double, elapsed: Double) -> Double? {
+        guard let open = current else { return nil }
+        let meters = distance - open.startMeters
+        let seconds = elapsed - open.startSeconds
+        guard meters >= 50, seconds > 0 else { return nil }
+        return seconds / (meters / 1_000)
+    }
+
     /// At the end of the run: keeps the rep in progress if most of it was run.
     public mutating func finish(distance: Double, elapsed: Double, date: Date) {
         close(distance: distance, elapsed: elapsed, date: date)
