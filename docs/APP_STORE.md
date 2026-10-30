@@ -656,6 +656,20 @@ Strides, guided properly
 - Another tap when it ends, a pip fills for each stride done, and after the sixth: "All 6 strides done, easy to the end".
 - No card covers the countdown any more, so the seconds and the pace stay in front of you for the whole burst.
 
+Taps only where they mean something
+- Your wrist is tapped where an effort begins or ends, and nowhere else: a tap when a rep or a stride starts, a different one when it ends, two taps before the strides block, and the success tap after the last one.
+- Easy running is silent now, warm-up, the jogs between reps and the cool-down included, and so is reaching the planned distance. Those moments are still shown on the screen, they just don't buzz.
+- Auto-Pause has its own pair of taps, so the watch pausing you at a traffic light can never be mistaken for a step change.
+
+A screen that fits the kind of run
+- Easy and long runs are judged one way only: running them slower is never marked as off pace, which is what the plan always promised. Only going faster than your easy window shows as off.
+- A threshold or marathon-pace run shows what's left of the block, and its own pace rather than the whole run's average, which the warm-up drags down. Mid-rep it says how much of the rep is left.
+- The jog between reps counts the metres to the next one, with your heart rate and a pip for each rep done.
+- Fixed: a run at one steady pace had lost its target pace and target distance on the watch's run screen.
+
+Runs done so far, in plain words
+- The count on Progress says what it means: "1 of 4 run days since you started", and when a run came in short of the plan it says so, instead of leaving two numbers that look wrong together.
+
 See what your strides did
 - Every stride is saved with the run in Apple Health, with its time, the distance it covered and your heart rate, as segments the Fitness app shows too.
 - After the run, in Today and on that day in Plan, each stride shows with its pace: "All 6 strides done, 3:14 to 3:31/km".
@@ -672,7 +686,7 @@ TRAINING FROM THE BOOKS
 Easy runs, threshold runs, intervals and marathon-pace runs, never more than two hard sessions a week. Strides keep your legs quick. Long runs build to 32 km for the marathon. A tune-up race six weeks out sets your paces. Race day tells you how to pace it and what to eat and drink, and after the race the plan brings you back with rest and easy runs. Based on Jack Tupper Daniels, Pete Pfitzinger, the Hansons and Hal Higdon.
 
 A PLAN THAT FOLLOWS YOU
-Every run counts, even one on a rest day. Missed kilometres are never piled onto the days after. Ran less than planned? The coming weeks build from what you actually ran, at most 10% more each week. Back from a break? Your paces ease a little and you start with easy runs. Strong runs nudge your paces up a little at a time. Drag days to swap them when life gets in the way.
+Every run counts, even one on a rest day. Missed kilometres are never piled onto the days after. Ran less than planned? The coming weeks build from what you actually ran, at most 10% more each week. Back from a break? Your paces ease a little and you start with easy runs. Strong runs nudge your paces up. Drag days to swap them when life gets in the way.
 
 THE WHOLE PLAN
 See what you ran on each day, what you missed, what changed and why, your new paces next to the old ones, and what each week is for, all the way to race day.
@@ -684,7 +698,7 @@ A CALM LOOK, LIGHT AND DARK
 Every kind of run has its own colour, the same on Today, in the plan and in your paces. Today shows your run and your week at a glance, a circle for every day.
 
 INTERVALS AND STRIDES ON YOUR WRIST
-On interval days your Apple Watch guides you through every rep: a tap and "get ready" just before it, "Go" with its distance and pace, and how many are done, each tap telling you which is which. Strides run on the clock: two taps when they start, then every 20 s burst counted down big on your wrist, with a tap at its start and end. Afterwards you see every rep against its target and every stride with its time and pace, and the plan follows how your reps really went. Feel like intervals on another day? Start another session offers them when they fit your week, and says why when they don't.
+On interval days your Apple Watch guides you through every rep: "get ready" before it, then a tap and "Go" with its pace, and a tap when it is done. Only the start and end of an effort tap your wrist, so easy running is left in peace. Strides run on the clock: two taps when they start, then every 20 s burst counted down big on your wrist, with a tap at its start and end. Afterwards you see every rep against its target and every stride with its time and pace, and the plan follows how your reps really went. Feel like intervals on another day? Start another session offers them when they fit your week, and says why when they don't.
 
 RUN ON YOUR WRIST OR YOUR PHONE
 Start today's run on Apple Watch with heart rate, or on iPhone with GPS. The run screens show time, distance, your pace and the target, and on the watch a second page adds your averages, this kilometre, climb and what is left. Finish is held for a second, so a run never ends by accident. The watch's own Auto-Pause holds your run at a traffic light, and a run on the watch shows on your iPhone's Lock Screen, where you can pause and finish it. Every run is saved to Apple Health.
@@ -693,7 +707,7 @@ YOUR PACES IN A MINUTE
 The pace calculator turns one recent race into your VDOT, your five training paces, a race-day range and the plan endurancr would build, ready to start with one tap. It's in the app, and as an App Clip it opens without installing, right in Safari or from a link.
 
 NOTHING HIDDEN
-How it works explains every rule the plan follows, in plain words, with the books and studies behind it. endurancr is open source, so you can read every line that touches your data.
+How it works explains every rule the plan follows, in plain words, with the books behind it. endurancr is open source, so you can read every line that touches your data.
 
 PRIVATE BY DESIGN
 No account, no server, no analytics, no ads, no tracking. Your plan stays on your device, and your runs live in Apple Health.
@@ -705,13 +719,14 @@ endurancr is a training aid, not medical advice. Talk to a doctor before you sta
 
 ### Build
 
-1.7.0 (46). Builds 44 and 45 were earlier 1.7.0 archives, before the stride page
-showed your pace next to its target and before the card at the start of the block
-said "Easy 60 s" rather than "Strides now"; use 46.
+1.7.0 (47). Builds 44 to 46 were earlier 1.7.0 archives, before the taps were cut
+back to the start and end of an effort and before the run screen fitted itself to the
+kind of run; use 47.
 
 ### Screenshots
 
 New: `watch-7-strides.png` (the stride countdown on the watch) and its video through
 the whole block, and `iphone-11-strides.png` (the strides in Today after the run). The
-watch summary figure now also turns to its strides page. The rest is unchanged from
-1.6.0. Everything is in `releases/1.7.0/`.
+watch summary figure now also turns to its strides page, and the Progress figure has
+the reworded "runs done so far". The rest is unchanged from 1.6.0. Everything is in
+`releases/1.7.0/`.

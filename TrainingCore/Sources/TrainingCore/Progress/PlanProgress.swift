@@ -23,8 +23,13 @@ public struct PlanProgress: Sendable, Equatable {
 
     /// Running workouts due so far: every one before today, plus today's once it's done.
     public var workoutsScheduledToDate: Int
-    /// Of those, how many a recorded run fulfilled.
+    /// Of those, how many a recorded run fulfilled: a day counts when you ran at
+    /// least 80% of what was planned for it (`AdaptationEngine.isCompleted`).
     public var workoutsCompleted: Int
+    /// Of those, how many you ran at all, whatever the distance. Above
+    /// `workoutsCompleted` when runs came in short of the plan, which is the only
+    /// way "1 of 4" can mean "I ran three times".
+    public var daysRun: Int
 
     public var currentWeekPlannedMeters: Double
     public var currentWeekCompletedMeters: Double
@@ -107,6 +112,12 @@ public struct PlanProgress: Sendable, Equatable {
         let plannedToDate = runningToDate.reduce(0) { $0 + $1.distanceMeters }
         let totalPlanned = workouts.filter(\.type.isRunning).reduce(0) { $0 + $1.distanceMeters }
         let completedCount = runningToDate.filter { engine.isCompleted($0, by: completedRuns, calendar: calendar) }.count
+        // Days you ran at all, short runs included, so the screen can say why a day
+        // that you ran doesn't count as done.
+        let daysRunCount = runningToDate.filter { workout in
+            let day = calendar.startOfDay(for: workout.date)
+            return completedRuns.contains { calendar.startOfDay(for: $0.date) == day && $0.distanceMeters > 0 }
+        }.count
 
         // Locate the current week (the one containing `asOf`).
         let currentWeek = plan.weeks.first { week in
@@ -146,6 +157,7 @@ public struct PlanProgress: Sendable, Equatable {
             totalPlannedMeters: totalPlanned,
             workoutsScheduledToDate: runningToDate.count,
             workoutsCompleted: completedCount,
+            daysRun: daysRunCount,
             currentWeekPlannedMeters: currentWeek?.plannedVolumeMeters ?? 0,
             currentWeekCompletedMeters: currentWeekCompleted,
             nextWorkout: next,

@@ -129,8 +129,10 @@ struct LiveRunView: View {
         }
         #endif
         .onChange(of: workout.isAutoPaused) { _, paused in
-            // watchOS's Auto-Pause, felt at the traffic light without looking.
-            WKInterfaceDevice.current().play(paused ? .stop : .start)
+            // watchOS's Auto-Pause, felt at the traffic light without looking. Its
+            // own pair of taps, so a run stopping is never mistaken for a rep
+            // starting or ending.
+            WKInterfaceDevice.current().play(paused ? .directionDown : .directionUp)
         }
     }
 
@@ -602,6 +604,7 @@ private struct StepCardView: View {
         switch card.tone {
         case .go: .green
         case .ready: .yellow
+        case .note: .green
         case .strides, .easy, .done, .info: .accentColor
         }
     }

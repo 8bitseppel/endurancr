@@ -87,9 +87,14 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
 - Swap days by dragging them in the plan; the watch shows the same adjusted days.
 - The plan shows what you ran on each past day (done, shorter or missed), what a changed day was and why, new paces next to the old ones with the reason, what each week is for, how far the week is, the 32 km runs and the taper, and ends with the race outlook.
 - Intervals, threshold and marathon-pace blocks and the tune-up race are guided on
-  Apple Watch by distance: about 100 m before a rep it taps and shows "Rep 3 of 6 in
-  100 m", then "Go" with the rep's distance and pace from your current fitness, and "3 of
-  6 done, easy now" after it, each with its own tap.
+  Apple Watch by distance: about 100 m before a rep it shows "Rep 3 of 6 in 100 m",
+  then "Go" with the rep's distance and pace from your current fitness, and "3 of 6
+  done, easy now" after it.
+- The wrist is only tapped where an effort begins or ends: a tap when a rep or stride
+  starts, a different one when it ends, two taps before the strides block, and the
+  success tap after the last one. Easy running is silent, warm-up, jogs and cool-down
+  included, and so is reaching the planned distance. watchOS Auto-Pause has its own
+  pair of taps, so a traffic light never feels like a step change.
 - Strides are guided on the clock, because 20 s is over before GPS has settled: the run
   screen says how far it is until they start, then taps twice and shows "Easy 60 s, then
   6 × 20 s quick and light". Each stride begins with that easy minute counted down big on

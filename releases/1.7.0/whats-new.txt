@@ -7,6 +7,20 @@ Strides, guided properly
 - Another tap when it ends, a pip fills for each stride done, and after the sixth: "All 6 strides done, easy to the end".
 - No card covers the countdown any more, so the seconds and the pace stay in front of you for the whole burst.
 
+Taps only where they mean something
+- Your wrist is tapped where an effort begins or ends, and nowhere else: a tap when a rep or a stride starts, a different one when it ends, two taps before the strides block, and the success tap after the last one.
+- Easy running is silent now, warm-up, the jogs between reps and the cool-down included, and so is reaching the planned distance. Those moments are still shown on the screen, they just don't buzz.
+- Auto-Pause has its own pair of taps, so the watch pausing you at a traffic light can never be mistaken for a step change.
+
+A screen that fits the kind of run
+- Easy and long runs are judged one way only: running them slower is never marked as off pace, which is what the plan always promised. Only going faster than your easy window shows as off.
+- A threshold or marathon-pace run shows what's left of the block, and its own pace rather than the whole run's average, which the warm-up drags down. Mid-rep it says how much of the rep is left.
+- The jog between reps counts the metres to the next one, with your heart rate and a pip for each rep done.
+- Fixed: a run at one steady pace had lost its target pace and target distance on the watch's run screen.
+
+Runs done so far, in plain words
+- The count on Progress says what it means: "1 of 4 run days since you started", and when a run came in short of the plan it says so, instead of leaving two numbers that look wrong together.
+
 See what your strides did
 - Every stride is saved with the run in Apple Health, with its time, the distance it covered and your heart rate, as segments the Fitness app shows too.
 - After the run, in Today and on that day in Plan, each stride shows with its pace: "All 6 strides done, 3:14 to 3:31/km".

@@ -400,9 +400,7 @@ struct ProgressDashboardView: View {
                 bar("Through the plan",
                     detail: progress.currentWeekNumber.map { "Week \($0) of \(progress.totalWeeks)" } ?? "",
                     fraction: progress.overallCompletionFraction)
-                bar("Runs done so far",
-                    detail: "\(progress.workoutsCompleted) of \(progress.workoutsScheduledToDate) runs that were due",
-                    fraction: progress.runsDoneFraction)
+                bar("Runs done so far", detail: runsDoneDetail(progress), fraction: progress.runsDoneFraction)
                 LabeledContent("Distance so far",
                                value: "\(Format.distance(progress.completedDistanceMeters)) of \(Format.distance(progress.plannedToDateMeters))")
                     .font(.subheadline)
@@ -411,9 +409,23 @@ struct ProgressDashboardView: View {
             Text("Sticking to the plan")
         } footer: {
             if progress.plannedToDateMeters > 0 {
-                Text("Only runs that were already due count. Today's run counts once you've done it.")
+                Text("Counted from the day your plan started, not from this week. A day counts as done once you've run at least 80% of what was planned for it, so a run that came in short leaves its day undone. Today's run counts once you've done it.")
             }
         }
+    }
+
+    /// "1 of 4 run days since you started", and when runs came in short of the plan,
+    /// why the two numbers are so far apart. A count without its scope reads as this
+    /// week's, and 1 of 4 with three runs behind you looks like a mistake.
+    private func runsDoneDetail(_ progress: PlanProgress) -> String {
+        var text = "\(progress.workoutsCompleted) of \(progress.workoutsScheduledToDate) run days since you started"
+        let short = progress.daysRun - progress.workoutsCompleted
+        if short > 0 {
+            text += short == 1
+                ? ". One more you ran, but it came in short of the plan."
+                : ". \(short) more you ran, but they came in short of the plan."
+        }
+        return text
     }
 
     private func bar(_ title: String, detail: String, fraction: Double) -> some View {

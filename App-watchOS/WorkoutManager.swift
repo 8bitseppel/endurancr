@@ -373,10 +373,11 @@ final class WorkoutManager: NSObject {
               distanceMeters >= planned.distanceMeters else { return }
         if let guided, guided.index < guided.steps.count - 1 { return }
         saidPlanDone = true
-        play(.done)
+        // Shown, not felt: you're running easy here, and there's nothing to do
+        // about it except keep going or stop.
         cue = RunCue(title: "Plan done",
                      detail: "\(Format.workoutTitle(planned.type)), \(Format.distance(planned.distanceMeters))",
-                     note: "", tone: .done)
+                     note: "", tone: .note)
     }
 
     /// A step began: tap the wrist and hand the screen what to say.
@@ -386,13 +387,14 @@ final class WorkoutManager: NSObject {
         cue = next
         #if DEBUG
         if DemoMode.isOn {
-            print("[step] at \(Int(distanceMeters)) m, \(Int(elapsedSeconds)) s, \(next.tone.haptic.times)× \(next.tone.haptic.type.rawValue): \(next.note) | \(next.title) | \(next.detail)")
+            let tap = next.tone.haptic.map { "\($0.times)× \($0.type.rawValue)" } ?? "no tap"
+            print("[step] at \(Int(distanceMeters)) m, \(Int(elapsedSeconds)) s, \(tap): \(next.note) | \(next.title) | \(next.detail)")
         }
         #endif
     }
 
     private func play(_ tone: RunCue.Tone) {
-        let (type, times) = tone.haptic
+        guard let (type, times) = tone.haptic else { return }
         WKInterfaceDevice.current().play(type)
         guard times > 1 else { return }
         // A second tap, far enough behind the first to be felt as two.
@@ -472,7 +474,7 @@ final class WorkoutManager: NSObject {
         play(next.tone)
         cue = next
         #if DEBUG
-        if DemoMode.isOn { print("[step] at \(Int(distanceMeters)) m, \(Int(elapsedSeconds)) s, 1× notification: Get ready | \(next.title) | \(next.detail)") }
+        if DemoMode.isOn { print("[step] at \(Int(distanceMeters)) m, \(Int(elapsedSeconds)) s, no tap: Get ready | \(next.title) | \(next.detail)") }
         #endif
     }
 

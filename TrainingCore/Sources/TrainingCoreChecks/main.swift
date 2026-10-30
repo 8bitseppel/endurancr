@@ -299,6 +299,14 @@ h.suite("Progress counts") {
     // Once Friday's run is done, it's due and counted.
     let friRun = try require(plan.weeks[0].workouts.filter(\.type.isRunning).dropFirst().first, "Friday run")
     let onFri = CompletedRun(date: friRun.date, distanceMeters: friRun.distanceMeters, durationSeconds: 2_400, plannedWorkoutID: friRun.id)
+    // A run that came in short leaves its day undone, but it is still a day you ran:
+    // that difference is why "1 of 4" can mean "I ran three times".
+    let shortWed = CompletedRun(date: onWed.date, distanceMeters: onWed.distanceMeters * 0.5,
+                                durationSeconds: onWed.durationSeconds * 0.5)
+    let pShort = PlanProgress.make(plan: plan, completedRuns: [shortWed], asOf: friday, calendar: cal)
+    h.check(pShort.workoutsCompleted == 0 && pShort.daysRun == 1,
+            "a short run leaves its day undone but counts as a day you ran")
+
     let p2 = PlanProgress.make(plan: plan, completedRuns: [onWed, onFri], asOf: friday, calendar: cal)
     h.check(p2.workoutsScheduledToDate == 2 && p2.workoutsCompleted == 2, "today's run counts once it's done")
 
