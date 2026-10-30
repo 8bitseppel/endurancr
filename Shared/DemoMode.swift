@@ -111,7 +111,10 @@ enum DemoMode {
     /// `-demoReps YES`: the finished run was an interval session, 6 × 800 m at
     /// interval pace with the last two a little slow, for the summary screenshots.
     static var reps: [RepSplit] {
-        guard isOn, UserDefaults.standard.bool(forKey: "demoReps") else { return [] }
+        guard isOn else { return [] }
+        // `-demoReps strides YES`: the run was an easy one that ended with strides.
+        if UserDefaults.standard.string(forKey: "demoReps") == "strides" { return strides }
+        guard UserDefaults.standard.bool(forKey: "demoReps") else { return [] }
         let target = plan?.paceZones.intervalSecPerKm ?? 300
         var start = Date.now.addingTimeInterval(-1_800)
         return (1...6).map { n in
@@ -121,6 +124,20 @@ enum DemoMode {
             return RepSplit(label: "Rep \(n)/6", number: n, total: 6, meters: 800, seconds: seconds,
                             targetPaceSecPerKm: target, averageHeartRate: 158 + Double(n) * 2,
                             start: start, end: start.addingTimeInterval(seconds))
+        }
+    }
+
+    /// Six 20 s strides at the end of an easy run, as they were timed: run by feel,
+    /// so they carry their time and the pace they covered, and no target.
+    static var strides: [RepSplit] {
+        var start = Date.now.addingTimeInterval(-600)
+        let meters: [Double] = [98, 101, 97, 95, 99, 103]
+        return (1...6).map { n in
+            defer { start = start.addingTimeInterval(80) }
+            return RepSplit(label: "Stride \(n)/6", kind: .stride, number: n, total: 6,
+                            meters: meters[n - 1], seconds: 20, targetPaceSecPerKm: nil,
+                            averageHeartRate: 148 + Double(n) * 3,
+                            start: start, end: start.addingTimeInterval(20))
         }
     }
 
@@ -192,7 +209,7 @@ enum DemoMode {
             let pace = today.targetPaceSecPerKm.map { ($0.lowerBound + $0.upperBound) / 2 } ?? 360
             runs.append(CompletedRun(date: Calendar.current.startOfDay(for: .now).addingTimeInterval(7 * 3600),
                                      distanceMeters: meters, durationSeconds: meters / 1_000 * pace,
-                                     averageHeartRate: 146))
+                                     averageHeartRate: 146, reps: reps.isEmpty ? nil : reps))
         }
         return runs
     }

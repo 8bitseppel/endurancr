@@ -4,8 +4,13 @@ import Foundation
 /// its end. Saved with the run in Apple Health, so the plan can show every rep against
 /// its target and judge the session by its reps rather than the run's average.
 public struct RepSplit: Sendable, Equatable, Codable {
+    /// A rep of a session, or a 20 s stride at the end of an easy run. Strides are
+    /// recorded but never marked off against a pace: they're run by feel.
+    public enum Kind: String, Sendable, Equatable, Codable { case rep, stride }
+
     /// "Rep 3/6", or the block's name ("Threshold", "Marathon pace", "Tune-up race").
     public var label: String
+    public var kind: Kind
     public var number: Int
     public var total: Int
     public var meters: Double
@@ -16,9 +21,10 @@ public struct RepSplit: Sendable, Equatable, Codable {
     public var start: Date
     public var end: Date
 
-    public init(label: String, number: Int, total: Int, meters: Double, seconds: Double,
+    public init(label: String, kind: Kind = .rep, number: Int, total: Int, meters: Double, seconds: Double,
                 targetPaceSecPerKm: Double?, averageHeartRate: Double? = nil, start: Date, end: Date) {
         self.label = label
+        self.kind = kind
         self.number = number
         self.total = total
         self.meters = meters
@@ -27,6 +33,21 @@ public struct RepSplit: Sendable, Equatable, Codable {
         self.averageHeartRate = averageHeartRate
         self.start = start
         self.end = end
+    }
+
+    /// Runs saved before strides were recorded have no `kind`: they're all reps.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        label = try c.decode(String.self, forKey: .label)
+        kind = try c.decodeIfPresent(Kind.self, forKey: .kind) ?? .rep
+        number = try c.decode(Int.self, forKey: .number)
+        total = try c.decode(Int.self, forKey: .total)
+        meters = try c.decode(Double.self, forKey: .meters)
+        seconds = try c.decode(Double.self, forKey: .seconds)
+        targetPaceSecPerKm = try c.decodeIfPresent(Double.self, forKey: .targetPaceSecPerKm)
+        averageHeartRate = try c.decodeIfPresent(Double.self, forKey: .averageHeartRate)
+        start = try c.decode(Date.self, forKey: .start)
+        end = try c.decode(Date.self, forKey: .end)
     }
 
     public var paceSecPerKm: Double? { meters > 0 && seconds > 0 ? seconds / (meters / 1_000) : nil }
@@ -40,94 +61,26 @@ public struct RepSplit: Sendable, Equatable, Codable {
     public static let slowerTolerance: Double = 5
     public static let fasterTolerance: Double = 10
 
+    /// `nil` for a stride: 20 s by feel is nothing to mark off against a pace.
     public var verdict: Verdict? {
-        guard let pace = paceSecPerKm, let target = targetPaceSecPerKm else { return nil }
+        guard kind == .rep, let pace = paceSecPerKm, let target = targetPaceSecPerKm else { return nil }
         if pace > target + Self.slowerTolerance { return .slower }
         if pace < target - Self.fasterTolerance { return .faster }
         return .onPace
     }
 }
 
-/// Follows a run's steps as the distance grows and closes each rep when it ends.
-/// Strides aren't kept: 100 m is too short for GPS to time fairly, and they're run by
-/// feel. A rep cut short (less than half its distance, the run ended) isn't kept either.
-public struct RepTracker: Sendable {
-    public let steps: [WorkoutStep]
-    public private(set) var reps: [RepSplit] = []
-    private var current: Open?
-
-    private struct Open: Sendable {
-        var step: WorkoutStep
-        var startMeters: Double
-        var startSeconds: Double
-        var startDate: Date
-        var heartRateSum: Double = 0
-        var heartRateCount = 0
-    }
-
-    /// `nil` when the run has no reps to time (a steady run, or only strides).
-    public init?(workout: PlannedWorkout, zones: PaceZones) {
-        let steps = WorkoutSteps.steps(for: workout, zones: zones)
-        guard steps.contains(where: Self.isTimed) else { return nil }
-        self.steps = steps
-    }
-
-    static func isTimed(_ step: WorkoutStep) -> Bool {
-        step.kind == .work && !step.label.hasPrefix("Stride")
-    }
-
-    /// Feed every new reading: the distance and running time so far, the time of the
-    /// reading and the heart rate (0 when there's none).
-    public mutating func update(distance: Double, elapsed: Double, date: Date, heartRate: Double) {
-        let step = steps.first { $0.startMeters + $0.distanceMeters > distance } ?? steps.last
-        guard let step else { return }
-        if current?.step.index != step.index {
-            close(distance: distance, elapsed: elapsed, date: date)
-            current = Self.isTimed(step)
-                ? Open(step: step, startMeters: distance, startSeconds: elapsed, startDate: date)
-                : nil
-        }
-        if heartRate > 0 {
-            current?.heartRateSum += heartRate
-            current?.heartRateCount += 1
-        }
-    }
-
-    /// The average pace of the rep in progress so far, once 50 m of it are run; `nil`
-    /// between reps.
-    public func currentPace(distance: Double, elapsed: Double) -> Double? {
-        guard let open = current else { return nil }
-        let meters = distance - open.startMeters
-        let seconds = elapsed - open.startSeconds
-        guard meters >= 50, seconds > 0 else { return nil }
-        return seconds / (meters / 1_000)
-    }
-
-    /// At the end of the run: keeps the rep in progress if most of it was run.
-    public mutating func finish(distance: Double, elapsed: Double, date: Date) {
-        close(distance: distance, elapsed: elapsed, date: date)
-        current = nil
-    }
-
-    private mutating func close(distance: Double, elapsed: Double, date: Date) {
-        guard let open = current else { return }
-        let meters = distance - open.startMeters
-        let seconds = elapsed - open.startSeconds
-        guard meters >= open.step.distanceMeters / 2, seconds > 0 else { return }
-        let total = open.step.repTotal ?? 1
-        reps.append(RepSplit(
-            label: open.step.label, number: open.step.repNumber ?? 1, total: total,
-            meters: meters, seconds: seconds, targetPaceSecPerKm: open.step.targetPaceSecPerKm,
-            averageHeartRate: open.heartRateCount > 0 ? open.heartRateSum / Double(open.heartRateCount) : nil,
-            start: open.startDate, end: date
-        ))
-    }
-}
-
 /// What the reps say, in plain words, for the plan and the run summary.
 public enum RepReport {
-    /// The reps with a pace and a target, the ones that can be judged.
+    /// The reps with a pace and a target, the ones that can be judged. Strides are
+    /// never among them: they're run by feel, so there's nothing to judge.
     public static func judged(_ reps: [RepSplit]) -> [RepSplit] { reps.filter { $0.verdict != nil } }
+
+    /// The session's reps, without the strides.
+    public static func reps(_ reps: [RepSplit]) -> [RepSplit] { reps.filter { $0.kind == .rep } }
+
+    /// The strides at the end of an easy run, as they were run.
+    public static func strides(_ reps: [RepSplit]) -> [RepSplit] { reps.filter { $0.kind == .stride } }
 
     /// More than half the reps slower than their target: the session came in slow.
     /// Used by the plan to ease the paces (`TrainingBuddy`).
@@ -137,8 +90,30 @@ public enum RepReport {
         return judged.filter { $0.verdict == .slower }.count * 2 > judged.count
     }
 
-    /// "5 of 6 reps on pace, target 4:15/km. Rep 6 slower, at 4:31/km." `nil` without reps.
+    /// "5 of 6 reps on pace, target 4:15/km. Rep 6 slower, at 4:31/km.", or for an
+    /// easy run that ended with strides "All 6 strides done, 3:24 to 3:41/km."
+    /// `nil` when there's nothing recorded.
     public static func summary(_ reps: [RepSplit]) -> String? {
+        let parts = [repSummary(reps), strideSummary(strides(reps))].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
+    /// What the strides came to: how many were run, and how fast they were.
+    /// They're reported, never marked off: 20 s quick and light has no target pace.
+    private static func strideSummary(_ strides: [RepSplit]) -> String? {
+        guard let first = strides.first else { return nil }
+        let done = strides.count >= first.total
+            ? "All \(first.total) strides done"
+            : "\(strides.count) of \(first.total) strides done"
+        let paces = strides.compactMap(\.paceSecPerKm).sorted()
+        guard let fastest = paces.first, let slowest = paces.last else { return done + "." }
+        return fastest == slowest
+            ? "\(done), at \(pace(fastest))."
+            : "\(done), \(String(pace(fastest).dropLast(3))) to \(pace(slowest))."
+    }
+
+    private static func repSummary(_ all: [RepSplit]) -> String? {
+        let reps = reps(all)
         let judged = judged(reps)
         guard let first = judged.first else { return nil }
         let target = first.targetPaceSecPerKm.map { "target \(pace($0))" } ?? ""

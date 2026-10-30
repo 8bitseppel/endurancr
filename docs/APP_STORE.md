@@ -638,3 +638,78 @@ endurancr is a training aid, not medical advice. Talk to a doctor before you sta
 
 The watch run video and screenshots now show the second page and Hold to finish. The
 rest is unchanged from 1.5.0. Everything is in `releases/1.6.0/`.
+
+## Version 1.7.0
+
+### Promotional text (170)
+
+Strides on the clock: two taps when they start, each 20 s burst counted down big on your wrist, and every one saved and shown with its time and pace.
+
+### What's New (4000)
+
+Strides, guided properly
+- Strides now run on the clock, not on distance: 20 s is over before GPS has settled, so counting metres tapped your wrist after the burst instead of at it.
+- While the easy part of the run is still going, the watch says how far it is until they start.
+- Two taps, the only double tap in a run, say the strides are starting.
+- Each one begins with an easy minute, counted down big on the screen, with the pace the last stride came out at above it.
+- One tap when the burst starts: the screen turns green with which stride it is, the seconds left as large as the watch can show them, and "quick and light". Another tap when it ends.
+- A pip fills for each stride done, and after the sixth: "All 6 strides done, easy to the end".
+- No card covers the countdown any more, and no pace is shown during a burst, because GPS can't measure 20 s honestly.
+
+See what your strides did
+- Every stride is saved with the run in Apple Health, with its time, the distance it covered and your heart rate, as segments the Fitness app shows too.
+- After the run, in Today and on that day in Plan, each stride shows with its pace: "All 6 strides done, 3:14 to 3:31/km".
+- Strides are never marked off against a pace and never count as a hard session: they're run by feel, so nothing about them changes your plan.
+
+### Description (4000)
+
+endurancr builds a running plan around one goal, records your runs on Apple Watch or iPhone, and adapts the plan to what you really ran, like a running buddy who isn't pushy. No account, no feed, no ads.
+
+SET ONE GOAL
+Pick a race, from 5K to the marathon, and its date. endurancr builds a full plan with the VDOT method from Jack Tupper Daniels, paced to the fitness you have now. It uses a recent run from Apple Health, or a race result you type in. A short race shows your speed, not your endurance, so marathon pace starts a little easier until your long runs prove it.
+
+TRAINING FROM THE BOOKS
+Easy runs, threshold runs, intervals and marathon-pace runs, never more than two hard sessions a week. Strides keep your legs quick. Long runs build to 32 km for the marathon. A tune-up race six weeks out sets your paces. Race day tells you how to pace it and what to eat and drink, and after the race the plan brings you back with rest and easy runs. Based on Jack Tupper Daniels, Pete Pfitzinger, the Hansons and Hal Higdon.
+
+A PLAN THAT FOLLOWS YOU
+Every run counts, even one on a rest day. Missed kilometres are never piled onto the days after. Ran less than planned? The coming weeks build from what you actually ran, at most 10% more each week. Back from a break? Your paces ease a little and you start with easy runs. Strong runs nudge your paces up a little at a time. Drag days to swap them when life gets in the way.
+
+THE WHOLE PLAN
+See what you ran on each day, what you missed, what changed and why, your new paces next to the old ones, and what each week is for, all the way to race day.
+
+AN HONEST OUTLOOK
+Progress shows a finish-time range for today and for race day, and tells you whether your target is on track, within reach, a stretch or unlikely, and why. If it's out of reach, it suggests a realistic time. It only changes your target if you tap it.
+
+A CALM LOOK, LIGHT AND DARK
+Every kind of run has its own colour, the same on Today, in the plan and in your paces. Today shows your run and your week at a glance, a circle for every day.
+
+INTERVALS AND STRIDES ON YOUR WRIST
+On interval days your Apple Watch guides you through every rep: a tap and "get ready" just before it, "Go" with its distance and pace, and how many are done, each tap telling you which is which. Strides run on the clock: two taps when they start, then every 20 s burst counted down big on your wrist, with a tap at its start and end. Afterwards you see every rep against its target and every stride with its time and pace, and the plan follows how your reps really went. Feel like intervals on another day? Start another session offers them when they fit your week, and says why when they don't.
+
+RUN ON YOUR WRIST OR YOUR PHONE
+Start today's run on Apple Watch with heart rate, or on iPhone with GPS. The run screens show time, distance, your pace and the target, and on the watch a second page adds your averages, this kilometre, climb and what is left. Finish is held for a second, so a run never ends by accident. The watch's own Auto-Pause holds your run at a traffic light, and a run on the watch shows on your iPhone's Lock Screen, where you can pause and finish it. Every run is saved to Apple Health.
+
+YOUR PACES IN A MINUTE
+The pace calculator turns one recent race into your VDOT, your five training paces, a race-day range and the plan endurancr would build, ready to start with one tap. It's in the app, and as an App Clip it opens without installing, right in Safari or from a link.
+
+NOTHING HIDDEN
+How it works explains every rule the plan follows, in plain words, with the books and studies behind it. endurancr is open source, so you can read every line that touches your data.
+
+PRIVATE BY DESIGN
+No account, no server, no analytics, no ads, no tracking. Your plan stays on your device, and your runs live in Apple Health.
+
+FREE
+No subscription and no in-app purchases.
+
+endurancr is a training aid, not medical advice. Talk to a doctor before you start a new training plan.
+
+### Build
+
+1.7.0 (44).
+
+### Screenshots
+
+New: `watch-7-strides.png` (the stride countdown on the watch) and its video through
+the whole block, and `iphone-11-strides.png` (the strides in Today after the run). The
+watch summary figure now also turns to its strides page. The rest is unchanged from
+1.6.0. Everything is in `releases/1.7.0/`.

@@ -86,11 +86,22 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   the iPhone at once counts once.
 - Swap days by dragging them in the plan; the watch shows the same adjusted days.
 - The plan shows what you ran on each past day (done, shorter or missed), what a changed day was and why, new paces next to the old ones with the reason, what each week is for, how far the week is, the 32 km runs and the taper, and ends with the race outlook.
-- Intervals, threshold and marathon-pace blocks, the tune-up race and strides are guided
-  on Apple Watch by distance: about 100 m before a rep it taps and shows "Rep 3 of 6 in
+- Intervals, threshold and marathon-pace blocks and the tune-up race are guided on
+  Apple Watch by distance: about 100 m before a rep it taps and shows "Rep 3 of 6 in
   100 m", then "Go" with the rep's distance and pace from your current fitness, and "3 of
-  6 done, easy now" after it, each with its own tap. Strides count as about 100 m quick
-  and light with about 150 m easy between.
+  6 done, easy now" after it, each with its own tap.
+- Strides are guided on the clock, because 20 s is over before GPS has settled: the run
+  screen says how far it is until they start, then taps twice and shows "Strides now, 6 ×
+  20 s, easy between". Each stride begins with an easy minute counted down big on the
+  screen, one tap when the burst starts (the screen turns green: which stride, the
+  seconds left, "quick and light"), another when it ends, a pip for each one done, and
+  "All 6 strides done" after the sixth. No card covers the countdown, and no pace is
+  shown during a 20 s burst because GPS can't measure one honestly.
+- Every rep and stride is saved with the run in Apple Health (its time, distance, pace
+  and heart rate, and as segments the Fitness app shows) and read back in Today, after
+  the run and on that day in Plan: reps against their target, strides counted and timed,
+  "All 6 strides done, 3:14 to 3:31/km". Strides are never judged against a pace and
+  never count as a hard session.
 - Start another session: this week's hard session moved to today (swapping the days),
   an interval session of the plan's size in a week with only one, or strides. Only when
   it fits: not in base weeks, not the day after a hard session or the long run, not the

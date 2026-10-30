@@ -60,7 +60,7 @@ struct RunSummaryView: View {
 
                     if !data.reps.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("Your reps").brandEyebrow()
+                            Text(RepsView.title(for: data.reps)).brandEyebrow()
                             RepsView(reps: data.reps)
                         }
                         .brandCard()

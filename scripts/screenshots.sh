@@ -91,7 +91,7 @@ rec() {
   sleep 2.5
   xcrun simctl io "$1" recordVideo --codec=h264 --force "$BUILD/$4.mov" >/dev/null 2>&1 &
   recorder=$!
-  sleep 14
+  sleep "${REC_SECONDS:-14}"
   kill -INT "$recorder"
   wait "$recorder" || true
   # The Simulator only writes a frame when the screen changes, and its decode
@@ -101,6 +101,30 @@ rec() {
     "tpad=stop_mode=clone:stop_duration=2,fps=$6,scale=$5:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle" \
     "$OUT/$4.gif"
   echo "    $OUT/$4.gif"
+}
+
+# rec_sim <device> <bundle id> <screen> <file name> <gif width> <gif fps> <seconds> [args]
+# For screens that play by themselves (a simulated guided run): no page turning, and
+# the still is taken once the session is under way, not on its first card.
+rec_sim() {
+  d=$1; b=$2; scr=$3; f=$4; gw=$5; gf=$6; secs=$7; shift 7
+  xcrun simctl terminate "$d" "$b" 2>/dev/null || true
+  xcrun simctl launch "$d" "$b" -demo -demoScreen "$scr" "$@" >/dev/null
+  sleep 7
+  xcrun simctl io "$d" screenshot --type=png "$OUT/$f.png" >/dev/null 2>&1
+  echo "    $OUT/$f.png"
+  xcrun simctl terminate "$d" "$b" 2>/dev/null || true
+  xcrun simctl launch "$d" "$b" -demo -demoScreen "$scr" "$@" >/dev/null
+  sleep 1
+  xcrun simctl io "$d" recordVideo --codec=h264 --force "$BUILD/$f.mov" >/dev/null 2>&1 &
+  recorder=$!
+  sleep "$secs"
+  kill -INT "$recorder"
+  wait "$recorder" || true
+  ffmpeg -loglevel error -y -fflags +igndts -i "$BUILD/$f.mov" -vf \
+    "tpad=stop_mode=clone:stop_duration=2,fps=$gf,scale=$gw:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle" \
+    "$OUT/$f.gif"
+  echo "    $OUT/$f.gif"
 }
 
 # The order follows a first week with the app: set a goal, run, check in.
@@ -119,6 +143,8 @@ shot "$PHONE" app.endurancr plan iphone-8-week -demoPlanWeek 6
 shot "$PHONE" app.endurancr paces iphone-9-paces -clipResults
 # Another session: intervals offered today instead of the easy run.
 shot "$PHONE" app.endurancr - iphone-10-another -demoOffers offer -demoOffersOpen YES
+# Today after an easy run that ended with strides: every one with its pace.
+shot "$PHONE" app.endurancr - iphone-11-strides -demoDoneToday YES -demoReps strides
 
 # The same in dark, for the light and dark slider on the website.
 echo "==> iPhone, dark"
@@ -133,6 +159,7 @@ shot "$PHONE" app.endurancr plan iphone-7-plan-dark
 shot "$PHONE" app.endurancr plan iphone-8-week-dark -demoPlanWeek 6
 shot "$PHONE" app.endurancr paces iphone-9-paces-dark -clipResults
 shot "$PHONE" app.endurancr - iphone-10-another-dark -demoOffers offer -demoOffersOpen YES
+shot "$PHONE" app.endurancr - iphone-11-strides-dark -demoDoneToday YES -demoReps strides
 xcrun simctl ui "$PHONE" appearance light
 
 echo "==> App Clip"
@@ -157,6 +184,10 @@ rec "$WATCH" app.endurancr.watchkitapp summary watch-3-summary 312 25 -demoReps 
 rec  "$WATCH" app.endurancr.watchkitapp run watch-4-intervals 312 25 -demoStepCard YES
 rec  "$WATCH" app.endurancr.watchkitapp summary watch-5-reps 312 25 -demoReps YES -demoRepsPage YES
 shot "$WATCH" app.endurancr.watchkitapp - watch-6-another -demoOffers offer -demoOffersOpen YES
+# Strides: the whole block as the watch runs it, from "Strides now" to "All 6 done".
+rec_sim "$WATCH" app.endurancr.watchkitapp intervals watch-7-strides 312 12 50 -demoStrides YES
+# The strides after the run, with their times and paces.
+rec "$WATCH" app.endurancr.watchkitapp summary watch-8-strides-done 312 25 -demoReps strides -demoRepsPage YES
 python3 scripts/watch-clock.py
 
 echo "==> Done"

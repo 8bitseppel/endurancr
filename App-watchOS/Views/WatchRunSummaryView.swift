@@ -105,10 +105,55 @@ struct WatchRunSummaryView: View {
         .padding(.horizontal, 4)
     }
 
-    /// Page 2 after an interval session, readable at a glance: how many reps were on
-    /// pace, a bar per rep in its colour, and which were off, in words (not by colour
-    /// alone). Every rep's pace is on the iPhone, after the run and in the plan.
-    private var repsPage: some View {
+    /// Page 2 after a session with reps or strides. Strides are only counted and
+    /// timed, never marked off: 20 s by feel has no target to miss.
+    @ViewBuilder private var repsPage: some View {
+        if RepReport.reps(summary.reps).isEmpty, !RepReport.strides(summary.reps).isEmpty {
+            stridesPage
+        } else {
+            repVerdicts
+        }
+    }
+
+    /// The strides at the end of an easy run: how many were run, and how fast they
+    /// came out. Every stride's own pace is on the iPhone, after the run and in Plan.
+    private var stridesPage: some View {
+        let strides = RepReport.strides(summary.reps)
+        let total = strides.first?.total ?? strides.count
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("STRIDES DONE").font(.caption2).foregroundStyle(.secondary)
+            Text("\(strides.count) of \(total)")
+                .font(.system(.largeTitle, design: .rounded).weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(strides.count >= total ? .green : .primary)
+            HStack(spacing: 3) {
+                ForEach(Array(strides.enumerated()), id: \.offset) { _, _ in
+                    // The speed session's colour, softened: a stride is recorded,
+                    // not marked off, so it mustn't read like a verdict bar.
+                    Capsule().fill(.pink.opacity(0.6)).frame(height: 8)
+                }
+            }
+            .accessibilityHidden(true)
+            Text(strideLine(strides))
+                .font(.footnote).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.horizontal, 4)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// "20 s each, 3:20 to 3:30/km", or just the time when GPS caught no distance.
+    private func strideLine(_ strides: [RepSplit]) -> String {
+        let seconds = Int((strides.map(\.seconds).reduce(0, +) / Double(max(1, strides.count))).rounded())
+        let paces = strides.compactMap(\.paceSecPerKm).sorted()
+        guard let fastest = paces.first, let slowest = paces.last else { return "\(seconds) s each." }
+        return fastest == slowest
+            ? "\(seconds) s each, at \(Format.pace(fastest))."
+            : "\(seconds) s each, \(String(Format.pace(fastest).dropLast(3))) to \(Format.pace(slowest))."
+    }
+
+    private var repVerdicts: some View {
         let judged = RepReport.judged(summary.reps)
         let onPace = judged.filter { $0.verdict == .onPace }.count
         let off = judged.filter { $0.verdict == .slower || $0.verdict == .faster }

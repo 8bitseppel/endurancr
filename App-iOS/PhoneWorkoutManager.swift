@@ -56,8 +56,9 @@ final class PhoneWorkoutManager: NSObject {
     /// Today's planned session + the athlete's paces, so the Live Activity can show
     /// step-aware targets that advance as each step's distance is covered. Nil = free run.
     private var plannedWorkout: PlannedWorkout?
-    /// Times each rep of an interval session, saved with the run (`RepSplit`).
-    private var repTracker: RepTracker?
+    /// Follows the session step by step and times every rep and stride, saved with
+    /// the run (`RepSplit`). The timer below moves it on, so strides run on the clock.
+    private var guided: GuidedRun?
     /// The reps of the run just finished, for the summary.
     private(set) var reps: [RepSplit] = []
     private var zones: PaceZones?
@@ -99,13 +100,12 @@ final class PhoneWorkoutManager: NSObject {
     var plannedDistanceMeters: Double { plannedWorkout?.distanceMeters ?? 0 }
 
     /// The step the athlete is currently in, for step-aware targets that advance as
-    /// each step's distance is covered. `nil` for a free run.
-    var activeStep: WorkoutStep? {
-        guard let plannedWorkout, let zones else { return nil }
-        return WorkoutSteps.activeStep(
-            for: plannedWorkout, zones: zones, distanceCovered: distanceMeters
-        )
-    }
+    /// the session goes on. `nil` for a free run.
+    var activeStep: WorkoutStep? { guided?.step }
+
+    /// Seconds left of a step run by the clock (a stride, or the easy minute before
+    /// one); `nil` for a step run by distance.
+    var stepSecondsLeft: Double? { guided?.remainingSeconds(elapsed: elapsedSeconds) }
 
     #if DEBUG
     /// Fills in a run in progress for Simulator screenshots (see `DemoMode`),
@@ -134,7 +134,7 @@ final class PhoneWorkoutManager: NSObject {
         self.targetPace = targetPace
         self.plannedWorkout = plannedWorkout
         self.zones = zones
-        repTracker = plannedWorkout.flatMap { w in zones.flatMap { RepTracker(workout: w, zones: $0) } }
+        guided = plannedWorkout.flatMap { w in zones.flatMap { GuidedRun(workout: w, zones: $0) } }
         reps = []
 
         let config = HKWorkoutConfiguration()
@@ -296,9 +296,9 @@ final class PhoneWorkoutManager: NSObject {
     /// The reps go into Health twice: as Apple's workout segments, which the Fitness
     /// app shows, and as one metadata entry endurancr reads back with their targets.
     private func saveReps(to builder: HKWorkoutBuilder, endingAt date: Date) async throws {
-        repTracker?.finish(distance: distanceMeters, elapsed: elapsedSeconds, date: date)
-        reps = repTracker?.reps ?? []
-        repTracker = nil
+        guided?.finish(distance: distanceMeters, elapsed: elapsedSeconds, date: date)
+        reps = guided?.reps ?? []
+        guided = nil
         guard let json = RepReport.encode(reps) else { return }
         try await builder.addMetadata([RepReport.metadataKey: json])
         try await builder.addWorkoutEvents(reps.map { rep in
@@ -321,8 +321,8 @@ final class PhoneWorkoutManager: NSObject {
             MainActor.assumeIsolated {
                 guard let self, !self.isPaused, let seg = self.segmentStart else { return }
                 self.elapsedSeconds = self.accumulatedSeconds + Date().timeIntervalSince(seg)
-                self.repTracker?.update(distance: self.distanceMeters, elapsed: self.elapsedSeconds,
-                                        date: Date(), heartRate: 0)
+                self.guided?.update(distance: self.distanceMeters, elapsed: self.elapsedSeconds,
+                                    date: Date(), heartRate: 0)
                 // No usable fix for 10 s (standing, or under cover): no pace, rather
                 // than the last running pace still showing as on target.
                 if let fix = self.lastFixDate, Date().timeIntervalSince(fix) > 10 {

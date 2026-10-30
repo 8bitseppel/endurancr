@@ -7,7 +7,9 @@ import Foundation
 /// distance is covered.
 public struct WorkoutStep: Sendable, Equatable {
     public enum Kind: String, Sendable, Equatable {
-        case warmup, work, recovery, cooldown, steady
+        /// `stride` is a 20 s burst inside an easy run: work, but run by the clock
+        /// and by feel rather than to a pace target.
+        case warmup, work, stride, recovery, cooldown, steady
     }
 
     public var kind: Kind
@@ -19,7 +21,16 @@ public struct WorkoutStep: Sendable, Equatable {
     public var repNumber: Int?
     /// Total rep count for `work`/`recovery` steps; `nil` otherwise.
     public var repTotal: Int?
+    /// How far the step runs. For a timed step (`seconds != nil`) this is only an
+    /// estimate of what its seconds cover, used to show it and to add the session up.
     public var distanceMeters: Double
+    /// How long the step lasts, when it's run by the clock instead of by distance:
+    /// strides and the easy stretch between them. `nil` = run by distance.
+    ///
+    /// A stride is 20 s quick and light. Timing it is the only honest way: GPS needs
+    /// longer than 20 s to settle, so 100 m of distance arrives late and the burst
+    /// would be over before the watch noticed.
+    public var seconds: Double?
     /// Cumulative distance at which this step begins.
     public var startMeters: Double
     /// The pace zone this step runs at.
@@ -32,7 +43,7 @@ public struct WorkoutStep: Sendable, Equatable {
     public init(
         kind: Kind, index: Int, total: Int,
         repNumber: Int? = nil, repTotal: Int? = nil,
-        distanceMeters: Double, startMeters: Double,
+        distanceMeters: Double, seconds: Double? = nil, startMeters: Double,
         paceType: WorkoutType, targetPaceSecPerKm: Double?, label: String
     ) {
         self.kind = kind
@@ -41,6 +52,7 @@ public struct WorkoutStep: Sendable, Equatable {
         self.repNumber = repNumber
         self.repTotal = repTotal
         self.distanceMeters = distanceMeters
+        self.seconds = seconds
         self.startMeters = startMeters
         self.paceType = paceType
         self.targetPaceSecPerKm = targetPaceSecPerKm
@@ -135,10 +147,16 @@ public enum WorkoutSteps {
 
     // MARK: Strides
 
-    /// Strides end an easy run: 6 × 20 s quick and light, about a minute easy between.
-    /// The watch follows distance, so each stride is the 100 m that 20 s at repetition
-    /// pace about covers, and each break the 150 m of a minute's easy jog after it.
+    /// Strides end an easy run: 6 × 20 s quick and light, a minute easy between.
+    /// They run on the clock, not on distance: each one is the 20 s burst itself,
+    /// preceded by the minute of easy running that sets it up. So the block reads
+    /// easy, stride, easy, stride … and the last stride is followed by easy running
+    /// to the end of the run.
     public static let strideCount = 6
+    public static let strideSeconds: Double = 20
+    /// The easy minute before each stride, Daniels' "full recovery" between them.
+    public static let strideEasySeconds: Double = 60
+    /// What a stride and its easy minute cover when there's no pace to work from.
     public static let strideMeters: Double = 100
     public static let strideRecoveryMeters: Double = 150
 
@@ -148,31 +166,52 @@ public enum WorkoutSteps {
             && w.distanceMeters >= Double(strideCount) * (strideMeters + strideRecoveryMeters) + 1_500
     }
 
+    /// Roughly how far the stride block covers at these paces, so the easy part
+    /// before it can be as long as the rest of the run.
+    public static func strideBlockMeters(_ zones: PaceZones) -> Double {
+        Double(strideCount) * (meters(strideSeconds, at: zones.repetitionSecPerKm, fallback: strideMeters)
+            + meters(strideEasySeconds, at: zones.easySecPerKm, fallback: strideRecoveryMeters))
+    }
+
+    private static func meters(_ seconds: Double, at paceSecPerKm: Double, fallback: Double) -> Double {
+        paceSecPerKm > 0 ? (seconds / paceSecPerKm * 1_000 / 10).rounded() * 10 : fallback
+    }
+
     private static func strideSteps(for w: PlannedWorkout, zones: PaceZones) -> [WorkoutStep] {
-        let block = Double(strideCount) * (strideMeters + strideRecoveryMeters)
-        let total = 1 + strideCount * 2
+        let stride = meters(strideSeconds, at: zones.repetitionSecPerKm, fallback: strideMeters)
+        let easy = meters(strideEasySeconds, at: zones.easySecPerKm, fallback: strideRecoveryMeters)
+        let lead = max(1_000, w.distanceMeters - Double(strideCount) * (stride + easy))
+        // Easy part, then six times [easy minute, stride], then easy to the end.
+        let total = 2 + strideCount * 2
         var steps = [WorkoutStep(
             kind: .warmup, index: 0, total: total,
-            distanceMeters: w.distanceMeters - block, startMeters: 0,
+            distanceMeters: lead, startMeters: 0,
             paceType: .easy, targetPaceSecPerKm: zones.easySecPerKm, label: "Easy"
         )]
-        var start = w.distanceMeters - block
+        var start = lead
         for r in 1...strideCount {
             steps.append(WorkoutStep(
-                kind: .work, index: steps.count, total: total, repNumber: r, repTotal: strideCount,
-                distanceMeters: strideMeters, startMeters: start,
-                paceType: .repetitionSpeed, targetPaceSecPerKm: zones.repetitionSecPerKm,
-                label: "Stride \(r)/\(strideCount)"
-            ))
-            start += strideMeters
-            steps.append(WorkoutStep(
                 kind: .recovery, index: steps.count, total: total, repNumber: r, repTotal: strideCount,
-                distanceMeters: strideRecoveryMeters, startMeters: start,
+                distanceMeters: easy, seconds: strideEasySeconds, startMeters: start,
                 paceType: .easy, targetPaceSecPerKm: zones.easySecPerKm,
                 label: "Easy \(r)/\(strideCount)"
             ))
-            start += strideRecoveryMeters
+            start += easy
+            steps.append(WorkoutStep(
+                kind: .stride, index: steps.count, total: total, repNumber: r, repTotal: strideCount,
+                distanceMeters: stride, seconds: strideSeconds, startMeters: start,
+                paceType: .repetitionSpeed, targetPaceSecPerKm: zones.repetitionSecPerKm,
+                label: "Stride \(r)/\(strideCount)"
+            ))
+            start += stride
         }
+        // Whatever is left of the run, easy. The strides take their own time, so how
+        // much that is only shows at the end: the step runs to the finish.
+        steps.append(WorkoutStep(
+            kind: .cooldown, index: steps.count, total: total,
+            distanceMeters: max(0, w.distanceMeters - start), startMeters: start,
+            paceType: .easy, targetPaceSecPerKm: zones.easySecPerKm, label: "Easy to the end"
+        ))
         return steps
     }
 
@@ -197,10 +236,12 @@ public enum WorkoutSteps {
         }
     }
 
-    /// The step the athlete is currently in for a given cumulative distance: the
-    /// first step whose end (`startMeters + distanceMeters`) is still ahead. Past the
-    /// end, returns the last step (you're finishing the cool-down); `nil` if there are
-    /// no steps at all.
+    /// The step at a given cumulative distance: the first step whose end
+    /// (`startMeters + distanceMeters`) is still ahead. Past the end, returns the last
+    /// step (you're finishing the cool-down); `nil` if there are no steps at all.
+    ///
+    /// Only an estimate where steps run on the clock (strides), so a run in progress
+    /// is followed by `GuidedRun`, which knows when each step actually began.
     public static func activeStep(for w: PlannedWorkout, zones: PaceZones, distanceCovered: Double) -> WorkoutStep? {
         let all = steps(for: w, zones: zones)
         if let step = all.first(where: { $0.startMeters + $0.distanceMeters > distanceCovered }) {

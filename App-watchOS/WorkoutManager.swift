@@ -1,5 +1,6 @@
 import Foundation
 import HealthKit
+import WatchKit
 import CoreLocation
 import TrainingCore
 
@@ -63,12 +64,12 @@ final class WorkoutManager: NSObject {
         return meters >= 100 && seconds > 0 ? seconds / (meters / 1_000) : nil
     }
 
-    /// During a rep: its average pace so far (`RepTracker`), the fairest "am I on pace".
+    /// During a rep: its average pace so far (`GuidedRun`), the fairest "am I on pace".
     var thisRepPaceSecPerKm: Double? {
         #if DEBUG
         if let demoThisRep { return demoThisRep }
         #endif
-        return repTracker?.currentPace(distance: distanceMeters, elapsed: elapsedSeconds)
+        return guided?.currentPace(distance: distanceMeters, elapsed: elapsedSeconds)
     }
 
     #if DEBUG
@@ -99,14 +100,80 @@ final class WorkoutManager: NSObject {
     private(set) var savedDistanceMeters: Double?
     /// Latest running speed (m/s) from the watch's sensors, for the live pace.
     private var currentSpeed: Double = 0
-    /// Times each rep of an interval session, saved with the run (`RepSplit`).
-    private var repTracker: RepTracker?
     /// The reps of the run just finished, for the summary.
     private(set) var reps: [RepSplit] = []
+
+    // MARK: Step guidance
+
+    /// Follows today's session step by step and records every rep and stride as it
+    /// ends. `nil` for a free run or a run at one steady pace.
+    ///
+    /// It lives here rather than on the run screen because a stride is 20 s long and
+    /// the wrist has to be tapped when it starts and when it ends, whether or not the
+    /// screen is awake. The screen only draws the cue the recorder decided on.
+    private(set) var guided: GuidedRun?
+    /// The step the athlete is in now; `nil` for a free run.
+    var activeStep: WorkoutStep? { guided?.step }
+    /// The step the screen should show full screen right now.
+    private(set) var cue: RunCue?
+    /// The rep already announced with "get ready", so it's announced once.
+    private var readiedStep: Int?
+    /// Moves the session on once a second, so steps that run on the clock (strides,
+    /// the easy minute before each) end on time and not when GPS next reports in.
+    private var ticker: Timer?
+    /// A run picked up after the app was relaunched: the next reading says which
+    /// step it's in.
+    private var isRecovering = false
+    /// "Plan done" is said once a run.
+    private var saidPlanDone = false
+
+    /// Seconds left of a step run by the clock: a stride, or the easy minute before
+    /// one. `nil` for a step run by distance.
+    var stepSecondsLeft: Double? { guided?.remainingSeconds(elapsed: elapsedSeconds) }
+    /// Metres left of a step run by distance; `nil` for a timed step or the last one.
+    var stepMetersLeft: Double? { guided?.remainingMeters(distance: distanceMeters) }
+    /// How far through the current step, 0 to 1, for the ring around a stride.
+    var stepProgress: Double { guided?.progress(distance: distanceMeters, elapsed: elapsedSeconds) ?? 0 }
+    /// The pace of the last stride that was run, once it's over and can be measured
+    /// honestly; `nil` before the first one is done.
+    var lastStridePace: Double? {
+        guided.flatMap { RepReport.strides($0.reps).last?.paceSecPerKm }
+    }
+
+    /// How many strides are done, of how many, during a run with strides.
+    var stridesDone: (done: Int, total: Int)? {
+        guard let guided, let total = guided.steps.first(where: { $0.kind == .stride })?.repTotal else { return nil }
+        return (RepReport.strides(guided.reps).count, total)
+    }
 
     #if DEBUG
     /// The demo's running speed, so its live pace reads as on target.
     func setDemoSpeed(_ metersPerSecond: Double) { currentSpeed = metersPerSecond }
+
+    /// Runs a session from a simulation instead of from HealthKit, through the same
+    /// step engine, cues and taps as a real run (`IntervalRunSimulation`).
+    func demoStart(plannedWorkout: PlannedWorkout, zones: PaceZones) {
+        resetLiveState()
+        self.plannedWorkout = plannedWorkout
+        self.zones = zones
+        guided = GuidedRun(workout: plannedWorkout, zones: zones)
+        isRunning = true
+    }
+
+    func demoAdvance(distance: Double, elapsed: Double, speed: Double, heartRate: Double) {
+        distanceMeters = distance
+        elapsedSeconds = elapsed
+        currentSpeed = speed
+        self.heartRate = heartRate
+        advanceSteps(at: Date())
+        checkPlanDone()
+    }
+
+    func demoFinish() {
+        guided?.finish(distance: distanceMeters, elapsed: elapsedSeconds, date: Date())
+        reps = guided?.reps ?? []
+        isRunning = false
+    }
     #endif
 
     /// The run's time at `date`, for a clock that ticks every second rather than
@@ -141,7 +208,8 @@ final class WorkoutManager: NSObject {
         self.plannedWorkout = plannedWorkout
         self.zones = zones
         self.goalName = goalName
-        repTracker = plannedWorkout.flatMap { w in zones.flatMap { RepTracker(workout: w, zones: $0) } }
+        guided = plannedWorkout.flatMap { w in zones.flatMap { GuidedRun(workout: w, zones: $0) } }
+        startTicking()
         RunContext(plannedWorkout: plannedWorkout, zones: zones, goalName: goalName).save()
         let config = HKWorkoutConfiguration()
         config.activityType = .running
@@ -194,6 +262,10 @@ final class WorkoutManager: NSObject {
         savedDuration = nil
         savedDistanceMeters = nil
         reps = []
+        guided = nil
+        cue = nil
+        readiedStep = nil
+        saidPlanDone = false
     }
 
     /// Connects a new or recovered session: its live builder, a route builder and GPS.
@@ -227,6 +299,11 @@ final class WorkoutManager: NSObject {
                 self.plannedWorkout = context?.plannedWorkout
                 self.zones = context?.zones
                 self.goalName = context?.goalName ?? ""
+                self.guided = context?.plannedWorkout.flatMap { w in
+                    context?.zones.flatMap { GuidedRun(workout: w, zones: $0) }
+                }
+                self.isRecovering = self.guided != nil
+                self.startTicking()
                 self.attach(session)
                 // Show the recovered run on the iPhone again.
                 session.startMirroringToCompanionDevice { _, _ in }
@@ -239,14 +316,185 @@ final class WorkoutManager: NSObject {
     func pause() { session?.pause() }
     func resume() { session?.resume() }
 
+    // MARK: Step guidance
+
+    /// Once a second, while the run is going: steps that run on the clock end on
+    /// time. HealthKit only delivers data when it has some, which isn't often
+    /// enough for a 20 s stride.
+    private func startTicking() {
+        ticker?.invalidate()
+        ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tick() }
+        }
+    }
+
+    private func tick() {
+        guard isRunning else { ticker?.invalidate(); ticker = nil; return }
+        elapsedSeconds = elapsedTime(at: .now)
+        advanceSteps(at: Date())
+        checkPlanDone()
+    }
+
+    /// Ends the step that's over, taps the wrist and says what's next. Runs both on
+    /// every tick and whenever new data arrives, so a stride ends on its 20th second
+    /// and a rep ends on its last metre.
+    private func advanceSteps(at date: Date) {
+        guard var run = guided, !isPaused, !isAutoPaused else { return }
+        if isRecovering, distanceMeters > 0 {
+            // Relaunched mid-run: pick up at the step the distance says, rather than
+            // starting the session again from the warm-up.
+            isRecovering = false
+            run.seek(distance: distanceMeters, elapsed: elapsedSeconds)
+        }
+        let entered = run.update(distance: distanceMeters, elapsed: elapsedSeconds,
+                                 date: date, heartRate: heartRate)
+        guided = run
+        if entered.isEmpty {
+            readyNextRep()
+        } else {
+            for step in entered { announce(step) }
+        }
+    }
+
+    /// Today's distance reached: one tap and a note, nothing more. It waits for the
+    /// session's last step, so it can't cut in between strides.
+    private func checkPlanDone() {
+        guard !saidPlanDone, isRunning, let planned = plannedWorkout, planned.distanceMeters > 0,
+              distanceMeters >= planned.distanceMeters else { return }
+        if let guided, guided.index < guided.steps.count - 1 { return }
+        saidPlanDone = true
+        play(.done)
+        cue = RunCue(title: "Plan done",
+                     detail: "\(Format.workoutTitle(planned.type)), \(Format.distance(planned.distanceMeters))",
+                     note: "", tone: .done)
+    }
+
+    /// A step began: tap the wrist and hand the screen what to say.
+    private func announce(_ step: WorkoutStep) {
+        guard let next = buildCue(for: step) else { return }
+        play(next.tone)
+        cue = next
+        #if DEBUG
+        if DemoMode.isOn {
+            print("[step] at \(Int(distanceMeters)) m, \(Int(elapsedSeconds)) s, \(next.tone.haptic.times)× \(next.tone.haptic.type.rawValue): \(next.note) | \(next.title) | \(next.detail)")
+        }
+        #endif
+    }
+
+    private func play(_ tone: RunCue.Tone) {
+        let (type, times) = tone.haptic
+        WKInterfaceDevice.current().play(type)
+        guard times > 1 else { return }
+        // A second tap, far enough behind the first to be felt as two.
+        for i in 1..<times {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45 * Double(i)) {
+                WKInterfaceDevice.current().play(type)
+            }
+        }
+    }
+
+    /// What the screen says when `step` begins, or `nil` for a step that starts
+    /// without a word (the cool-down right after an "all done" card).
+    private func buildCue(for step: WorkoutStep) -> RunCue? {
+        let steps = guided?.steps ?? []
+        let done = step.repNumber.map { $0 - 1 } ?? 0
+        switch step.kind {
+        case .stride:
+            // No card: the page behind it is already counting this stride down.
+            return RunCue(title: strideTitle(step), detail: "\(Int(step.seconds ?? 20)) s quick and light",
+                          note: "Go", tone: .go, screenSeconds: nil)
+        case .recovery where step.seconds != nil && step.repNumber == 1:
+            // The strides begin: the one double tap of the run, then the easy minute
+            // that sets the first one up.
+            return RunCue(title: "Strides now",
+                          detail: "\(step.repTotal ?? 6) × \(Int(WorkoutSteps.strideSeconds)) s, easy between",
+                          note: "Easy first, \(Int(step.seconds ?? 60)) s", tone: .strides, screenSeconds: 3)
+        case .recovery where step.seconds != nil:
+            // The stride just ended: felt, not read. The page counts the easy
+            // minute down from here.
+            return RunCue(title: "Easy \(Int(step.seconds ?? 60)) s", detail: "Next: \(strideTitle(step))",
+                          note: "\(done) of \(step.repTotal ?? 6) strides done", tone: .easy, screenSeconds: nil)
+        case .cooldown where strideTotal != nil:
+            // The last stride is done; what's left of the run is easy.
+            return RunCue(title: "All \(strideTotal ?? 6) strides done", detail: "Easy to the end",
+                          note: "Well run", tone: .done)
+        case .work:
+            return RunCue(title: repTitle(step), detail: stepDetail(step), note: "Go", tone: .go)
+        case .recovery where isLastRecovery(step, in: steps):
+            // After the last rep: straight to the cool-down, counting its easy part in.
+            let cooldown = steps.last { $0.kind == .cooldown }?.distanceMeters ?? 0
+            return RunCue(title: cooldown > 0 ? "Cool-down" : "Easy to the end",
+                          detail: "\(Format.distanceCompact(step.distanceMeters + cooldown)) easy",
+                          note: "All \(step.repTotal ?? 1) done. Well run.", tone: .done)
+        case .recovery:
+            let count = step.repNumber.flatMap { n in step.repTotal.map { "\(n) of \($0) done" } } ?? "Done"
+            return RunCue(title: "Easy now", detail: stepDetail(step), note: count, tone: .easy)
+        case .cooldown:
+            // Already said after the last rep's easy part.
+            if step.index > 0, isLastRecovery(steps[step.index - 1], in: steps) { return nil }
+            let reps = steps.last { $0.kind == .work }?.repTotal ?? 1
+            return RunCue(title: "Cool-down", detail: stepDetail(step),
+                          note: reps > 1 ? "All \(reps) done. Well run." : "Done. Well run.", tone: .done)
+        case .warmup, .steady:
+            return RunCue(title: step.label.isEmpty ? "Run" : step.label, detail: stepDetail(step),
+                          note: "", tone: .info)
+        }
+    }
+
+    /// Just before a rep: "Rep 3 of 6 in 70 m", so it doesn't come as a surprise.
+    /// Strides need no warning: the easy minute before each counts itself down.
+    private func readyNextRep() {
+        guard let guided, guided.step.kind != .work, guided.step.seconds == nil,
+              let rep = guided.nextStep, rep.kind == .work, readiedStep != rep.index,
+              let left = guided.remainingMeters(distance: distanceMeters) else { return }
+        guard left <= min(100, guided.step.distanceMeters / 2) else { return }
+        readiedStep = rep.index
+        // Rounded to 10 m: "in 70 m", not "in 74 m".
+        let meters = max(10, Int((left / 10).rounded()) * 10)
+        let next = RunCue(title: "\(repTitle(rep)) in \(meters) m", detail: stepDetail(rep),
+                          note: "Get ready", tone: .ready)
+        play(next.tone)
+        cue = next
+        #if DEBUG
+        if DemoMode.isOn { print("[step] at \(Int(distanceMeters)) m, \(Int(elapsedSeconds)) s, 1× notification: Get ready | \(next.title) | \(next.detail)") }
+        #endif
+    }
+
+    /// How many strides the session has, when it has any.
+    private var strideTotal: Int? {
+        guided?.steps.first { $0.kind == .stride }?.repTotal
+    }
+
+    /// The easy part after the last rep, when nothing but easy running follows.
+    private func isLastRecovery(_ step: WorkoutStep, in steps: [WorkoutStep]) -> Bool {
+        step.kind == .recovery && step.repNumber == step.repTotal
+            && !steps.dropFirst(step.index + 1).contains { $0.kind == .work }
+    }
+
+    /// "Rep 3 of 6", or the block's name ("Threshold").
+    private func repTitle(_ step: WorkoutStep) -> String {
+        guard let n = step.repNumber, let total = step.repTotal, total > 1 else { return step.label }
+        return "Rep \(n) of \(total)"
+    }
+
+    /// "Stride 3 of 6", for the stride itself or the easy minute before it.
+    private func strideTitle(_ step: WorkoutStep) -> String {
+        "Stride \(step.repNumber ?? 1) of \(step.repTotal ?? WorkoutSteps.strideCount)"
+    }
+
+    /// "1 km at 4:15/km", "400 m easy".
+    private func stepDetail(_ step: WorkoutStep) -> String {
+        if step.kind == .cooldown, step.distanceMeters < 1 { return "easy to the end" }
+        let distance = Format.distanceCompact(step.distanceMeters)
+        if step.kind == .recovery || step.kind == .cooldown || step.paceType == .easy { return "\(distance) easy" }
+        return "\(distance) at \(step.targetPaceSecPerKm.map(Format.pace) ?? "race effort")"
+    }
+
     /// Sends the current numbers to the iPhone, at most about once a second.
     private func sendToPhone(force: Bool = false) {
         guard isRunning, let session, force || Date().timeIntervalSince(lastMirrorSent) >= 1 else { return }
         lastMirrorSent = Date()
-        var step: WorkoutStep?
-        if let plannedWorkout, let zones {
-            step = WorkoutSteps.activeStep(for: plannedWorkout, zones: zones, distanceCovered: distanceMeters)
-        }
+        let step = activeStep
         let structured = step.map { $0.kind != .steady } ?? false
         let update = RunMirrorUpdate(
             workoutTitle: plannedWorkout.map { Format.workoutTitle($0.type) } ?? "Run",
@@ -272,6 +520,8 @@ final class WorkoutManager: NSObject {
         // Set synchronously so the view's dismiss handler sees the explicit finish
         // even for a zero-distance run.
         didFinish = true
+        ticker?.invalidate()
+        ticker = nil
         locationManager.stopUpdatingLocation()
         session?.end()
         isRunning = false
@@ -333,9 +583,11 @@ extension WorkoutManager {
     /// The reps go into Health twice: as Apple's workout segments, which the Fitness
     /// app shows, and as one metadata entry endurancr reads back with their targets.
     fileprivate func saveReps(to builder: HKWorkoutBuilder, endingAt date: Date) async throws {
-        repTracker?.finish(distance: distanceMeters, elapsed: elapsedSeconds, date: date)
-        reps = repTracker?.reps ?? []
-        repTracker = nil
+        guided?.finish(distance: distanceMeters, elapsed: elapsedSeconds, date: date)
+        reps = guided?.reps ?? []
+        guided = nil
+        ticker?.invalidate()
+        ticker = nil
         guard let json = RepReport.encode(reps) else { return }
         try await builder.addMetadata([RepReport.metadataKey: json])
         let segments = reps.map { rep in
@@ -417,6 +669,8 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
                 didFinish = true
                 isRunning = false
                 isAutoPaused = false
+                ticker?.invalidate()
+                ticker = nil
                 locationManager.stopUpdatingLocation()
                 Task { await self.saveWorkout(endingAt: date) }
             default:
@@ -521,7 +775,8 @@ extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
                 lastKmMarkSeconds = elapsed
                 nextKmMark += 1_000
             }
-            repTracker?.update(distance: distanceMeters, elapsed: elapsed, date: Date(), heartRate: heartRate)
+            advanceSteps(at: Date())
+            checkPlanDone()
             sendToPhone()
         }
     }

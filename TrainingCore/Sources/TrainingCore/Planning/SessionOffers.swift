@@ -161,9 +161,11 @@ public struct SessionOffers: Sendable, Equatable {
         return nil
     }
 
-    /// A run with reps, or one run at threshold effort or faster on average.
+    /// A run with reps, or one run at threshold effort or faster on average. An easy
+    /// run that ended with strides stays easy: six 20 s bursts are form work, and
+    /// shouldn't cost tomorrow its session.
     static func isHard(_ run: CompletedRun, zones: PaceZones) -> Bool {
-        if let reps = run.reps, !reps.isEmpty { return true }
+        if let reps = run.reps, !RepReport.reps(reps).isEmpty { return true }
         guard run.distanceMeters >= 3_000 else { return false }
         let effort = PlanReview.effort(paceSecPerKm: run.averagePaceSecPerKm, zones: zones)
         return effort == .threshold || effort == .interval

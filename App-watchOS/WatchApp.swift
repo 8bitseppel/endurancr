@@ -118,25 +118,50 @@ private struct IntervalRunSimulation: View {
             }
         }
         .task {
-            workout.isRunning = true
-            workout.heartRate = 150
-            // The same tracker the real run uses. Reps 1 to 4 on pace, 5 and 6 15 s/km slower.
-            var tracker = RepTracker(workout: planned, zones: zones)
-            while workout.distanceMeters < planned.distanceMeters {
-                try? await Task.sleep(for: .milliseconds(100))
-                let step = WorkoutSteps.activeStep(for: planned, zones: zones, distanceCovered: workout.distanceMeters)
-                let slower = step?.kind == .work && (step?.repNumber ?? 0) >= 5 ? 15.0 : 0
-                workout.distanceMeters += 4
-                workout.elapsedSeconds += 4 * ((step?.targetPaceSecPerKm ?? 330) + slower) / 1_000
-                tracker?.update(distance: workout.distanceMeters, elapsed: workout.elapsedSeconds,
-                                date: .now, heartRate: workout.heartRate)
+            // The real step engine, cues and taps: only the sensors are simulated.
+            // Each tick of 100 ms is a few seconds of running, so a session plays
+            // out in under a minute. Reps 1 to 4 on pace, 5 and 6 15 s/km slower.
+            let strides = UserDefaults.standard.bool(forKey: "demoStrides")
+            // Strides run on the clock, so the demo runs them near real time to
+            // show the countdown, and skips through the easy minutes between. The
+            // easy part before the block starts 200 m from its end.
+            let secondsPerTick = { (step: WorkoutStep?) -> Double in
+                // Fine enough that a rep ends within a few metres of its mark, as it
+                // does in a real run where readings arrive about every second.
+                guard strides else { return 3 }
+                return step?.kind == .stride ? 0.4 : 6
             }
-            tracker?.finish(distance: workout.distanceMeters, elapsed: workout.elapsedSeconds, date: .now)
-            let reps = tracker?.reps ?? []
-            print("[sim] finished at \(Int(workout.distanceMeters)) m")
-            for rep in reps { print("[rep] \(rep.label) \(Int(rep.meters)) m \(rep.paceSecPerKm.map(Format.pace) ?? "--") \(rep.verdict.map { "\($0)" } ?? "")") }
+            workout.demoStart(plannedWorkout: planned, zones: zones)
+            var elapsed = 0.0
+            var distance = 0.0
+            if strides, let lead = WorkoutSteps.steps(for: planned, zones: zones).first?.distanceMeters {
+                distance = max(0, lead - 200)
+                elapsed = distance / 1_000 * zones.easySecPerKm
+            }
+            while distance < planned.distanceMeters, elapsed < 36_000 {
+                let step = workout.activeStep
+                let slower = step?.kind == .work && (step?.repNumber ?? 0) >= 5 ? 15.0 : 0
+                let pace = (step?.targetPaceSecPerKm ?? zones.easySecPerKm) + slower
+                let speed = 1_000 / pace
+                let tick = secondsPerTick(step)
+                distance += speed * tick
+                elapsed += tick
+                workout.demoAdvance(distance: distance, elapsed: elapsed, speed: speed, heartRate: 150)
+                try? await Task.sleep(for: .milliseconds(100))
+                // Past the last stride there's nothing left to guide: hold on the
+                // "all done" card, then finish.
+                if strides, workout.activeStep?.kind == .cooldown {
+                    try? await Task.sleep(for: .seconds(4))
+                    break
+                }
+            }
+            workout.demoFinish()
+            let reps = workout.reps
+            print("[sim] finished at \(Int(workout.distanceMeters)) m, \(Int(workout.elapsedSeconds)) s")
+            for rep in reps {
+                print("[rep] \(rep.label) \(Int(rep.meters)) m \(Int(rep.seconds)) s \(rep.paceSecPerKm.map(Format.pace) ?? "--") \(rep.verdict.map { "\($0)" } ?? "by feel")")
+            }
             print("[summary] \(RepReport.summary(reps) ?? "")")
-            workout.isRunning = false
             summary = WatchRunSummary(distanceMeters: workout.distanceMeters, durationSeconds: workout.elapsedSeconds,
                                       saved: true, weekNumber: nil, weekCompletedMeters: 0, weekTargetMeters: 0,
                                       reps: reps)

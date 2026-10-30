@@ -15,6 +15,12 @@ import WatchKit
 /// interval session's targets advance automatically as each step's distance is
 /// covered — no need to look up the plan mid-run. A free run (no plan) shows just
 /// live pace and distance.
+///
+/// Inside the strides at the end of an easy run, the first page gives the whole
+/// screen to the one thing that matters for the next 20 seconds: the seconds left,
+/// large enough to read at a glance, and how many strides are done. Which step the
+/// run is in, and the taps on the wrist that go with it, come from `WorkoutManager`
+/// (see `RunCue`), so they're right whether or not the screen is awake.
 struct LiveRunView: View {
     @Bindable var workout: WorkoutManager
     /// Today's planned session, if this run follows the plan. `nil` = free run.
@@ -25,23 +31,21 @@ struct LiveRunView: View {
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
     @State private var page = Page.metrics
     enum Page { case metrics, details, controls }
-    /// The full-screen card at a step change, or just before a rep.
-    @State private var card: StepCard?
-    /// The rep already announced with "get ready", so it's announced once.
-    @State private var readiedStep: Int?
+    /// The full-screen card at a step change, as the recorder decided it.
+    @State private var card: RunCue?
 
     /// Every step of the session, in order; empty for a free run.
-    private var steps: [WorkoutStep] {
-        guard let plannedWorkout, let zones else { return [] }
-        return WorkoutSteps.steps(for: plannedWorkout, zones: zones)
-    }
+    private var steps: [WorkoutStep] { workout.guided?.steps ?? [] }
 
-    /// The step the athlete is currently in, given how far they've run.
-    private var activeStep: WorkoutStep? {
-        guard let plannedWorkout, let zones else { return nil }
-        return WorkoutSteps.activeStep(
-            for: plannedWorkout, zones: zones, distanceCovered: workout.distanceMeters
-        )
+    /// The step the athlete is currently in.
+    private var activeStep: WorkoutStep? { workout.activeStep }
+
+    /// Inside the strides: a stride, or the easy minute that sets one up. The page
+    /// then shows the countdown and nothing else.
+    private var strideStep: WorkoutStep? {
+        guard let step = activeStep,
+              step.kind == .stride || (step.kind == .recovery && step.seconds != nil) else { return nil }
+        return step
     }
 
     var body: some View {
@@ -85,22 +89,10 @@ struct LiveRunView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
-        .onChange(of: activeStep?.index) { old, new in
-            // A new step began: say what's next, full screen, with a tap you can tell
-            // apart without looking (a rep starts, a break starts, all reps done).
-            guard let old, let new, old != new, let step = activeStep else { return }
-            announce(step)
-        }
-        .onChange(of: workout.distanceMeters) { old, distance in
-            readyNextRep(at: distance)
-            // The planned distance reached: one tap and a note, nothing more.
-            if let planned = plannedWorkout, planned.distanceMeters > 0,
-               old < planned.distanceMeters, distance >= planned.distanceMeters {
-                WKInterfaceDevice.current().play(.success)
-                show(StepCard(title: "Plan done",
-                              detail: "\(Format.workoutTitle(planned.type)), \(Format.distance(planned.distanceMeters))",
-                              note: "", tint: .green, haptic: .success))
-            }
+        // A step began: the recorder has already tapped the wrist, here it's shown.
+        .onChange(of: workout.cue) { _, cue in
+            guard let cue, let seconds = cue.screenSeconds else { return }
+            show(cue, for: seconds)
         }
         #if DEBUG
         .task {
@@ -108,10 +100,9 @@ struct LiveRunView: View {
             // with `-demoScroll` it plays get ready, Go, the run screen, then page 2.
             guard DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoStepCard"),
                   let rep = steps.first(where: { $0.kind == .work && $0.repNumber == 3 }) else { return }
-            let go = card(for: rep)
+            let go = RunCue(title: repTitle(rep), detail: stepDetail(rep), note: "Go", tone: .go)
             guard UserDefaults.standard.bool(forKey: "demoScroll") else { card = go; return }
-            card = StepCard(title: "\(repTitle(rep)) in 100 m", detail: stepDetail(rep), note: "Get ready",
-                            tint: .yellow, haptic: .notification)
+            card = RunCue(title: "\(repTitle(rep)) in 100 m", detail: stepDetail(rep), note: "Get ready", tone: .ready)
             try? await Task.sleep(for: .seconds(3))
             withAnimation { card = go }
             try? await Task.sleep(for: .seconds(3))
@@ -132,82 +123,28 @@ struct LiveRunView: View {
 
     // MARK: Step guidance
 
-    private func announce(_ step: WorkoutStep) {
-        // The last rep's easy part already said "All done"; the cool-down after it
-        // starts without another card.
-        if step.kind == .cooldown, step.index > 0, isLastRecovery(steps[step.index - 1]) { return }
-        let next = card(for: step)
-        WKInterfaceDevice.current().play(next.haptic)
-        show(next)
-    }
-
-    /// Just before a rep: "Rep 3 of 6 in 100 m", so it doesn't come as a surprise.
-    private func readyNextRep(at distance: Double) {
-        guard let step = activeStep, step.kind != .work,
-              step.index + 1 < steps.count else { return }
-        let rep = steps[step.index + 1]
-        guard rep.kind == .work, readiedStep != rep.index else { return }
-        let lead = min(100, step.distanceMeters / 2)
-        let left = step.startMeters + step.distanceMeters - distance
-        guard left <= lead else { return }
-        readiedStep = rep.index
-        WKInterfaceDevice.current().play(.notification)
-        // Rounded to 10 m: "in 70 m", not "in 74 m".
-        let meters = max(10, Int((left / 10).rounded()) * 10)
-        show(StepCard(title: "\(repTitle(rep)) in \(meters) m",
-                      detail: stepDetail(rep), note: "Get ready", tint: .yellow, haptic: .notification))
-    }
-
-    private func show(_ next: StepCard) {
-        #if DEBUG
-        if DemoMode.isOn { print("[step] at \(Int(workout.distanceMeters)) m, tap \(next.haptic.rawValue): \(next.note) | \(next.title) | \(next.detail)") }
-        #endif
+    /// Shows the cue the recorder decided on. The tap on the wrist has already
+    /// happened there, so it's felt even with the screen asleep.
+    private func show(_ next: RunCue, for seconds: Double) {
         withAnimation { card = next }
-        AccessibilityNotification.Announcement("\(next.title). \(next.detail). \(next.note)").post()
+        AccessibilityNotification.Announcement("\(next.note). \(next.title). \(next.detail)").post()
         Task {
-            try? await Task.sleep(for: .seconds(5))
+            try? await Task.sleep(for: .seconds(seconds))
             if card == next { withAnimation { card = nil } }
         }
-    }
-
-    private func card(for step: WorkoutStep) -> StepCard {
-        switch step.kind {
-        case .work:
-            return StepCard(title: repTitle(step), detail: stepDetail(step), note: "Go", tint: .green, haptic: .start)
-        case .recovery where isLastRecovery(step):
-            // After the last rep: straight to the cool-down, counting its easy part in.
-            let cooldown = steps.last { $0.kind == .cooldown }?.distanceMeters ?? 0
-            // Strides end an easy run, which has no cool-down of its own.
-            return StepCard(title: cooldown > 0 ? "Cool-down" : "Easy to the end", detail: "\(Format.distanceCompact(step.distanceMeters + cooldown)) easy",
-                            note: "All \(step.repTotal ?? 1) done. Well run.", tint: .accentColor, haptic: .success)
-        case .recovery:
-            let done = step.repNumber.flatMap { n in step.repTotal.map { "\(n) of \($0) done" } } ?? "Done"
-            return StepCard(title: "Easy now", detail: stepDetail(step), note: done, tint: .accentColor, haptic: .directionDown)
-        case .cooldown:
-            let reps = steps.last { $0.kind == .work }?.repTotal ?? 1
-            return StepCard(title: "Cool-down", detail: stepDetail(step),
-                            note: reps > 1 ? "All \(reps) done. Well run." : "Done. Well run.",
-                            tint: .accentColor, haptic: .success)
-        case .warmup, .steady:
-            return StepCard(title: step.label.isEmpty ? "Run" : step.label, detail: stepDetail(step), note: "",
-                            tint: .accentColor, haptic: .click)
-        }
-    }
-
-    /// The easy part after the last rep, when nothing but easy running follows.
-    private func isLastRecovery(_ step: WorkoutStep) -> Bool {
-        step.kind == .recovery && step.repNumber == step.repTotal
-            && !steps.dropFirst(step.index + 1).contains { $0.kind == .work }
     }
 
     /// "Rep 3 of 6", "Stride 2 of 6", or the block's name ("Threshold").
     private func repTitle(_ step: WorkoutStep) -> String {
         guard let n = step.repNumber, let total = step.repTotal, total > 1 else { return step.label }
-        return "\(step.label.hasPrefix("Stride") ? "Stride" : "Rep") \(n) of \(total)"
+        return "\(step.kind == .stride ? "Stride" : "Rep") \(n) of \(total)"
     }
 
-    /// "1 km at 4:15/km", "400 m easy".
+    /// "1 km at 4:15/km", "400 m easy", "20 s quick and light".
     private func stepDetail(_ step: WorkoutStep) -> String {
+        if step.kind == .stride { return "\(Int(step.seconds ?? 20)) s quick and light" }
+        // The easy running after the last stride takes whatever is left of the run.
+        if step.kind == .cooldown, step.distanceMeters < 1 { return "easy to the end" }
         let distance = Format.distanceCompact(step.distanceMeters)
         if step.kind == .recovery || step.kind == .cooldown || step.paceType == .easy { return "\(distance) easy" }
         return "\(distance) at \(step.targetPaceSecPerKm.map(Format.pace) ?? "race effort")"
@@ -215,7 +152,75 @@ struct LiveRunView: View {
 
     /// Page 1: everything needed while running, on one screen. It never scrolls,
     /// so the Crown always reaches page 2; large text sizes shrink the numbers.
-    private var metricsPage: some View {
+    /// Inside the strides it hands the whole page to the countdown.
+    @ViewBuilder private var metricsPage: some View {
+        if let stride = strideStep {
+            strideFocus(stride)
+        } else {
+            runningMetrics
+        }
+    }
+
+    /// The 20 seconds of a stride, and the easy minute before it, as big as the
+    /// screen allows: there's no time to read anything else. The seconds left are
+    /// the number, with a bar running down and a pip per stride under it.
+    private func strideFocus(_ step: WorkoutStep) -> some View {
+        let isStride = step.kind == .stride
+        let total = step.repTotal ?? WorkoutSteps.strideCount
+        let number = step.repNumber ?? 1
+        // Counted down to 1, never 0: the step is over at zero, not showing it.
+        let left = max(1, Int((workout.stepSecondsLeft ?? step.seconds ?? 0).rounded(.up)))
+        return VStack(alignment: .leading, spacing: 2) {
+            Text(isStride ? "STRIDE \(number) OF \(total)" : eyebrow)
+                .font(.caption).fontWeight(.bold)
+                .foregroundStyle(isStride ? .green : .accentColor)
+            Text("\(left) s")
+                .font(.system(size: 62, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .contentTransition(.numericText(countsDown: true))
+                .foregroundStyle(isStride ? .green : .primary)
+            ProgressView(value: workout.stepProgress)
+                .tint(isStride ? .green : .accentColor)
+                .accessibilityHidden(true)
+            // No pace during the stride itself: GPS needs longer than 20 s to tell
+            // the truth, so what it would show is the pace from before the burst.
+            // The one that's over gets its real pace, in the line above.
+            Text(isStride ? "QUICK AND LIGHT" : "NEXT: STRIDE \(number) OF \(total)")
+                .font(.footnote.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+            stridePips(done: isStride ? number - 1 : number - 1, current: number, total: total)
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.horizontal, 4)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(isStride
+            ? "Stride \(number) of \(total), \(left) seconds left, quick and light"
+            : "Easy, \(left) seconds to stride \(number) of \(total)"
+                + (workout.lastStridePace.map { ". Last stride \(Format.pace($0))" } ?? ""))
+    }
+
+    /// "EASY", with the pace the last stride actually came out at once there is one.
+    private var eyebrow: String {
+        guard let pace = workout.lastStridePace else { return "EASY" }
+        return "EASY  ·  LAST \(Format.pace(pace))"
+    }
+
+    /// One pip per stride: done, the one being run, and the ones still to come.
+    private func stridePips(done: Int, current: Int, total: Int) -> some View {
+        HStack(spacing: 3) {
+            ForEach(1...max(1, total), id: \.self) { n in
+                Capsule()
+                    .fill(n <= done ? Color.green : n == current ? Color.green.opacity(0.5) : Color.secondary.opacity(0.3))
+                    .frame(height: 5)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    private var runningMetrics: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
                 clock
@@ -272,7 +277,7 @@ struct LiveRunView: View {
             GridRow {
                 detail("Last km", workout.lastKmSeconds.map(Format.duration) ?? "--")
                 // During a rep: the rep's pace so far; otherwise the kilometre in progress.
-                if activeStep?.kind == .work, !(activeStep?.label.hasPrefix("Stride") ?? false) {
+                if activeStep?.kind == .work {
                     detail("This rep", workout.thisRepPaceSecPerKm.map(Format.pace) ?? "--",
                            tint: paceTint(target: activeStep?.targetPaceSecPerKm, pace: workout.thisRepPaceSecPerKm))
                 } else {
@@ -334,18 +339,29 @@ struct LiveRunView: View {
     }
 
     /// The current step: its label ("Rep 3/6"), step distance, and step target pace.
-    /// A steady run shows the overall target instead of a per-step label.
+    /// A steady run shows the overall target instead of a per-step label. During the
+    /// easy part of a run that ends with strides, how far it is until they start.
     private func stepBanner(_ step: WorkoutStep) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(step.label.isEmpty ? "Target" : step.label)
                 .font(.caption).fontWeight(.semibold)
                 .foregroundStyle(.tint)
-            Text("\(Format.distanceCompact(step.distanceMeters)) @ \(step.targetPaceSecPerKm.map(Format.pace) ?? "--")")
+            Text(stridesComing(step) ?? (step.kind == .cooldown && step.distanceMeters < 1
+                 ? "easy to the end"
+                 : "\(Format.distanceCompact(step.distanceMeters)) @ \(step.targetPaceSecPerKm.map(Format.pace) ?? "--")"))
                 .font(.footnote).monospacedDigit()
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 4)
+    }
+
+    /// "Strides in 1.2 km", while the easy part before them is still running.
+    private func stridesComing(_ step: WorkoutStep) -> String? {
+        guard step.kind == .warmup, workout.guided?.nextStep?.seconds != nil,
+              let left = workout.stepMetersLeft else { return nil }
+        let total = steps.first { $0.kind == .stride }?.repTotal ?? WorkoutSteps.strideCount
+        return "\(total) strides in \(Format.distanceCompact(left))"
     }
 
     private func paceTint(target: Double?, pace: Double? = nil) -> Color {
@@ -479,24 +495,25 @@ extension View {
     }
 }
 
-/// What the run screen says, full screen, at a step change.
-struct StepCard: Equatable {
-    var title: String
-    var detail: String
-    var note: String
-    var tint: Color
-    var haptic: WKHapticType
-}
-
+/// A cue, full screen: what to do now, what it is, and how far along the session is.
 private struct StepCardView: View {
-    let card: StepCard
+    let card: RunCue
+
+    /// Green to go, yellow to get ready, the accent colour otherwise.
+    private var tint: Color {
+        switch card.tone {
+        case .go: .green
+        case .ready: .yellow
+        case .strides, .easy, .done, .info: .accentColor
+        }
+    }
 
     var body: some View {
         VStack(spacing: 6) {
             if !card.note.isEmpty {
                 Text(card.note)
                     .font(.headline)
-                    .foregroundStyle(card.tint)
+                    .foregroundStyle(tint)
             }
             Text(card.title)
                 .font(.system(.title2, design: .rounded).weight(.bold))

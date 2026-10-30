@@ -1,0 +1,13 @@
+Strides, guided properly
+- Strides now run on the clock, not on distance: 20 s is over before GPS has settled, so counting metres tapped your wrist after the burst instead of at it.
+- While the easy part of the run is still going, the watch says how far it is until they start.
+- Two taps, the only double tap in a run, say the strides are starting.
+- Each one begins with an easy minute, counted down big on the screen, with the pace the last stride came out at above it.
+- One tap when the burst starts: the screen turns green with which stride it is, the seconds left as large as the watch can show them, and "quick and light". Another tap when it ends.
+- A pip fills for each stride done, and after the sixth: "All 6 strides done, easy to the end".
+- No card covers the countdown any more, and no pace is shown during a burst, because GPS can't measure 20 s honestly.
+
+See what your strides did
+- Every stride is saved with the run in Apple Health, with its time, the distance it covered and your heart rate, as segments the Fitness app shows too.
+- After the run, in Today and on that day in Plan, each stride shows with its pace: "All 6 strides done, 3:14 to 3:31/km".
+- Strides are never marked off against a pace and never count as a hard session: they're run by feel, so nothing about them changes your plan.

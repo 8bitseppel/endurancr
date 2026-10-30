@@ -55,7 +55,11 @@ struct PhoneLiveRunView: View {
                             tile("Target pace", "--", detail: nil)
                         }
                         if let step = recorder.activeStep, step.kind != .steady {
-                            tile("Step", step.label, detail: Format.distanceCompact(step.distanceMeters))
+                            // A stride and the easy minute before it run on the clock:
+                            // the seconds left are what the step is, not its metres.
+                            tile("Step", step.label,
+                                 detail: recorder.stepSecondsLeft.map { "\(max(1, Int($0.rounded(.up)))) s left" }
+                                     ?? Format.distanceCompact(step.distanceMeters))
                         } else {
                             tile("GPS", recorder.routePointCount > 0 ? "\(recorder.routePointCount)" : "…",
                                  detail: recorder.routePointCount > 0 ? "points" : "acquiring")

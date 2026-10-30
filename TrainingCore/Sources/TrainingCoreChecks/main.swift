@@ -1520,21 +1520,31 @@ h.suite("Workout steps") {
     // Past the total distance clamps to the final cool-down step.
     let past = WorkoutSteps.activeStep(for: interval, zones: zones, distanceCovered: 999_999)
     h.check(past?.kind == .cooldown, "past the end returns the cool-down step")
-    // Strides: an easy part, then 6 × (100 m stride + 150 m easy), ending on the run's distance.
+    // Strides: an easy part, then six times [easy minute, 20 s stride], then easy
+    // to the end. They run on the clock: 100 m of GPS distance arrives too late to
+    // time a 20 s burst with.
     var strides = easy
     strides.distanceMeters = 8_000
     strides.notes = VDOTPlanGenerator.stridesNote
     let strideSteps = WorkoutSteps.steps(for: strides, zones: zones)
-    h.check(strideSteps.count == 13 && strideSteps[0].label == "Easy" && strideSteps[1].label == "Stride 1/6",
-            "strides become an easy part and six strides")
-    h.check(strideSteps[1].paceType == .repetitionSpeed && strideSteps[2].kind == .recovery,
-            "a stride runs at repetition pace, then easy")
+    h.check(strideSteps.count == 14 && strideSteps[0].label == "Easy"
+            && strideSteps[1].label == "Easy 1/6" && strideSteps[2].label == "Stride 1/6",
+            "strides become an easy part, then an easy minute before each stride")
+    h.check(strideSteps[2].kind == .stride && strideSteps[2].seconds == 20
+            && strideSteps[1].kind == .recovery && strideSteps[1].seconds == 60,
+            "a stride lasts 20 s and the easy stretch before it a minute")
+    h.check(strideSteps[2].paceType == .repetitionSpeed, "a stride runs at repetition pace")
+    h.check(strideSteps[0].seconds == nil && strideSteps[0].distanceMeters > 5_000,
+            "the easy part before the strides is run by distance, and is most of the run")
+    h.check(strideSteps.last?.kind == .cooldown && strideSteps.last?.label == "Easy to the end",
+            "after the last stride the run finishes easy")
     h.check(abs((strideSteps.last!.startMeters + strideSteps.last!.distanceMeters) - 8_000) < 0.5,
             "the strides end where the run ends")
     h.check(WorkoutSteps.isGuided(strides) && !WorkoutSteps.isGuided(easy), "a run with strides is guided, a plain easy run isn't")
-    // Reps as they're run: the tracker times each rep between its start and end.
+
+    // Reps as they're run: the engine times each rep between its start and end.
     let t0 = Date(timeIntervalSince1970: 0)
-    var tracker = RepTracker(workout: interval, zones: zones)!
+    var tracker = GuidedRun(workout: interval, zones: zones)!
     // 1600 m warm-up, 6 × 800 m with 400 m easy, at 5 m/s and reps 1 to 4 on pace
     // (225 s/km), 5 and 6 at 245 s/km.
     var d = 0.0, secs = 0.0
@@ -1547,11 +1557,14 @@ h.suite("Workout steps") {
         }
     }
     tracker.finish(distance: d, elapsed: secs, date: t0.addingTimeInterval(secs))
-    var midRep = RepTracker(workout: interval, zones: zones)!
+    var midRep = GuidedRun(workout: interval, zones: zones)!
     midRep.update(distance: 1_600, elapsed: 528, date: t0, heartRate: 0)
     midRep.update(distance: 2_000, elapsed: 618, date: t0, heartRate: 0)
     h.check(abs((midRep.currentPace(distance: 2_000, elapsed: 618) ?? 0) - 225) < 0.5, "the pace of the rep in progress so far")
-    h.check(tracker.reps.count == 6 && tracker.reps.allSatisfy { abs($0.meters - 800) <= 10 }, "the tracker keeps six 800 m reps")
+    h.check(midRep.step.kind == .work && midRep.remainingMeters(distance: 2_000) == 400,
+            "mid-rep it says how much of the rep is left")
+    h.check(tracker.reps.count == 6 && tracker.reps.allSatisfy { abs($0.meters - 800) <= 10 }, "the engine keeps six 800 m reps")
+    h.check(tracker.reps.allSatisfy { $0.kind == .rep }, "an interval session's splits are reps, not strides")
     h.check(tracker.reps[0].verdict == .onPace && tracker.reps[5].verdict == .slower, "reps 1 to 4 on pace, 5 and 6 slower")
     h.check(tracker.reps[0].averageHeartRate == 160, "a rep keeps its heart rate")
     h.check(RepReport.summary(tracker.reps) == "4 of 6 reps on pace, target 3:45/km. Reps 5 and 6 slower, at 4:05 and 4:05/km.",
@@ -1560,8 +1573,53 @@ h.suite("Workout steps") {
     h.check(RepReport.decode(RepReport.encode(tracker.reps)) == tracker.reps, "reps survive the trip through Health's metadata")
     let slowReps = tracker.reps.map { var r = $0; r.seconds = r.meters / 1_000 * 250; return r }
     h.check(RepReport.isSlow(slowReps), "most reps slower makes the session slow")
-    h.check(RepTracker(workout: strides, zones: zones) == nil && RepTracker(workout: easy, zones: zones) == nil,
-            "strides and steady runs aren't timed")
+
+    // A run before strides were recorded has no `kind` in its metadata: all reps.
+    let oldJSON = "[{\"label\":\"Rep 1/2\",\"number\":1,\"total\":2,\"meters\":800,"
+        + "\"seconds\":180,\"targetPaceSecPerKm\":225,\"start\":0,\"end\":180}]"
+    h.check(RepReport.decode(oldJSON)?.first?.kind == .rep, "reps saved before strides were timed still read as reps")
+
+    // A strides run, the way the watch runs it: a reading a second, the strides on
+    // the clock. Every one of them has to come back out as a recorded stride.
+    var strideRun = GuidedRun(workout: strides, zones: zones)!
+    var entered: [String] = []
+    var sd = strideSteps[0].distanceMeters - 100     // 100 m before the strides start
+    var ss = sd / 1_000 * 330
+    for _ in 0..<2_000 {
+        // Strides 1 to 3 at 3:20/km, 4 to 6 a touch slower.
+        let pace = strideRun.step.kind == .stride
+            ? ((strideRun.step.repNumber ?? 1) <= 3 ? 200.0 : 210.0) : 330.0
+        sd += 1_000 / pace
+        ss += 1
+        entered += strideRun.update(distance: sd, elapsed: ss, date: t0.addingTimeInterval(ss), heartRate: 150).map(\.label)
+        if strideRun.step.kind == .cooldown { break }
+    }
+    strideRun.finish(distance: sd, elapsed: ss, date: t0.addingTimeInterval(ss))
+    let ran = RepReport.strides(strideRun.reps)
+    h.check(entered.first == "Easy 1/6" && entered.dropFirst().first == "Stride 1/6",
+            "the strides block begins with its easy minute, then the first stride")
+    h.check(entered.filter { $0.hasPrefix("Stride") }.count == 6, "all six strides are announced")
+    h.check(entered.last == "Easy to the end", "after the sixth stride the run finishes easy")
+    h.check(ran.count == 6 && strideRun.reps.count == 6, "all six strides are recorded (got \(ran.count))")
+    h.check(ran.allSatisfy { abs($0.seconds - 20) <= 1 }, "each recorded stride lasted its 20 s")
+    h.check(ran.allSatisfy { abs($0.meters - 100) <= 12 }, "each stride covers about 100 m")
+    h.check(ran.allSatisfy { $0.verdict == nil && $0.targetPaceSecPerKm == nil },
+            "a stride is recorded, never marked off against a pace")
+    h.check(ran.allSatisfy { $0.averageHeartRate == 150 }, "a stride keeps its heart rate")
+    h.check(RepReport.summary(strideRun.reps) == "All 6 strides done, 3:20 to 3:30/km.",
+            "the strides read back in plain words: \(RepReport.summary(strideRun.reps) ?? "")")
+    h.check(RepReport.judged(strideRun.reps).isEmpty && !RepReport.isSlow(strideRun.reps),
+            "strides never make a session count as slow")
+    h.check(RepReport.decode(RepReport.encode(strideRun.reps)) == strideRun.reps,
+            "strides survive the trip through Health's metadata")
+
+    // A stride cut short by the end of the run isn't kept; half of one is.
+    var cut = GuidedRun(workout: strides, zones: zones)!
+    cut.seek(distance: strideSteps[2].startMeters + 10, elapsed: 1_000)
+    h.check(cut.step.kind == .stride, "a run picked up after a crash lands on the right step")
+    cut.update(distance: strideSteps[2].startMeters + 30, elapsed: 1_004, date: t0, heartRate: 0)
+    cut.finish(distance: strideSteps[2].startMeters + 30, elapsed: 1_004, date: t0)
+    h.check(cut.reps.isEmpty, "a stride the run ended in the middle of isn't recorded")
 
     var shortStrides = strides
     shortStrides.distanceMeters = 2_500
@@ -1613,6 +1671,18 @@ h.suite("Another session") {
                                 durationSeconds: 8 * plan.paceZones.thresholdSecPerKm)
         h.check(offers(easy.date, [fast], false).reason == "The day after a hard session is for easy running.",
                 "the day after a hard run is easy")
+        // Strides are form work: an easy run that ended with six of them yesterday
+        // doesn't cost today its session.
+        let yesterdayStrides = CompletedRun(
+            date: shift(easy.date, -1), distanceMeters: 8_000,
+            durationSeconds: 8 * plan.paceZones.easySecPerKm,
+            reps: (1...6).map { n in
+                RepSplit(label: "Stride \(n)/6", kind: .stride, number: n, total: 6, meters: 100,
+                         seconds: 20, targetPaceSecPerKm: nil, start: easy.date, end: easy.date)
+            }
+        )
+        h.check(offers(easy.date, [yesterdayStrides], false).reason == nil,
+                "strides yesterday don't count as a hard session")
     }
 
     // Moving this week's session must not put two hard days side by side: on the
