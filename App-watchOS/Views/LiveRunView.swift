@@ -182,13 +182,23 @@ struct LiveRunView: View {
             ProgressView(value: workout.stepProgress)
                 .tint(isStride ? .green : .accentColor)
                 .accessibilityHidden(true)
-            // No pace during the stride itself: GPS needs longer than 20 s to tell
-            // the truth, so what it would show is the pace from before the burst.
-            // The one that's over gets its real pace, in the line above.
-            Text(isStride ? "QUICK AND LIGHT" : "NEXT: STRIDE \(number) OF \(total)")
-                .font(.footnote.weight(.semibold))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
+            if isStride {
+                // The pace while the burst is on, to run it by, next to what it's
+                // aimed at: the two numbers say slow or fast, so it doesn't hang on
+                // the colour. It comes from the watch's running speed, not from
+                // distance, so it moves with you; the first seconds of a stride
+                // still read slow while the sensors catch up.
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    stridePace("PACE", Format.pace(workout.paceSecPerKm),
+                               tint: stridePaceTint(target: step.targetPaceSecPerKm))
+                    stridePace("TARGET", step.targetPaceSecPerKm.map(Format.pace) ?? "--", tint: .secondary)
+                }
+            } else {
+                Text("NEXT: STRIDE \(number) OF \(total)")
+                    .font(.footnote.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
             stridePips(done: isStride ? number - 1 : number - 1, current: number, total: total)
         }
         .lineLimit(1)
@@ -197,9 +207,31 @@ struct LiveRunView: View {
         .padding(.horizontal, 4)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(isStride
-            ? "Stride \(number) of \(total), \(left) seconds left, quick and light"
+            ? "Stride \(number) of \(total), \(left) seconds left. Pace \(Format.pace(workout.paceSecPerKm)), target \(step.targetPaceSecPerKm.map(Format.pace) ?? "none")"
             : "Easy, \(left) seconds to stride \(number) of \(total)"
                 + (workout.lastStridePace.map { ". Last stride \(Format.pace($0))" } ?? ""))
+    }
+
+    /// A stride's pace next to its target, small labels over big numbers.
+    private func stridePace(_ label: String, _ value: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(label).font(.caption2).foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(.title3, design: .rounded).weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(tint)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Green while the stride is near its pace, orange when it's well off. Wider
+    /// than a rep's 5 s/km: a stride is 20 s run by feel, and the watch's speed
+    /// reading needs a few of those seconds to settle, so a tight band would
+    /// flicker and say nothing.
+    private func stridePaceTint(target: Double?) -> Color {
+        let pace = workout.paceSecPerKm
+        guard let target, pace > 0 else { return .green }
+        return abs(pace - target) <= 15 ? .green : .orange
     }
 
     /// "EASY", with the pace the last stride actually came out at once there is one.

@@ -7,7 +7,7 @@ the details and reasons behind each text are in `docs/APP_STORE.md`.
 
 | Version | Build | Date | What changed |
 |---|---|---|---|
-| [1.7.0](1.7.0/UPLOAD.md) | 44 | 2026-10-30 | Strides on the clock: two taps, each 20 s burst counted down, every one saved and shown |
+| [1.7.0](1.7.0/UPLOAD.md) | 45 | 2026-10-30 | Strides on the clock: two taps, each 20 s burst counted down, every one saved and shown |
 | [1.6.0](1.6.0/UPLOAD.md) | 43 | 2026-10-25 | A second watch page during the run (this km, to go), hold to finish, done today |
 | [1.5.0](1.5.0/UPLOAD.md) | 41 | 2026-10-24 | Start another session: intervals when they fit your week, and why when not |
 | [1.4.0](1.4.0/UPLOAD.md) | 36 | 2026-10-23 | Intervals guided on Apple Watch, every rep saved and shown against its target |

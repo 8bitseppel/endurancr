@@ -652,9 +652,9 @@ Strides, guided properly
 - While the easy part of the run is still going, the watch says how far it is until they start.
 - Two taps, the only double tap in a run, say the strides are starting.
 - Each one begins with an easy minute, counted down big on the screen, with the pace the last stride came out at above it.
-- One tap when the burst starts: the screen turns green with which stride it is, the seconds left as large as the watch can show them, and "quick and light". Another tap when it ends.
-- A pip fills for each stride done, and after the sixth: "All 6 strides done, easy to the end".
-- No card covers the countdown any more, and no pace is shown during a burst, because GPS can't measure 20 s honestly.
+- One tap when the burst starts: the screen turns green with which stride it is, the seconds left as large as the watch can show them, and the pace you're running next to the pace it's aimed at, green while you're near it and orange when you're well off.
+- Another tap when it ends, a pip fills for each stride done, and after the sixth: "All 6 strides done, easy to the end".
+- No card covers the countdown any more, so the seconds and the pace stay in front of you for the whole burst.
 
 See what your strides did
 - Every stride is saved with the run in Apple Health, with its time, the distance it covered and your heart rate, as segments the Fitness app shows too.
@@ -705,7 +705,8 @@ endurancr is a training aid, not medical advice. Talk to a doctor before you sta
 
 ### Build
 
-1.7.0 (44).
+1.7.0 (45). Build 44 was an earlier 1.7.0 archive, before the stride page showed
+your pace next to its target; use 45.
 
 ### Screenshots
 

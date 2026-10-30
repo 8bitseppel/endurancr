@@ -94,9 +94,11 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   screen says how far it is until they start, then taps twice and shows "Strides now, 6 ×
   20 s, easy between". Each stride begins with an easy minute counted down big on the
   screen, one tap when the burst starts (the screen turns green: which stride, the
-  seconds left, "quick and light"), another when it ends, a pip for each one done, and
-  "All 6 strides done" after the sixth. No card covers the countdown, and no pace is
-  shown during a 20 s burst because GPS can't measure one honestly.
+  seconds left, and the pace you're running next to its target, green while you're near
+  it and orange when you're well off), another when it ends, a pip for each one done,
+  and "All 6 strides done" after the sixth. No card covers the countdown. The pace comes
+  from the watch's running speed, not from the distance, so it moves with you inside a
+  20 s burst; the first seconds of one still read slow while the sensors catch up.
 - Every rep and stride is saved with the run in Apple Health (its time, distance, pace
   and heart rate, and as segments the Fitness app shows) and read back in Today, after
   the run and on that day in Plan: reps against their target, strides counted and timed,

@@ -140,7 +140,10 @@ private struct IntervalRunSimulation: View {
             }
             while distance < planned.distanceMeters, elapsed < 36_000 {
                 let step = workout.activeStep
-                let slower = step?.kind == .work && (step?.repNumber ?? 0) >= 5 ? 15.0 : 0
+                // Reps 5 and 6 come in slower, and stride 4 is run a touch too hard,
+                // so the demo shows the pace off target as well as on it.
+                var slower = step?.kind == .work && (step?.repNumber ?? 0) >= 5 ? 15.0 : 0
+                if step?.kind == .stride, step?.repNumber == 4 { slower = 30 }
                 let pace = (step?.targetPaceSecPerKm ?? zones.easySecPerKm) + slower
                 let speed = 1_000 / pace
                 let tick = secondsPerTick(step)
