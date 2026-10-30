@@ -150,6 +150,16 @@ final class WorkoutManager: NSObject {
     /// The demo's running speed, so its live pace reads as on target.
     func setDemoSpeed(_ metersPerSecond: Double) { currentSpeed = metersPerSecond }
 
+    /// Points a still demo run at today's session, at the step its distance says, so
+    /// the screen shows the same targets a real run would.
+    func demoGuide(_ planned: PlannedWorkout, _ zones: PaceZones) {
+        plannedWorkout = planned
+        self.zones = zones
+        var run = GuidedRun(workout: planned, zones: zones)
+        run.seek(distance: distanceMeters, elapsed: elapsedSeconds)
+        guided = run
+    }
+
     /// Runs a session from a simulation instead of from HealthKit, through the same
     /// step engine, cues and taps as a real run (`IntervalRunSimulation`).
     func demoStart(plannedWorkout: PlannedWorkout, zones: PaceZones) {
@@ -208,7 +218,7 @@ final class WorkoutManager: NSObject {
         self.plannedWorkout = plannedWorkout
         self.zones = zones
         self.goalName = goalName
-        guided = plannedWorkout.flatMap { w in zones.flatMap { GuidedRun(workout: w, zones: $0) } }
+        guided = plannedWorkout.flatMap { w in zones.map { GuidedRun(workout: w, zones: $0) } }
         startTicking()
         RunContext(plannedWorkout: plannedWorkout, zones: zones, goalName: goalName).save()
         let config = HKWorkoutConfiguration()
@@ -300,7 +310,7 @@ final class WorkoutManager: NSObject {
                 self.zones = context?.zones
                 self.goalName = context?.goalName ?? ""
                 self.guided = context?.plannedWorkout.flatMap { w in
-                    context?.zones.flatMap { GuidedRun(workout: w, zones: $0) }
+                    context?.zones.map { GuidedRun(workout: w, zones: $0) }
                 }
                 self.isRecovering = self.guided != nil
                 self.startTicking()
@@ -454,8 +464,11 @@ final class WorkoutManager: NSObject {
         readiedStep = rep.index
         // Rounded to 10 m: "in 70 m", not "in 74 m".
         let meters = max(10, Int((left / 10).rounded()) * 10)
+        // Between reps the page is already counting the metres down, so the tap is
+        // enough: a card over it would hide the number it's announcing.
+        let covers = guided.step.kind != .recovery || (guided.step.repTotal ?? 1) <= 1
         let next = RunCue(title: "\(repTitle(rep)) in \(meters) m", detail: stepDetail(rep),
-                          note: "Get ready", tone: .ready)
+                          note: "Get ready", tone: .ready, screenSeconds: covers ? 5 : nil)
         play(next.tone)
         cue = next
         #if DEBUG

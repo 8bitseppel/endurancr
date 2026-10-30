@@ -30,11 +30,11 @@ public struct GuidedRun: Sendable, Equatable {
             : steps
     }
 
-    /// `nil` when there's nothing to guide: one steady step, run at one pace.
-    public init?(workout: PlannedWorkout, zones: PaceZones) {
-        let steps = WorkoutSteps.steps(for: workout, zones: zones)
-        guard steps.count > 1 else { return nil }
-        self.init(steps: steps)
+    /// Follows a planned run. A run at one steady pace has a single step and never
+    /// moves on, which is still the right answer: the screen needs its target pace
+    /// as much as an interval session does.
+    public init(workout: PlannedWorkout, zones: PaceZones) {
+        self.init(steps: WorkoutSteps.steps(for: workout, zones: zones))
     }
 
     public var step: WorkoutStep { steps[min(index, steps.count - 1)] }

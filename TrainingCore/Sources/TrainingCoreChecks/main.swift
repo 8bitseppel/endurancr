@@ -1542,9 +1542,18 @@ h.suite("Workout steps") {
             "the strides end where the run ends")
     h.check(WorkoutSteps.isGuided(strides) && !WorkoutSteps.isGuided(easy), "a run with strides is guided, a plain easy run isn't")
 
+    // A run at one pace is still followed: the screen needs its target even though
+    // there's nothing to advance to.
+    var steady = GuidedRun(workout: easy, zones: zones)
+    h.check(steady.step.kind == .steady && steady.step.targetPaceSecPerKm == 330,
+            "a steady run has one step at its target pace")
+    steady.update(distance: 2_000, elapsed: 660, date: Date(timeIntervalSince1970: 0), heartRate: 0)
+    h.check(steady.step.kind == .steady && steady.reps.isEmpty && steady.remainingMeters(distance: 2_000) == 6_000,
+            "a steady run stays on its step and records no reps")
+
     // Reps as they're run: the engine times each rep between its start and end.
     let t0 = Date(timeIntervalSince1970: 0)
-    var tracker = GuidedRun(workout: interval, zones: zones)!
+    var tracker = GuidedRun(workout: interval, zones: zones)
     // 1600 m warm-up, 6 × 800 m with 400 m easy, at 5 m/s and reps 1 to 4 on pace
     // (225 s/km), 5 and 6 at 245 s/km.
     var d = 0.0, secs = 0.0
@@ -1557,7 +1566,7 @@ h.suite("Workout steps") {
         }
     }
     tracker.finish(distance: d, elapsed: secs, date: t0.addingTimeInterval(secs))
-    var midRep = GuidedRun(workout: interval, zones: zones)!
+    var midRep = GuidedRun(workout: interval, zones: zones)
     midRep.update(distance: 1_600, elapsed: 528, date: t0, heartRate: 0)
     midRep.update(distance: 2_000, elapsed: 618, date: t0, heartRate: 0)
     h.check(abs((midRep.currentPace(distance: 2_000, elapsed: 618) ?? 0) - 225) < 0.5, "the pace of the rep in progress so far")
@@ -1581,7 +1590,7 @@ h.suite("Workout steps") {
 
     // A strides run, the way the watch runs it: a reading a second, the strides on
     // the clock. Every one of them has to come back out as a recorded stride.
-    var strideRun = GuidedRun(workout: strides, zones: zones)!
+    var strideRun = GuidedRun(workout: strides, zones: zones)
     var entered: [String] = []
     var sd = strideSteps[0].distanceMeters - 100     // 100 m before the strides start
     var ss = sd / 1_000 * 330
@@ -1614,7 +1623,7 @@ h.suite("Workout steps") {
             "strides survive the trip through Health's metadata")
 
     // A stride cut short by the end of the run isn't kept; half of one is.
-    var cut = GuidedRun(workout: strides, zones: zones)!
+    var cut = GuidedRun(workout: strides, zones: zones)
     cut.seek(distance: strideSteps[2].startMeters + 10, elapsed: 1_000)
     h.check(cut.step.kind == .stride, "a run picked up after a crash lands on the right step")
     cut.update(distance: strideSteps[2].startMeters + 30, elapsed: 1_004, date: t0, heartRate: 0)

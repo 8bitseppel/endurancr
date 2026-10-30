@@ -32,7 +32,13 @@ struct LiveRunView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// The countdown's size, growing with the watch's text size setting.
     @ScaledMetric(relativeTo: .largeTitle) private var countdownSize: CGFloat = 62
-    @State private var page = Page.metrics
+    @State private var page: Page = {
+        #if DEBUG
+        // `-demoRunPage details`: open on the second page, for screenshots.
+        if DemoMode.isOn, UserDefaults.standard.string(forKey: "demoRunPage") == "details" { return .details }
+        #endif
+        return .metrics
+    }()
     enum Page { case metrics, details, controls }
     /// The full-screen card at a step change, as the recorder decided it.
     @State private var card: RunCue?
@@ -43,12 +49,16 @@ struct LiveRunView: View {
     /// The step the athlete is currently in.
     private var activeStep: WorkoutStep? { workout.activeStep }
 
-    /// Inside the strides: a stride, or the easy minute that sets one up. The page
-    /// then shows the countdown and nothing else.
-    private var strideStep: WorkoutStep? {
-        guard let step = activeStep,
-              step.kind == .stride || (step.kind == .recovery && step.seconds != nil) else { return nil }
-        return step
+    /// The steps that get the whole page: a stride, the easy minute that sets one
+    /// up, and the jog between interval reps. In all three the one thing worth
+    /// reading is how long until the next effort, so nothing else is on screen.
+    private var focusStep: WorkoutStep? {
+        guard let step = activeStep else { return nil }
+        switch step.kind {
+        case .stride: return step
+        case .recovery: return (step.repTotal ?? 1) > 1 ? step : nil
+        default: return nil
+        }
     }
 
     var body: some View {
@@ -157,34 +167,39 @@ struct LiveRunView: View {
     /// so the Crown always reaches page 2; large text sizes shrink the numbers.
     /// Inside the strides it hands the whole page to the countdown.
     @ViewBuilder private var metricsPage: some View {
-        if let stride = strideStep {
-            strideFocus(stride)
+        if let step = focusStep {
+            focusPage(step)
         } else {
             runningMetrics
         }
     }
 
-    /// The 20 seconds of a stride, and the easy minute before it, as big as the
-    /// screen allows: there's no time to read anything else while running. The
-    /// seconds left are the number, with a bar running down, the pace next to the
-    /// pace it's aimed at, and a pip per stride.
+    /// The 20 seconds of a stride, the easy minute before it, and the jog between
+    /// interval reps, as big as the screen allows: there's no time to read anything
+    /// else while running. What's left of the step is the number, with a bar running
+    /// down, what the step is for beside it, and a pip per rep or stride.
     ///
     /// The number is 62 pt but scaled with the text size the watch is set to
     /// (`@ScaledMetric`), capped so it can't push the page into a scroll: this page
     /// has to stay one screen high or the Crown can't reach Pause and Finish. At
     /// accessibility sizes the bar and the pips go, since the numbers are what matter.
-    private func strideFocus(_ step: WorkoutStep) -> some View {
+    private func focusPage(_ step: WorkoutStep) -> some View {
         let isStride = step.kind == .stride
+        let timed = step.seconds != nil
         let total = step.repTotal ?? WorkoutSteps.strideCount
         let number = step.repNumber ?? 1
-        // Counted down to 1, never 0: the step is over at zero, not showing it.
-        let left = max(1, Int((workout.stepSecondsLeft ?? step.seconds ?? 0).rounded(.up)))
+        // A timed step counts seconds down to 1, never 0: it's over at zero, not
+        // showing it. A jog counts the metres to the next rep.
+        let left = timed
+            ? "\(max(1, Int((workout.stepSecondsLeft ?? step.seconds ?? 0).rounded(.up)))) s"
+            : Format.distanceCompact(max(0, workout.stepMetersLeft ?? step.distanceMeters))
+        let next = isStride ? "" : (step.kind == .recovery && !timed ? "REP \(number + 1) OF \(total)" : "STRIDE \(number) OF \(total)")
         let big = dynamicTypeSize.isAccessibilitySize
         return VStack(alignment: .leading, spacing: 2) {
             Text(isStride ? "STRIDE \(number) OF \(total)" : "EASY")
                 .font(.caption).fontWeight(.bold)
                 .foregroundStyle(isStride ? .green : .accentColor)
-            Text("\(left) s")
+            Text(left)
                 .font(.system(size: min(countdownSize, 90), weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .contentTransition(.numericText(countsDown: true))
@@ -201,39 +216,44 @@ struct LiveRunView: View {
                     // the colour. It comes from the watch's running speed, not from
                     // distance, so it moves with you; the first seconds of a stride
                     // still read slow while the sensors catch up.
-                    strideValue("PACE", Format.pace(workout.paceSecPerKm),
-                                tint: stridePaceTint(target: step.targetPaceSecPerKm))
-                    strideValue("TARGET", step.targetPaceSecPerKm.map(Format.pace) ?? "--", tint: .secondary)
-                } else {
+                    focusValue("PACE", Format.pace(workout.paceSecPerKm),
+                               tint: stridePaceTint(target: step.targetPaceSecPerKm))
+                    focusValue("TARGET", step.targetPaceSecPerKm.map(Format.pace) ?? "--", tint: .secondary)
+                } else if timed {
                     // "Last" on its own would read as the last kilometre, which is a
                     // metric of its own on the next page; this one is the stride.
                     if let last = workout.lastStridePace {
-                        strideValue("LAST STRIDE", Format.pace(last), tint: .primary)
+                        focusValue("LAST STRIDE", Format.pace(last), tint: .primary)
                     }
-                    strideValue("NEXT", "Stride \(number)", tint: .primary)
+                    focusValue("NEXT", "Stride \(number)", tint: .primary)
+                } else {
+                    // Jogging between reps: the heart rate is what this step is for,
+                    // and the pace of a jog means nothing.
+                    focusValue("HEART RATE", workout.heartRate > 0 ? "\(Int(workout.heartRate))" : "--", tint: .red)
+                    focusValue("NEXT", "Rep \(min(number + 1, total))", tint: .primary)
                 }
             }
             if !big {
-                stridePips(done: number - 1, current: number, total: total)
+                stridePips(done: number - (isStride || timed ? 1 : 0), current: isStride ? number : number + 1, total: total)
             }
         }
         .lineLimit(1)
         .minimumScaleFactor(0.6)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.horizontal, 4)
-        // One VoiceOver stop, with the seconds in the value: a value is spoken again
+        // One VoiceOver stop, with what's left in the value: a value is spoken again
         // every time it changes, a label only when it's focused.
         .accessibilityElement(children: .ignore)
         .accessibilityRespondsToUserInteraction(true)
         .accessibilityLabel(isStride
             ? "Stride \(number) of \(total), quick and light. Pace \(Format.pace(workout.paceSecPerKm)), target \(step.targetPaceSecPerKm.map(Format.pace) ?? "none")"
-            : "Easy, then stride \(number) of \(total)"
-                + (workout.lastStridePace.map { ". Last stride \(Format.pace($0))" } ?? ""))
-        .accessibilityValue("\(left) seconds left")
+            : "Easy, then \(next.lowercased())"
+                + (timed ? (workout.lastStridePace.map { ". Last stride \(Format.pace($0))" } ?? "") : ""))
+        .accessibilityValue("\(left) left")
     }
 
-    /// A number on the stride page with its label over it.
-    private func strideValue(_ label: String, _ value: String, tint: Color) -> some View {
+    /// A number on the focus page with its label over it.
+    private func focusValue(_ label: String, _ value: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(label).font(.caption2).foregroundStyle(.secondary)
             Text(value)
@@ -276,14 +296,23 @@ struct LiveRunView: View {
 
             if let step = activeStep, let plannedWorkout {
                 if !step.label.isEmpty { stepBanner(step) }
-                metricPair(
-                    "Distance", Format.distance(workout.distanceMeters),
-                    "Target", Format.distance(plannedWorkout.distanceMeters)
-                )
+                // While the hard part is running, what's left of it beats the whole
+                // run's distance: that's the part you're pacing.
+                if let left = stepLeft(step) {
+                    metricPair(
+                        "Distance", Format.distance(workout.distanceMeters),
+                        (step.repTotal ?? 1) > 1 ? "Rep left" : "Block left", left
+                    )
+                } else {
+                    metricPair(
+                        "Distance", Format.distance(workout.distanceMeters),
+                        "Target", Format.distance(plannedWorkout.distanceMeters)
+                    )
+                }
                 metricPair(
                     "Pace", Format.pace(workout.paceSecPerKm),
                     "Target", step.targetPaceSecPerKm.map(Format.pace) ?? "--",
-                    valueTint: paceTint(target: step.targetPaceSecPerKm)
+                    valueTint: paceTint(target: step.targetPaceSecPerKm, easy: step.paceType == .easy)
                 )
             } else {
                 // Free run: no plan, so just live pace and distance.
@@ -296,6 +325,15 @@ struct LiveRunView: View {
         .minimumScaleFactor(0.6)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.horizontal, 4)
+    }
+
+    /// What's left of the hard part, while one is running: the rest of a threshold
+    /// or marathon-pace block, or of the rep you're in. `nil` on easy running, where
+    /// the whole run's target is the number that matters.
+    private func stepLeft(_ step: WorkoutStep) -> String? {
+        guard step.kind == .work, let left = workout.stepMetersLeft else { return nil }
+        // Compact, so the rest of a rep reads "900 m" rather than "0.9 km".
+        return Format.distanceCompact(left)
     }
 
     /// The run's time, ticking every second from HealthKit's own count (paused
@@ -322,10 +360,14 @@ struct LiveRunView: View {
             }
             GridRow {
                 detail("Last km", workout.lastKmSeconds.map(Format.duration) ?? "--")
-                // During a rep: the rep's pace so far; otherwise the kilometre in progress.
-                if activeStep?.kind == .work {
-                    detail("This rep", workout.thisRepPaceSecPerKm.map(Format.pace) ?? "--",
-                           tint: paceTint(target: activeStep?.targetPaceSecPerKm, pace: workout.thisRepPaceSecPerKm))
+                // During a rep or a block: its pace so far, the one it's judged by;
+                // otherwise the kilometre in progress. A threshold or marathon-pace
+                // run is one block, so calling it a rep would be wrong, and the whole
+                // run's average is dragged down by the warm-up either way.
+                if let step = activeStep, step.kind == .work {
+                    detail((step.repTotal ?? 1) > 1 ? "This rep" : "Block pace",
+                           workout.thisRepPaceSecPerKm.map(Format.pace) ?? "--",
+                           tint: paceTint(target: step.targetPaceSecPerKm, pace: workout.thisRepPaceSecPerKm))
                 } else {
                     detail("This km", workout.thisKmPaceSecPerKm.map(Format.pace) ?? "--")
                 }
@@ -410,10 +452,20 @@ struct LiveRunView: View {
         return "\(total) strides in \(Format.distanceCompact(left))"
     }
 
-    private func paceTint(target: Double?, pace: Double? = nil) -> Color {
+    /// Within 5 s/km of the step's target reads as on pace.
+    ///
+    /// On easy running it's one-sided: slower than easy pace is never a miss, which
+    /// is what the plan itself promises, so only running faster than the fast end of
+    /// the easy window counts as off. Daniels' one rule for easy days is that they
+    /// stay easy, and a watch that turns orange for running them gently argues
+    /// against the plan it came from.
+    private func paceTint(target: Double?, pace: Double? = nil, easy: Bool = false) -> Color {
         let pace = pace ?? workout.paceSecPerKm
         guard let target, pace > 0 else { return .green }
-        // Within ±5 s/km of the step target reads as on-pace.
+        if easy {
+            let fastEnd = plannedWorkout?.targetPaceSecPerKm?.lowerBound ?? target - 15
+            return pace >= fastEnd - 1 ? .green : .orange
+        }
         return abs(pace - target) <= 5 ? .green : .orange
     }
 

@@ -134,7 +134,7 @@ final class PhoneWorkoutManager: NSObject {
         self.targetPace = targetPace
         self.plannedWorkout = plannedWorkout
         self.zones = zones
-        guided = plannedWorkout.flatMap { w in zones.flatMap { GuidedRun(workout: w, zones: $0) } }
+        guided = plannedWorkout.flatMap { w in zones.map { GuidedRun(workout: w, zones: $0) } }
         reps = []
 
         let config = HKWorkoutConfiguration()
