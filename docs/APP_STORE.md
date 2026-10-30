@@ -728,5 +728,6 @@ kind of run; use 47.
 New: `watch-7-strides.png` (the stride countdown on the watch) and its video through
 the whole block, and `iphone-11-strides.png` (the strides in Today after the run). The
 watch summary figure now also turns to its strides page, and the Progress figure has
-the reworded "runs done so far". The rest is unchanged from 1.6.0. Everything is in
-`releases/1.7.0/`.
+the reworded "runs done so far". The App Preview was re-recorded: the one in 1.3.0 to
+1.6.0 still showed Today without "Start another session", the run screen without Hold
+to finish and the old Progress wording. Everything is in `releases/1.7.0/`.

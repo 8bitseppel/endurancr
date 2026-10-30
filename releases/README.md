@@ -18,6 +18,11 @@ the details and reasons behind each text are in `docs/APP_STORE.md`.
 | [1.0.2](1.0.2/UPLOAD.md) | 14 | 2026-10-05 | Longer long runs for the marathon and half marathon |
 | [1.0.0](1.0.0/UPLOAD.md) | 12 | 2026-09-28 | The first version |
 
+Every folder is written by `./scripts/package-release.sh`, which copies whatever is
+in `screenshots/appstore/` at the time. The App Preview video is the one asset it
+can't rebuild itself: record it with `./scripts/app-preview.sh` whenever an iPhone
+screen in it changes, or the release ships a video of an older app.
+
 1.0.0 to 1.2.0 were rebuilt from the repository afterwards: their screenshots from
 `docs/screenshots/` at each version's last commit, in the upload order noted in
 `docs/APP_STORE.md`. Their App Previews and App Clip cards weren't kept, because
