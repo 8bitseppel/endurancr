@@ -29,6 +29,9 @@ struct LiveRunView: View {
     var zones: PaceZones?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// The countdown's size, growing with the watch's text size setting.
+    @ScaledMetric(relativeTo: .largeTitle) private var countdownSize: CGFloat = 62
     @State private var page = Page.metrics
     enum Page { case metrics, details, controls }
     /// The full-screen card at a step change, as the recorder decided it.
@@ -162,58 +165,75 @@ struct LiveRunView: View {
     }
 
     /// The 20 seconds of a stride, and the easy minute before it, as big as the
-    /// screen allows: there's no time to read anything else. The seconds left are
-    /// the number, with a bar running down and a pip per stride under it.
+    /// screen allows: there's no time to read anything else while running. The
+    /// seconds left are the number, with a bar running down, the pace next to the
+    /// pace it's aimed at, and a pip per stride.
+    ///
+    /// The number is 62 pt but scaled with the text size the watch is set to
+    /// (`@ScaledMetric`), capped so it can't push the page into a scroll: this page
+    /// has to stay one screen high or the Crown can't reach Pause and Finish. At
+    /// accessibility sizes the bar and the pips go, since the numbers are what matter.
     private func strideFocus(_ step: WorkoutStep) -> some View {
         let isStride = step.kind == .stride
         let total = step.repTotal ?? WorkoutSteps.strideCount
         let number = step.repNumber ?? 1
         // Counted down to 1, never 0: the step is over at zero, not showing it.
         let left = max(1, Int((workout.stepSecondsLeft ?? step.seconds ?? 0).rounded(.up)))
+        let big = dynamicTypeSize.isAccessibilitySize
         return VStack(alignment: .leading, spacing: 2) {
-            Text(isStride ? "STRIDE \(number) OF \(total)" : eyebrow)
+            Text(isStride ? "STRIDE \(number) OF \(total)" : "EASY")
                 .font(.caption).fontWeight(.bold)
                 .foregroundStyle(isStride ? .green : .accentColor)
             Text("\(left) s")
-                .font(.system(size: 62, weight: .bold, design: .rounded))
+                .font(.system(size: min(countdownSize, 90), weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .contentTransition(.numericText(countsDown: true))
                 .foregroundStyle(isStride ? .green : .primary)
-            ProgressView(value: workout.stepProgress)
-                .tint(isStride ? .green : .accentColor)
-                .accessibilityHidden(true)
-            if isStride {
-                // The pace while the burst is on, to run it by, next to what it's
-                // aimed at: the two numbers say slow or fast, so it doesn't hang on
-                // the colour. It comes from the watch's running speed, not from
-                // distance, so it moves with you; the first seconds of a stride
-                // still read slow while the sensors catch up.
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    stridePace("PACE", Format.pace(workout.paceSecPerKm),
-                               tint: stridePaceTint(target: step.targetPaceSecPerKm))
-                    stridePace("TARGET", step.targetPaceSecPerKm.map(Format.pace) ?? "--", tint: .secondary)
-                }
-            } else {
-                Text("NEXT: STRIDE \(number) OF \(total)")
-                    .font(.footnote.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
+            if !big {
+                ProgressView(value: workout.stepProgress)
+                    .tint(isStride ? .green : .accentColor)
+                    .accessibilityHidden(true)
             }
-            stridePips(done: isStride ? number - 1 : number - 1, current: number, total: total)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                if isStride {
+                    // The pace while the burst is on, to run it by, next to what it's
+                    // aimed at: two numbers say slow or fast, so it doesn't hang on
+                    // the colour. It comes from the watch's running speed, not from
+                    // distance, so it moves with you; the first seconds of a stride
+                    // still read slow while the sensors catch up.
+                    strideValue("PACE", Format.pace(workout.paceSecPerKm),
+                                tint: stridePaceTint(target: step.targetPaceSecPerKm))
+                    strideValue("TARGET", step.targetPaceSecPerKm.map(Format.pace) ?? "--", tint: .secondary)
+                } else {
+                    // "Last" on its own would read as the last kilometre, which is a
+                    // metric of its own on the next page; this one is the stride.
+                    if let last = workout.lastStridePace {
+                        strideValue("LAST STRIDE", Format.pace(last), tint: .primary)
+                    }
+                    strideValue("NEXT", "Stride \(number)", tint: .primary)
+                }
+            }
+            if !big {
+                stridePips(done: number - 1, current: number, total: total)
+            }
         }
         .lineLimit(1)
         .minimumScaleFactor(0.6)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.horizontal, 4)
+        // One VoiceOver stop, with the seconds in the value: a value is spoken again
+        // every time it changes, a label only when it's focused.
         .accessibilityElement(children: .ignore)
+        .accessibilityRespondsToUserInteraction(true)
         .accessibilityLabel(isStride
-            ? "Stride \(number) of \(total), \(left) seconds left. Pace \(Format.pace(workout.paceSecPerKm)), target \(step.targetPaceSecPerKm.map(Format.pace) ?? "none")"
-            : "Easy, \(left) seconds to stride \(number) of \(total)"
+            ? "Stride \(number) of \(total), quick and light. Pace \(Format.pace(workout.paceSecPerKm)), target \(step.targetPaceSecPerKm.map(Format.pace) ?? "none")"
+            : "Easy, then stride \(number) of \(total)"
                 + (workout.lastStridePace.map { ". Last stride \(Format.pace($0))" } ?? ""))
+        .accessibilityValue("\(left) seconds left")
     }
 
-    /// A stride's pace next to its target, small labels over big numbers.
-    private func stridePace(_ label: String, _ value: String, tint: Color) -> some View {
+    /// A number on the stride page with its label over it.
+    private func strideValue(_ label: String, _ value: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(label).font(.caption2).foregroundStyle(.secondary)
             Text(value)
@@ -232,12 +252,6 @@ struct LiveRunView: View {
         let pace = workout.paceSecPerKm
         guard let target, pace > 0 else { return .green }
         return abs(pace - target) <= 15 ? .green : .orange
-    }
-
-    /// "EASY", with the pace the last stride actually came out at once there is one.
-    private var eyebrow: String {
-        guard let pace = workout.lastStridePace else { return "EASY" }
-        return "EASY  ·  LAST \(Format.pace(pace))"
     }
 
     /// One pip per stride: done, the one being run, and the ones still to come.

@@ -400,15 +400,18 @@ final class WorkoutManager: NSObject {
         let done = step.repNumber.map { $0 - 1 } ?? 0
         switch step.kind {
         case .stride:
-            // No card: the page behind it is already counting this stride down.
+            // The first one says what to do, briefly: the page behind has the
+            // countdown but no verb. After that no card at all, so nothing covers
+            // the seconds and the pace.
             return RunCue(title: strideTitle(step), detail: "\(Int(step.seconds ?? 20)) s quick and light",
-                          note: "Go", tone: .go, screenSeconds: nil)
+                          note: "Go", tone: .go, screenSeconds: step.repNumber == 1 ? 1.5 : nil)
         case .recovery where step.seconds != nil && step.repNumber == 1:
-            // The strides begin: the one double tap of the run, then the easy minute
-            // that sets the first one up.
-            return RunCue(title: "Strides now",
-                          detail: "\(step.repTotal ?? 6) × \(Int(WorkoutSteps.strideSeconds)) s, easy between",
-                          note: "Easy first, \(Int(step.seconds ?? 60)) s", tone: .strides, screenSeconds: 3)
+            // The strides begin, but the first thing to do is keep running easy, so
+            // that's the big line: "Strides now" over "easy for a minute" read as a
+            // contradiction. The two taps say the strides have begun.
+            return RunCue(title: "Easy \(Int(step.seconds ?? 60)) s",
+                          detail: "Then \(step.repTotal ?? 6) × \(Int(WorkoutSteps.strideSeconds)) s quick and light",
+                          note: "Strides next", tone: .strides, screenSeconds: 3)
         case .recovery where step.seconds != nil:
             // The stride just ended: felt, not read. The page counts the easy
             // minute down from here.

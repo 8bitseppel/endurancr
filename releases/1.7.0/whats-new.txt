@@ -1,8 +1,8 @@
 Strides, guided properly
 - Strides now run on the clock, not on distance: 20 s is over before GPS has settled, so counting metres tapped your wrist after the burst instead of at it.
 - While the easy part of the run is still going, the watch says how far it is until they start.
-- Two taps, the only double tap in a run, say the strides are starting.
-- Each one begins with an easy minute, counted down big on the screen, with the pace the last stride came out at above it.
+- Two taps, the only double tap in a run, say the strides are starting, and the screen says what to do first: "Easy 60 s, then 6 × 20 s quick and light".
+- Each stride begins with that easy minute, counted down big on the screen, next to the pace the stride before it came out at.
 - One tap when the burst starts: the screen turns green with which stride it is, the seconds left as large as the watch can show them, and the pace you're running next to the pace it's aimed at, green while you're near it and orange when you're well off.
 - Another tap when it ends, a pip fills for each stride done, and after the sixth: "All 6 strides done, easy to the end".
 - No card covers the countdown any more, so the seconds and the pace stay in front of you for the whole burst.

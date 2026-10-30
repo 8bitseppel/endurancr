@@ -109,6 +109,12 @@ private struct IntervalRunSimulation: View {
 
     @State private var summary: WatchRunSummary?
 
+    /// `-demoTextSize ax`: renders at an accessibility text size, which the watch
+    /// Simulator can't be set to, to check the run screen still fits one page.
+    private var textSize: DynamicTypeSize? {
+        UserDefaults.standard.string(forKey: "demoTextSize") == "ax" ? .accessibility3 : nil
+    }
+
     var body: some View {
         NavigationStack {
             if let summary {
@@ -117,6 +123,7 @@ private struct IntervalRunSimulation: View {
                 LiveRunView(workout: workout, plannedWorkout: planned, zones: zones)
             }
         }
+        .environment(\.dynamicTypeSize, textSize ?? .large)
         .task {
             // The real step engine, cues and taps: only the sensors are simulated.
             // Each tick of 100 ms is a few seconds of running, so a session plays

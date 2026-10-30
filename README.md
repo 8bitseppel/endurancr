@@ -91,9 +91,10 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   100 m", then "Go" with the rep's distance and pace from your current fitness, and "3 of
   6 done, easy now" after it, each with its own tap.
 - Strides are guided on the clock, because 20 s is over before GPS has settled: the run
-  screen says how far it is until they start, then taps twice and shows "Strides now, 6 ×
-  20 s, easy between". Each stride begins with an easy minute counted down big on the
-  screen, one tap when the burst starts (the screen turns green: which stride, the
+  screen says how far it is until they start, then taps twice and shows "Easy 60 s, then
+  6 × 20 s quick and light". Each stride begins with that easy minute counted down big on
+  the screen, next to the pace the stride before it came out at, one tap when the burst
+  starts (the screen turns green: which stride, the
   seconds left, and the pace you're running next to its target, green while you're near
   it and orange when you're well off), another when it ends, a pip for each one done,
   and "All 6 strides done" after the sixth. No card covers the countdown. The pace comes

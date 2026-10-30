@@ -650,8 +650,8 @@ Strides on the clock: two taps when they start, each 20 s burst counted down big
 Strides, guided properly
 - Strides now run on the clock, not on distance: 20 s is over before GPS has settled, so counting metres tapped your wrist after the burst instead of at it.
 - While the easy part of the run is still going, the watch says how far it is until they start.
-- Two taps, the only double tap in a run, say the strides are starting.
-- Each one begins with an easy minute, counted down big on the screen, with the pace the last stride came out at above it.
+- Two taps, the only double tap in a run, say the strides are starting, and the screen says what to do first: "Easy 60 s, then 6 × 20 s quick and light".
+- Each stride begins with that easy minute, counted down big on the screen, next to the pace the stride before it came out at.
 - One tap when the burst starts: the screen turns green with which stride it is, the seconds left as large as the watch can show them, and the pace you're running next to the pace it's aimed at, green while you're near it and orange when you're well off.
 - Another tap when it ends, a pip fills for each stride done, and after the sixth: "All 6 strides done, easy to the end".
 - No card covers the countdown any more, so the seconds and the pace stay in front of you for the whole burst.
@@ -705,8 +705,9 @@ endurancr is a training aid, not medical advice. Talk to a doctor before you sta
 
 ### Build
 
-1.7.0 (45). Build 44 was an earlier 1.7.0 archive, before the stride page showed
-your pace next to its target; use 45.
+1.7.0 (46). Builds 44 and 45 were earlier 1.7.0 archives, before the stride page
+showed your pace next to its target and before the card at the start of the block
+said "Easy 60 s" rather than "Strides now"; use 46.
 
 ### Screenshots
 
