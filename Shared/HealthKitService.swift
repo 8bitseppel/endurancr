@@ -63,22 +63,46 @@ final class HealthKitService {
     }
 
     /// Fetches running workouts since `date`, mapped to the engine's `CompletedRun`.
-    func fetchRuns(since date: Date) async -> [CompletedRun] {
+    ///
+    /// One query for the workouts, and the heart rate from each workout's own
+    /// statistics, which HealthKit stores with every workout recorded by a live
+    /// builder (the watch's, and Apple's Workout app). Only a workout without them,
+    /// from an app that saved no heart rate statistics, costs a query of its own,
+    /// and those run side by side. This used to be one query per run, one after the
+    /// other: a hundred runs into a plan, a hundred round trips before the watch's
+    /// home screen could show its week ring.
+    ///
+    /// `heartRate: false` skips even those, for screens that never show it.
+    func fetchRuns(since date: Date, heartRate: Bool = true) async -> [CompletedRun] {
         if DemoMode.isOn { return DemoMode.runs.filter { $0.date >= date } }
         let workouts = await fetchRunningWorkouts(since: date)
-        var runs: [CompletedRun] = []
-        for workout in workouts {
-            let distance = workout.statistics(for: HKQuantityType(.distanceWalkingRunning))?
-                .sumQuantity()?.doubleValue(for: .meter()) ?? 0
-            let hr = await averageHeartRate(during: workout)
-            runs.append(CompletedRun(
+        let bpm = HKUnit.count().unitDivided(by: .minute())
+        let rates: [Int: Double] = await withTaskGroup(of: (Int, Double?).self) { group in
+            for (i, workout) in workouts.enumerated() {
+                if let stored = workout.statistics(for: HKQuantityType(.heartRate))?
+                    .averageQuantity()?.doubleValue(for: bpm) {
+                    group.addTask { (i, stored) }
+                } else if heartRate {
+                    group.addTask { [self] in (i, await self.averageHeartRate(during: workout)) }
+                }
+            }
+            var found: [Int: Double] = [:]
+            for await (i, rate) in group { found[i] = rate }
+            return found
+        }
+        let runs = workouts.enumerated().map { i, workout in
+            CompletedRun(
                 date: workout.startDate,
-                distanceMeters: distance,
+                // An indoor run counts the distance the treadmill showed, typed in on
+                // the watch at the end, over the watch's own estimate.
+                distanceMeters: (workout.metadata?["EndurancrMachineDistance"] as? Double)
+                    ?? workout.statistics(for: HKQuantityType(.distanceWalkingRunning))?
+                        .sumQuantity()?.doubleValue(for: .meter()) ?? 0,
                 durationSeconds: workout.duration,
-                averageHeartRate: hr,
+                averageHeartRate: rates[i],
                 // The reps endurancr saved with an interval session (`RepReport`).
                 reps: RepReport.decode(workout.metadata?[RepReport.metadataKey] as? String)
-            ))
+            )
         }
         return CompletedRun.cleaned(runs)
     }

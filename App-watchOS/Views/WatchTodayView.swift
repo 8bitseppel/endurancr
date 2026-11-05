@@ -19,16 +19,22 @@ struct WatchTodayView: View {
     @State private var today = Calendar.current.startOfDay(for: .now)
     // Observes the store so a plan synced from the iPhone refreshes the view live.
     @Query(sort: \StoredPlan.updatedAt, order: .reverse) private var storedPlans: [StoredPlan]
+    /// The plan, built once each time the stored one changes. Building it means
+    /// generating every week of it from the inputs, and the screen reads it many
+    /// times per redraw, so reading `storedPlans.first?.plan` directly rebuilt the
+    /// whole plan each time.
+    @State private var plan: TrainingPlan?
+    /// Whether this week's numbers have come back from Health once. Until then the
+    /// ring is a placeholder of the same size, so nothing jumps when they arrive.
+    @State private var weekLoaded = false
     @State private var workout = WorkoutManager.shared
     @State private var showLiveRun = false
     // Captured at start so the live run screen can show step-aware targets. Nil for
     // a free run (no goal / rest day / nothing scheduled).
     @State private var runWorkout: PlannedWorkout?
     @State private var runZones: PaceZones?
-    // Post-run summary shown after Finish, and the week's completed volume captured
-    // at run start so the summary can never show less than "prior + this run" while
-    // HealthKit's save is still settling.
-    @State private var runSummary: WatchRunSummary?
+    // The week's completed volume when the run started, so the summary can show
+    // "before + this run" without waiting for Health to have the run.
     @State private var weekCompletedAtStart: Double = 0
     // This week's planned vs. completed volume for the home screen ring.
     @State private var weekProgress: PlanProgress?
@@ -53,11 +59,15 @@ struct WatchTodayView: View {
                     ScrollView { home(compact: false) }
                 }
                 .tag(HomePage.today)
-                if let plan = currentPlan, !workout.isRunning {
-                    OtherSessionView(plan: plan) { offer in
+                if !workout.isRunning {
+                    OtherSessionView(plan: currentPlan, today: todaysWorkout) { offer in
                         homePage = .today
-                        start(offer.workout, zones: plan.paceZones)
+                        if let plan = currentPlan { start(offer.workout, zones: plan.paceZones) }
                         if let from = offer.movesFrom { PlanSync.shared.requestSwap(today: .now, from: from) }
+                    } onIndoor: {
+                        homePage = .today
+                        captureToday()
+                        beginRun(indoor: true)
                     }
                     .tag(HomePage.another)
                 }
@@ -66,6 +76,7 @@ struct WatchTodayView: View {
             .demoTurnPage($homePage, to: .another)
             .containerBackground(Color.accentColor.opacity(0.45).gradient, for: .navigation)
             .task(id: "\(storedPlans.first?.updatedAt.timeIntervalSince1970 ?? 0)-\(today.timeIntervalSince1970)") {
+                reloadPlan()
                 await loadWeekProgress()
             }
             .onChange(of: scenePhase) { _, phase in
@@ -75,29 +86,12 @@ struct WatchTodayView: View {
             .task { if DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoOffersOpen") { homePage = .another } }
             #endif
             .navigationDestination(isPresented: $showLiveRun) {
-                LiveRunView(workout: workout, plannedWorkout: runWorkout, zones: runZones)
+                RunFlowView(workout: workout, plannedWorkout: runWorkout, zones: runZones,
+                            makeSummary: summaryFromWatch)
             }
-            .onChange(of: workout.saveState) { _, state in
-                // Summarize once Health has the finished run (or refused it), with
-                // the saved workout's own time and distance. A stationary or
-                // accidental run stays silent.
-                guard state == .saved || state == .failed, workout.didFinish else { return }
-                let distance = workout.savedDistanceMeters ?? workout.distanceMeters
-                guard distance >= Self.minSummaryDistanceMeters else { return }
-                let duration = workout.savedDuration ?? workout.elapsedSeconds
-                let saved = state == .saved
-                let prior = weekCompletedAtStart
-                let plan = currentPlan
-                let reps = workout.reps
-                Task {
-                    var summary = await Self.makeSummary(
-                        plan: plan, health: health,
-                        distance: distance, duration: duration,
-                        saved: saved, priorWeekCompleted: prior
-                    )
-                    summary.reps = reps
-                    runSummary = summary
-                }
+            .onChange(of: showLiveRun) { _, shown in
+                // Back from a run: this week again, with the run in it.
+                if !shown { Task { await loadWeekProgress() } }
             }
             .onChange(of: workout.isRunning, initial: true) { _, running in
                 // A run recovered after a crash: back to its run screen.
@@ -110,36 +104,23 @@ struct WatchTodayView: View {
             } message: {
                 Text("\(startError ?? "") Check that endurancr may use Health in the Settings app.")
             }
-            .sheet(item: $runSummary, onDismiss: { Task { await loadWeekProgress() } }) { summary in
-                NavigationStack { WatchRunSummaryView(summary: summary) }
-            }
+
         }
     }
 
-    /// Builds the post-run summary. Weekly numbers come from `PlanProgress` computed
-    /// on-watch; the completed figure is floored at `priorWeekCompleted + distance`
-    /// so a not-yet-visible HealthKit save never makes the week appear to shrink.
-    /// A free run (no plan) yields stats only, no weekly section.
-    private static func makeSummary(
-        plan: TrainingPlan?, health: HealthKitService,
-        distance: Double, duration: Double,
-        saved: Bool, priorWeekCompleted: Double
-    ) async -> WatchRunSummary {
-        guard let plan else {
-            return WatchRunSummary(distanceMeters: distance, durationSeconds: duration,
-                                   saved: saved, weekNumber: nil,
-                                   weekCompletedMeters: 0, weekTargetMeters: 0)
-        }
-        let since = plan.weeks.first?.startDate
-            ?? Calendar.current.date(byAdding: .month, value: -1, to: .now)!
-        let runs = await health.fetchRuns(since: since)
-        let progress = PlanProgress.make(plan: plan, completedRuns: runs, asOf: .now)
+    /// The summary at the moment the run ends, from what the watch already knows:
+    /// the run's own numbers, its reps, and the week as it was before the run plus
+    /// this one. No Health read, so it opens at once; the save confirms afterwards.
+    /// `nil` for a run too short to be a real one (an accidental start).
+    private func summaryFromWatch() -> WatchRunSummary? {
+        let distance = workout.distanceMeters
+        guard distance >= Self.minSummaryDistanceMeters else { return nil }
         return WatchRunSummary(
-            distanceMeters: distance, durationSeconds: duration, saved: saved,
-            weekNumber: progress.currentWeekNumber,
-            weekCompletedMeters: max(progress.currentWeekCompletedMeters, priorWeekCompleted + distance),
-            weekTargetMeters: progress.currentWeekPlannedMeters
-        )
+            distanceMeters: distance, durationSeconds: workout.elapsedSeconds, saved: true,
+            weekNumber: weekProgress?.currentWeekNumber,
+            weekCompletedMeters: weekCompletedAtStart + distance,
+            weekTargetMeters: weekProgress?.currentWeekPlannedMeters ?? 0,
+            reps: workout.reps)
     }
 
     /// `compact` is the tighter layout for the smallest watches.
@@ -230,7 +211,27 @@ struct WatchTodayView: View {
     /// This week's completed volume against the plan, as a small ring plus numbers.
     @ViewBuilder
     private func weekRing(compact: Bool) -> some View {
-        if let weekProgress, weekProgress.currentWeekPlannedMeters > 0 {
+        if !weekLoaded {
+            // Skeleton: the ring and its two lines at their real size, so the
+            // header and Start don't move when the week arrives.
+            HStack(spacing: 8) {
+                Circle().strokeBorder(.secondary.opacity(0.35), lineWidth: 4)
+                    .frame(width: 24, height: 24)
+                    .frame(width: 34, height: 34)
+                VStack(alignment: .leading, spacing: 3) {
+                    if !compact {
+                        Capsule().fill(.secondary.opacity(0.35)).frame(width: 52, height: 9)
+                    }
+                    Capsule().fill(.secondary.opacity(0.25)).frame(width: 84, height: 7)
+                }
+                Spacer(minLength: 0)
+            }
+            .phaseAnimator([0.55, 1]) { content, opacity in content.opacity(opacity) } animation: { _ in
+                .easeInOut(duration: 0.9)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Loading this week")
+        } else if let weekProgress, weekProgress.currentWeekPlannedMeters > 0 {
             let fraction = min(1, weekProgress.currentWeekCompletedMeters / weekProgress.currentWeekPlannedMeters)
             HStack(spacing: 8) {
                 Gauge(value: fraction) {
@@ -262,12 +263,28 @@ struct WatchTodayView: View {
     }
 
     private func loadWeekProgress() async {
-        guard let plan = currentPlan else { weekProgress = nil; return }
-        let since = plan.weeks.first?.startDate
-            ?? Calendar.current.date(byAdding: .month, value: -1, to: .now)!
-        let runs = await health.fetchRuns(since: since)
-        weekProgress = PlanProgress.make(plan: plan, completedRuns: runs, asOf: .now)
-        todayReview = PlanReview.make(plan: plan, original: nil, completedRuns: runs, asOf: .now).day(.now)
+        guard let plan = currentPlan else { weekProgress = nil; weekLoaded = true; return }
+        let runs = await Self.weekRuns(plan: plan, health: health)
+        let progress = PlanProgress.make(plan: plan, completedRuns: runs, asOf: .now)
+        let review = PlanReview.make(plan: plan, original: nil, completedRuns: runs, asOf: .now).day(.now)
+        // One animation for both, so "Done today" and the ring arrive together.
+        withAnimation(.smooth) {
+            weekProgress = progress
+            todayReview = review
+            weekLoaded = true
+        }
+    }
+
+    /// The runs the watch shows anything about: this week's. The ring is this week,
+    /// "Done today" is today, and neither needs heart rate. Reading every run since
+    /// the plan began, with its heart rate, is what made the home screen wait.
+    static func weekRuns(plan: TrainingPlan, health: HealthKitService) async -> [CompletedRun] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let week = plan.weeks.last { calendar.startOfDay(for: $0.startDate) <= today }
+        let since = week.map { calendar.startOfDay(for: $0.startDate) }
+            ?? calendar.date(byAdding: .day, value: -7, to: today)!
+        return await health.fetchRuns(since: since, heartRate: false)
     }
 
     /// Captures today's session and its paces so the run screen can show step-aware
@@ -296,24 +313,18 @@ struct WatchTodayView: View {
         beginRun()
     }
 
-    private func beginRun() {
-        guard workout.start(plannedWorkout: runWorkout, zones: runZones,
-                            goalName: currentPlan?.goal.name ?? "") else {
+    /// Prepares the run and opens the countdown; the run itself begins when the
+    /// countdown ends (`RunFlowView`).
+    private func beginRun(indoor: Bool = false) {
+        guard workout.prepare(plannedWorkout: runWorkout, zones: runZones,
+                              goalName: currentPlan?.goal.name ?? "", indoor: indoor) else {
             startError = workout.lastError ?? "The run couldn't start."
             return
         }
         showLiveRun = true
-        // Record this week's completed volume *before* the run so the post-run
-        // summary has a true prior baseline (the run isn't in HealthKit yet).
-        let plan = currentPlan
-        Task {
-            guard let plan else { weekCompletedAtStart = 0; return }
-            let since = plan.weeks.first?.startDate
-                ?? Calendar.current.date(byAdding: .month, value: -1, to: .now)!
-            let runs = await health.fetchRuns(since: since)
-            weekCompletedAtStart = PlanProgress.make(plan: plan, completedRuns: runs, asOf: .now)
-                .currentWeekCompletedMeters
-        }
+        // This week's completed volume before the run, so the post-run summary has
+        // a true baseline (the run isn't in Health yet). Already on screen: no read.
+        weekCompletedAtStart = weekProgress?.currentWeekCompletedMeters ?? 0
     }
 
     private var startButton: some View {
@@ -356,7 +367,16 @@ struct WatchTodayView: View {
         return planned.type == .rest ? .rest(note: planned.notes) : .workout(planned)
     }
 
-    private var currentPlan: TrainingPlan? {
-        storedPlans.first?.plan
+    private var currentPlan: TrainingPlan? { plan }
+
+    /// Today's planned run, if there is one.
+    private var todaysWorkout: PlannedWorkout? {
+        if case .workout(let planned) = state { return planned }
+        return nil
+    }
+
+    /// Rebuilds the cached plan from the store.
+    private func reloadPlan() {
+        plan = storedPlans.first?.plan
     }
 }

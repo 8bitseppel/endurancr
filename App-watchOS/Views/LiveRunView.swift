@@ -91,10 +91,8 @@ struct LiveRunView: View {
                 .handGestureShortcut(.primaryAction)
             }
         }
-        .onChange(of: workout.isRunning) { _, running in
-            // Finished from the iPhone's Live Activity: close like Finish here.
-            if !running { dismiss() }
-        }
+        // Finishing, here or from the iPhone's Live Activity, is `RunFlowView`'s:
+        // it turns this screen into the finish and the summary in place.
         .overlay {
             if let card {
                 StepCardView(card: card)
@@ -153,6 +151,11 @@ struct LiveRunView: View {
     private func repTitle(_ step: WorkoutStep) -> String {
         guard let n = step.repNumber, let total = step.repTotal, total > 1 else { return step.label }
         return "\(step.kind == .stride ? "Stride" : "Rep") \(n) of \(total)"
+    }
+
+    /// A pace as the run screen shows it: min/km outside, km/h on a treadmill.
+    private func paceText(_ secPerKm: Double) -> String {
+        workout.isIndoor ? Format.speed(secPerKm) : Format.pace(secPerKm)
     }
 
     /// "1 km at 4:15/km", "400 m easy", "20 s quick and light".
@@ -218,9 +221,9 @@ struct LiveRunView: View {
                     // the colour. It comes from the watch's running speed, not from
                     // distance, so it moves with you; the first seconds of a stride
                     // still read slow while the sensors catch up.
-                    focusValue("PACE", Format.pace(workout.paceSecPerKm),
+                    focusValue(workout.isIndoor ? "SPEED" : "PACE", paceText(workout.paceSecPerKm),
                                tint: stridePaceTint(target: step.targetPaceSecPerKm))
-                    focusValue("TARGET", step.targetPaceSecPerKm.map(Format.pace) ?? "--", tint: .secondary)
+                    focusValue("TARGET", step.targetPaceSecPerKm.map(paceText) ?? "--", tint: .secondary)
                 } else if timed {
                     // "Last" on its own would read as the last kilometre, which is a
                     // metric of its own on the next page; this one is the stride.
@@ -311,15 +314,17 @@ struct LiveRunView: View {
                         "Target", Format.distance(plannedWorkout.distanceMeters)
                     )
                 }
+                // On a treadmill you press km/h, not min/km, so indoors the target is
+                // the speed to set it to.
                 metricPair(
-                    "Pace", Format.pace(workout.paceSecPerKm),
-                    "Target", step.targetPaceSecPerKm.map(Format.pace) ?? "--",
+                    workout.isIndoor ? "Speed" : "Pace", paceText(workout.paceSecPerKm),
+                    "Target", step.targetPaceSecPerKm.map(paceText) ?? "--",
                     valueTint: paceTint(target: step.targetPaceSecPerKm, easy: step.paceType == .easy)
                 )
             } else {
                 // Free run: no plan, so just live pace and distance.
                 metric("Distance", Format.distance(workout.distanceMeters), tint: .accentColor)
-                metric("Pace", Format.pace(workout.paceSecPerKm), tint: .primary)
+                metric(workout.isIndoor ? "Speed" : "Pace", paceText(workout.paceSecPerKm), tint: .primary)
             }
         }
         // Numbers shrink a little before the page has to scroll.
@@ -438,7 +443,7 @@ struct LiveRunView: View {
                 .foregroundStyle(.tint)
             Text(stridesComing(step) ?? (step.kind == .cooldown && step.distanceMeters < 1
                  ? "easy to the end"
-                 : "\(Format.distanceCompact(step.distanceMeters)) @ \(step.targetPaceSecPerKm.map(Format.pace) ?? "--")"))
+                 : "\(Format.distanceCompact(step.distanceMeters)) @ \(step.targetPaceSecPerKm.map(paceText) ?? "--")"))
                 .font(.footnote).monospacedDigit()
                 .foregroundStyle(.secondary)
         }
@@ -547,7 +552,17 @@ struct LiveRunView: View {
         .accessibilityLabel("\(label) \(value), \(targetLabel.lowercased()) \(targetValue)")
     }
 
-    private var gpsStatus: some View {
+    @ViewBuilder private var gpsStatus: some View {
+        if workout.isIndoor {
+            Label("Indoor, no GPS", systemImage: "figure.run.treadmill")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        } else {
+            outdoorGPS
+        }
+    }
+
+    private var outdoorGPS: some View {
         Label(
             workout.routePointCount > 0 ? "GPS \(workout.routePointCount) pts" : "GPS acquiring…",
             systemImage: "location.fill"

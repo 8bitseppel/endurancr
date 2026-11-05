@@ -40,6 +40,10 @@ struct WatchRunSummary: Identifiable {
 /// time, pace), then the week and Done a Crown turn or swipe below.
 struct WatchRunSummaryView: View {
     let summary: WatchRunSummary
+    /// The save as it happens, when the summary opens before Health has the run:
+    /// "Saving to Health" turns into "Saved to Health" in place. `nil` uses
+    /// `summary.saved`, for a summary built after the save.
+    var saveState: WorkoutManager.SaveState? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var page: Page = {
         #if DEBUG
@@ -67,7 +71,7 @@ struct WatchRunSummaryView: View {
         }())
         .navigationTitle("Run complete")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { WKInterfaceDevice.current().play(.success) }
+        // No tap here: holding Finish already gave the run's last one.
     }
 
     /// Page 1: what the run did. It fits without scrolling at the usual text sizes;
@@ -226,11 +230,33 @@ struct WatchRunSummaryView: View {
         .padding(.horizontal, 4)
     }
 
-    private var saveStatus: some View {
-        Label(summary.saved ? "Saved to Health" : "Not saved to Health",
-              systemImage: summary.saved ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(summary.saved ? .green : .orange)
+    /// Where the run is: being saved, saved, or not saved. It changes in place, so
+    /// the summary never has to wait for Health before it can open.
+    @ViewBuilder private var saveStatus: some View {
+        let state = saveState ?? (summary.saved ? .saved : .failed)
+        Group {
+            switch state {
+            case .saving, .idle:
+                // A spinner the size of the check that replaces it: the system one is
+                // much taller on the watch, which pushed the page into scrolling.
+                Label {
+                    Text("Saving to Health")
+                } icon: {
+                    SmallSpinner()
+                }
+                .foregroundStyle(.secondary)
+            case .saved:
+                Label("Saved to Health", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .transition(.blurReplace)
+            case .failed:
+                Label("Not saved to Health", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .transition(.blurReplace)
+            }
+        }
+        .font(.footnote.weight(.semibold))
+        .animation(.smooth, value: state)
     }
 
     private var weeklyProgress: some View {
@@ -262,5 +288,21 @@ struct WatchRunSummaryView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label.capitalized) \(value)")
+    }
+}
+
+/// A spinner as small as a symbol in the line it sits in.
+private struct SmallSpinner: View {
+    @State private var turning = false
+
+    var body: some View {
+        Circle()
+            .trim(from: 0, to: 0.7)
+            .stroke(.secondary, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            .frame(width: 11, height: 11)
+            .rotationEffect(.degrees(turning ? 360 : 0))
+            .animation(.linear(duration: 0.9).repeatForever(autoreverses: false), value: turning)
+            .onAppear { turning = true }
+            .accessibilityHidden(true)
     }
 }

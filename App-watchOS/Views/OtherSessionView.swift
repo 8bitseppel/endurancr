@@ -6,8 +6,13 @@ import TrainingCore
 /// why intervals aren't offered when they aren't. The home screen's second page, a
 /// turn of the Crown below today's run, so the home screen stays one run and one Start.
 struct OtherSessionView: View {
-    let plan: TrainingPlan
+    /// `nil` without a goal: then only the indoor run is offered.
+    let plan: TrainingPlan?
+    /// Today's planned run, which the indoor run follows when there is one.
+    let today: PlannedWorkout?
     let onStart: (SessionOffers.Offer) -> Void
+    /// Today's run, or a free run, on a treadmill: no GPS.
+    let onIndoor: () -> Void
     @Environment(HealthKitService.self) private var health
     @State private var offers: SessionOffers?
 
@@ -18,7 +23,21 @@ struct OtherSessionView: View {
                 .foregroundStyle(.tint)
                 .listRowBackground(Color.clear)
                 .accessibilityAddTraits(.isHeader)
-            if let offers {
+            // First, since it's the same run in another place rather than another
+            // run, and it needs no plan at all.
+            Button(action: onIndoor) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label("Indoor run", systemImage: "figure.run.treadmill")
+                        .font(.headline)
+                    Text(today.map { "Today's \(Format.workoutTitle($0.type).lowercased()) on a treadmill, no GPS" }
+                         ?? "A free run on a treadmill, no GPS")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
+            }
+            if plan == nil {
+                EmptyView()
+            } else if let offers {
                 ForEach(offers.offers) { offer in
                     Button { onStart(offer) } label: {
                         VStack(alignment: .leading, spacing: 2) {
@@ -46,12 +65,12 @@ struct OtherSessionView: View {
             }
         }
 
-        .task { offers = await load() }
+        .task { if let plan { offers = await load(plan) } }
     }
 
     /// The same rules as on the iPhone, from this watch's own Health data: recent
     /// runs (with their reps), easing back after a break, and resting heart rate.
-    private func load() async -> SessionOffers {
+    private func load(_ plan: TrainingPlan) async -> SessionOffers {
         #if DEBUG
         if DemoMode.isOn, let demo = DemoMode.sessionOffers { return demo }
         #endif

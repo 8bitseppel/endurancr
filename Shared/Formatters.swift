@@ -3,6 +3,12 @@ import TrainingCore
 
 /// Display helpers shared by both apps. Uses the user's locale/units where possible.
 enum Format {
+    /// "9.6 km/h", from a pace in seconds per km: what a treadmill is set by.
+    static func speed(_ secPerKm: Double) -> String {
+        guard secPerKm > 0, secPerKm.isFinite else { return "--" }
+        return String(format: "%.1f km/h", 3_600 / secPerKm)
+    }
+
     /// Distance in km with one decimal, e.g. "12.4 km".
     static func distance(_ meters: Double) -> String {
         String(format: "%.1f km", meters / 1_000)

@@ -51,6 +51,8 @@ struct EndurancrWatchApp: App {
             NavigationStack { WatchRunSummaryView(summary: .demo) }
         case "intervals":
             IntervalRunSimulation()
+        case "flow":
+            DemoRunFlow()
         default:
             WatchTodayView()
         }
@@ -212,6 +214,38 @@ private struct IntervalRunSimulation: View {
                                       saved: true, weekNumber: nil, weekCompletedMeters: 0, weekTargetMeters: 0,
                                       reps: reps)
         }
+    }
+}
+
+/// `-demoScreen flow`: a run from Start to the summary, the way it plays on the
+/// wrist: the countdown, a few seconds of running, Hold to finish, the finish and
+/// the summary, with a save that confirms after a moment. `-demoIndoor YES` adds
+/// the treadmill's distance after the finish.
+private struct DemoRunFlow: View {
+    @State private var workout = WorkoutManager.demo
+
+    var body: some View {
+        NavigationStack {
+            RunFlowView(workout: workout, plannedWorkout: DemoMode.todaysWorkout, zones: DemoMode.plan?.paceZones) {
+                let run = DemoMode.finishedRun
+                return WatchRunSummary(distanceMeters: workout.distanceMeters, durationSeconds: workout.elapsedSeconds,
+                                       saved: true, weekNumber: run.week,
+                                       weekCompletedMeters: run.weekDone, weekTargetMeters: run.weekTarget)
+            }
+        }
+        .task {
+            // The countdown, then about eight seconds of the run, then Finish.
+            try? await Task.sleep(for: .seconds(11))
+            WKInterfaceDevice.current().play(.success)
+            workout.demoFinish()
+        }
+    }
+
+    init() {
+        let manager = WorkoutManager.demo
+        manager.isRunning = false
+        manager.demoPrepare(indoor: UserDefaults.standard.bool(forKey: "demoIndoor"))
+        _workout = State(initialValue: manager)
     }
 }
 

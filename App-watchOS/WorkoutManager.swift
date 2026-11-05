@@ -150,6 +150,12 @@ final class WorkoutManager: NSObject {
     /// The demo's running speed, so its live pace reads as on target.
     func setDemoSpeed(_ metersPerSecond: Double) { currentSpeed = metersPerSecond }
 
+    /// A demo run waiting at its countdown, for `-demoScreen flow`.
+    func demoPrepare(indoor: Bool) {
+        isIndoor = indoor
+        isPreparing = true
+    }
+
     /// Points a still demo run at today's session, at the step its distance says, so
     /// the screen shows the same targets a real run would.
     func demoGuide(_ planned: PlannedWorkout, _ zones: PaceZones) {
@@ -180,9 +186,18 @@ final class WorkoutManager: NSObject {
     }
 
     func demoFinish() {
-        guided?.finish(distance: distanceMeters, elapsed: elapsedSeconds, date: Date())
-        reps = guided?.reps ?? []
+        guard var run = guided else { isRunning = false; return }
+        run.finish(distance: distanceMeters, elapsed: elapsedSeconds, date: Date())
+        reps = run.reps
+        guided = nil
+        didFinish = true
+        saveState = .saving
         isRunning = false
+        // A demo has no Health to save to: say saved after the time a real save takes.
+        Task {
+            try? await Task.sleep(for: .seconds(1.6))
+            saveState = .saved
+        }
     }
     #endif
 
@@ -205,11 +220,63 @@ final class WorkoutManager: NSObject {
         return elapsedSeconds / (distanceMeters / 1_000)
     }
 
-    /// Starts recording. Returns false (with `lastError` set) when HealthKit
-    /// refuses, e.g. without Health access, so no empty run screen opens.
+    /// Whether the session is warming up for the countdown: created and prepared,
+    /// sensors on, nothing recorded yet. `begin()` starts the run itself.
+    private(set) var isPreparing = false
+    /// A run on a treadmill or indoor track: no GPS and no route, distance from the
+    /// watch's motion sensors, and the distance the machine shows typed in at the end.
+    private(set) var isIndoor = false
+    /// Whether the session ever began recording, so a countdown that never finished
+    /// doesn't try to save an empty workout.
+    private var hasBegun = false
+
+    /// Indoors: the distance the treadmill showed, typed in at the end. The plan
+    /// counts it instead of the watch's estimate, which can be off by a tenth on a
+    /// belt; Apple Health keeps the watch's own measure next to it.
+    private(set) var machineDistanceMeters: Double?
+    /// The saved run is waiting for the treadmill's distance (`confirmMachineDistance`).
+    private(set) var needsMachineDistance = false
+    private var machineDistanceWaiter: CheckedContinuation<Double?, Never>?
+
+    /// The treadmill's distance, or `nil` to keep the watch's. Saves the run.
+    func confirmMachineDistance(_ meters: Double?) {
+        guard needsMachineDistance else { return }
+        needsMachineDistance = false
+        machineDistanceMeters = meters
+        machineDistanceWaiter?.resume(returning: meters)
+        machineDistanceWaiter = nil
+    }
+
+    /// Waits for the treadmill's distance, for at most two minutes: a run left on the
+    /// wrist unanswered is saved with the watch's own distance rather than lost.
+    private func awaitMachineDistance() async -> Double? {
+        needsMachineDistance = true
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(120))
+            self?.confirmMachineDistance(nil)
+        }
+        return await withCheckedContinuation { machineDistanceWaiter = $0 }
+    }
+
+    /// Starts recording right away, without a countdown. Returns false (with
+    /// `lastError` set) when HealthKit refuses, e.g. without Health access, so no
+    /// empty run screen opens.
     @discardableResult
-    func start(plannedWorkout: PlannedWorkout? = nil, zones: PaceZones? = nil, goalName: String = "") -> Bool {
-        if isRunning { return true }                 // already running: keep it
+    func start(plannedWorkout: PlannedWorkout? = nil, zones: PaceZones? = nil, goalName: String = "",
+               indoor: Bool = false) -> Bool {
+        guard prepare(plannedWorkout: plannedWorkout, zones: zones, goalName: goalName, indoor: indoor) else { return false }
+        begin()
+        return true
+    }
+
+    /// Creates and prepares the workout session, as Apple's Workout app does at its
+    /// countdown: the sensors and GPS come on and settle, nothing is recorded yet.
+    /// Call `begin()` when the countdown ends. Returns false (with `lastError` set)
+    /// when HealthKit refuses.
+    @discardableResult
+    func prepare(plannedWorkout: PlannedWorkout? = nil, zones: PaceZones? = nil, goalName: String = "",
+                 indoor: Bool = false) -> Bool {
+        if isRunning || isPreparing { return true }  // already going: keep it
         guard session == nil, saveState != .saving else {
             lastError = "The last run is still being saved. Try again in a moment."
             return false
@@ -218,34 +285,51 @@ final class WorkoutManager: NSObject {
         self.plannedWorkout = plannedWorkout
         self.zones = zones
         self.goalName = goalName
+        isIndoor = indoor
         guided = plannedWorkout.flatMap { w in zones.map { GuidedRun(workout: w, zones: $0) } }
-        startTicking()
-        RunContext(plannedWorkout: plannedWorkout, zones: zones, goalName: goalName).save()
+        RunContext(plannedWorkout: plannedWorkout, zones: zones, goalName: goalName, indoor: indoor).save()
         let config = HKWorkoutConfiguration()
         config.activityType = .running
-        config.locationType = .outdoor
+        config.locationType = indoor ? .indoor : .outdoor
 
         do {
             let session = try HKWorkoutSession(healthStore: store, configuration: config)
-            let builder = attach(session)
-
+            attach(session)
             // Prepare, then mirror to the iPhone, then start, as Apple's sample does.
             // Without the iPhone nearby the run just records here.
             session.prepare()
             session.startMirroringToCompanionDevice { _, _ in }
-            let startDate = Date()
-            session.startActivity(with: startDate)
-            builder.beginCollection(withStart: startDate) { [weak self] _, error in
-                let message = error?.localizedDescription
-                Self.onMain { if let message { self?.lastError = message } }
-            }
-            isRunning = true
+            isPreparing = true
             return true
         } catch {
             lastError = error.localizedDescription
             RunContext.clear()
             return false
         }
+    }
+
+    /// Starts the prepared run: the clock and the recording begin now.
+    func begin() {
+        #if DEBUG
+        // A demo flow has no session: the countdown still leads into the run.
+        if DemoMode.isOn, session == nil, isPreparing {
+            isPreparing = false
+            hasBegun = true
+            isRunning = true
+            return
+        }
+        #endif
+        guard isPreparing, let session, let builder else { return }
+        isPreparing = false
+        hasBegun = true
+        let startDate = Date()
+        session.startActivity(with: startDate)
+        builder.beginCollection(withStart: startDate) { [weak self] _, error in
+            let message = error?.localizedDescription
+            Self.onMain { if let message { self?.lastError = message } }
+        }
+        startTicking()
+        isRunning = true
     }
 
     /// Clears the last run's numbers, so a new or recovered run starts from zero.
@@ -275,6 +359,9 @@ final class WorkoutManager: NSObject {
         guided = nil
         cue = nil
         readiedStep = nil
+        isPreparing = false
+        hasBegun = false
+        machineDistanceMeters = nil
         saidPlanDone = false
     }
 
@@ -289,8 +376,12 @@ final class WorkoutManager: NSObject {
         builder.delegate = self
         self.session = session
         self.builder = builder
-        self.routeBuilder = HKWorkoutRouteBuilder(healthStore: store, device: nil)
-        beginLocationUpdates()
+        // Indoors there's no route to record, and GPS would only drift: distance
+        // comes from the watch's motion sensors, as in Apple's Workout app.
+        if session.workoutConfiguration.locationType != .indoor {
+            self.routeBuilder = HKWorkoutRouteBuilder(healthStore: store, device: nil)
+            beginLocationUpdates()
+        }
         return builder
     }
 
@@ -313,6 +404,8 @@ final class WorkoutManager: NSObject {
                     context?.zones.map { GuidedRun(workout: w, zones: $0) }
                 }
                 self.isRecovering = self.guided != nil
+                self.isIndoor = context?.indoor ?? (session.workoutConfiguration.locationType == .indoor)
+                self.hasBegun = true
                 self.startTicking()
                 self.attach(session)
                 // Show the recovered run on the iPhone again.
@@ -538,11 +631,23 @@ final class WorkoutManager: NSObject {
         // Set synchronously so the view's dismiss handler sees the explicit finish
         // even for a zero-distance run.
         didFinish = true
-        ticker?.invalidate()
-        ticker = nil
+        closeReps(at: Date())
         locationManager.stopUpdatingLocation()
         session?.end()
         isRunning = false
+    }
+
+    /// Closes the rep or stride in progress and settles the run's reps, the moment
+    /// the run ends rather than partway through saving it, so the summary can show
+    /// them straight away. Runs once; a second call does nothing.
+    private func closeReps(at date: Date) {
+        ticker?.invalidate()
+        ticker = nil
+        guard var run = guided else { return }
+        elapsedSeconds = elapsedTime(at: date)
+        run.finish(distance: distanceMeters, elapsed: elapsedSeconds, date: date)
+        reps = run.reps
+        guided = nil
     }
 
     /// Runs `work` on the main actor, after anything queued before it, so session
@@ -574,6 +679,9 @@ final class WorkoutManager: NSObject {
             self.builder = nil
         }
         do {
+            if isIndoor, distanceMeters > 0, let meters = await awaitMachineDistance(), meters > 0 {
+                try await builder.addMetadata([Self.machineDistanceKey: meters])
+            }
             try await saveReps(to: builder, endingAt: date)
             // The climb, as Apple Health's own elevation gain for the run.
             if elevationGainMeters > 0 {
@@ -585,8 +693,9 @@ final class WorkoutManager: NSObject {
                 return
             }
             savedDuration = workout.duration
-            savedDistanceMeters = workout.statistics(for: HKQuantityType(.distanceWalkingRunning))?
-                .sumQuantity()?.doubleValue(for: .meter())
+            savedDistanceMeters = machineDistanceMeters
+                ?? workout.statistics(for: HKQuantityType(.distanceWalkingRunning))?
+                    .sumQuantity()?.doubleValue(for: .meter())
             saveState = .saved
             // The workout is in Health now; a missing route doesn't undo that.
             _ = try? await routeBuilder?.finishRoute(with: workout, metadata: nil)
@@ -598,14 +707,13 @@ final class WorkoutManager: NSObject {
 }
 
 extension WorkoutManager {
+    /// The treadmill's distance in metres, kept with an indoor run in Apple Health.
+    nonisolated static let machineDistanceKey = "EndurancrMachineDistance"
+
     /// The reps go into Health twice: as Apple's workout segments, which the Fitness
     /// app shows, and as one metadata entry endurancr reads back with their targets.
     fileprivate func saveReps(to builder: HKWorkoutBuilder, endingAt date: Date) async throws {
-        guided?.finish(distance: distanceMeters, elapsed: elapsedSeconds, date: date)
-        reps = guided?.reps ?? []
-        guided = nil
-        ticker?.invalidate()
-        ticker = nil
+        closeReps(at: date)   // already done at Finish; here for a run ended elsewhere
         guard let json = RepReport.encode(reps) else { return }
         try await builder.addMetadata([RepReport.metadataKey: json])
         let segments = reps.map { rep in
@@ -622,6 +730,8 @@ private struct RunContext: Codable {
     var plannedWorkout: PlannedWorkout?
     var zones: PaceZones?
     var goalName: String
+    /// Optional, so a context saved by an older build still reads.
+    var indoor: Bool? = nil
 
     private static let key = "activeRunContext"
 
@@ -682,13 +792,20 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
             case .paused:
                 isPaused = true
                 sendToPhone(force: true)
+            case .ended where !hasBegun:
+                // Ended during the countdown: nothing was recorded, nothing to save.
+                isPreparing = false
+                locationManager.stopUpdatingLocation()
+                RunContext.clear()
+                session = nil
+                builder = nil
+                routeBuilder = nil
             case .ended:
                 // Finished here, or with Finish on the iPhone's Live Activity.
                 didFinish = true
+                closeReps(at: date)
                 isRunning = false
                 isAutoPaused = false
-                ticker?.invalidate()
-                ticker = nil
                 locationManager.stopUpdatingLocation()
                 Task { await self.saveWorkout(endingAt: date) }
             default:
