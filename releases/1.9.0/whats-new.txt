@@ -1,0 +1,9 @@
+Plans that start where you are
+- When you make a plan, endurancr reads the last six weeks of runs in Apple Health: your weekly distance and your longest run of the last month.
+- If you already run more than a beginner's start, the plan starts there: the first weeks at your weekly distance, and the long run near your longest.
+- Already running more than the race asks for? The peak week rises to a little above what you run, within a limit for the race.
+- You see the numbers on the goal screen under Your running, and can change them or switch them off.
+- New to running, or under 10 km a week? Your plan is exactly as before.
+
+When you outgrow the plan
+- If you run well over the plan for two weeks, Today offers to start the weeks ahead from what you run. It never does it by itself, and never in the taper or race week.

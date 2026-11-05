@@ -7,6 +7,7 @@ the details and reasons behind each text are in `docs/APP_STORE.md`.
 
 | Version | Build | Date | What changed |
 |---|---|---|---|
+| [1.9.0](1.9.0/UPLOAD.md) | 51 | 2026-11-05 | Plans that start from how much you already run, and a step up when you outgrow them |
 | [1.8.0](1.8.0/UPLOAD.md) | 50 | 2026-11-05 | Indoor runs in km/h, runs in Calendar, a watch that never waits from Start to Saved |
 | [1.7.0](1.7.0/UPLOAD.md) | 47 | 2026-10-30 | Strides on the clock: two taps, each 20 s burst counted down, every one saved and shown |
 | [1.6.0](1.6.0/UPLOAD.md) | 43 | 2026-10-25 | A second watch page during the run (this km, to go), hold to finish, done today |
