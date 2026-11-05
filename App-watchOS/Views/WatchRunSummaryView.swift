@@ -71,6 +71,17 @@ struct WatchRunSummaryView: View {
         }())
         .navigationTitle("Run complete")
         .navigationBarTitleDisplayMode(.inline)
+        #if DEBUG
+        .task {
+            // `-demoScreen flow`: the save confirms, then a turn to the week and Done.
+            guard DemoMode.isOn, DemoMode.screen == "flow" else { return }
+            try? await Task.sleep(for: .seconds(4.5))
+            withAnimation { page = summary.reps.isEmpty ? .week : .reps }
+            guard !summary.reps.isEmpty else { return }
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation { page = .week }
+        }
+        #endif
         // No tap here: holding Finish already gave the run's last one.
     }
 

@@ -74,7 +74,11 @@ final class HealthKitService {
     ///
     /// `heartRate: false` skips even those, for screens that never show it.
     func fetchRuns(since date: Date, heartRate: Bool = true) async -> [CompletedRun] {
-        if DemoMode.isOn { return DemoMode.runs.filter { $0.date >= date } }
+        if DemoMode.isOn {
+            // `-demoSlowHealth YES`: answer as a busy watch would, to show the loading.
+            if UserDefaults.standard.bool(forKey: "demoSlowHealth") { try? await Task.sleep(for: .seconds(2.5)) }
+            return DemoMode.runs.filter { $0.date >= date }
+        }
         let workouts = await fetchRunningWorkouts(since: date)
         let bpm = HKUnit.count().unitDivided(by: .minute())
         let rates: [Int: Double] = await withTaskGroup(of: (Int, Double?).self) { group in

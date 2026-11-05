@@ -193,9 +193,10 @@ final class WorkoutManager: NSObject {
         didFinish = true
         saveState = .saving
         isRunning = false
-        // A demo has no Health to save to: say saved after the time a real save takes.
+        // A demo has no Health to save to: say saved after the time a slow real save
+        // takes, so the summary is seen saving before it's saved.
         Task {
-            try? await Task.sleep(for: .seconds(1.6))
+            try? await Task.sleep(for: .seconds(3.4))
             saveState = .saved
         }
     }
@@ -628,6 +629,10 @@ final class WorkoutManager: NSObject {
     }
 
     func end() {
+        #if DEBUG
+        // A demo run has no session: Finish plays the demo's save instead.
+        if DemoMode.isOn, session == nil, isRunning { demoFinish(); return }
+        #endif
         // Set synchronously so the view's dismiss handler sees the explicit finish
         // even for a zero-distance run.
         didFinish = true

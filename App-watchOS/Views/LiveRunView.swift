@@ -32,6 +32,8 @@ struct LiveRunView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// The countdown's size, growing with the watch's text size setting.
     @ScaledMetric(relativeTo: .largeTitle) private var countdownSize: CGFloat = 62
+    /// `-demoScreen flow`: tells Finish to hold itself, once its page is showing.
+    @State private var demoHold = false
     @State private var page: Page = {
         #if DEBUG
         // `-demoRunPage details`: open on the second page, for screenshots.
@@ -69,6 +71,17 @@ struct LiveRunView: View {
         }
         .tabViewStyle(.verticalPage)
         .demoTurnPages($page, through: UserDefaults.standard.bool(forKey: "demoStepCard") ? [] : [.details, .controls])
+        #if DEBUG
+        .task {
+            // `-demoScreen flow`: a few seconds of running, then the controls page,
+            // where Finish is held.
+            guard DemoMode.isOn, DemoMode.screen == "flow" else { return }
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation { page = .controls }
+            try? await Task.sleep(for: .seconds(1.6))
+            demoHold = true
+        }
+        #endif
         .navigationTitle(workout.isAutoPaused ? "Auto-paused" : workout.isPaused ? "Paused" : "Running")
         .navigationBarTitleDisplayMode(.inline)
         // Leaving the screen would leave the run recording with no way back to it;
@@ -490,8 +503,8 @@ struct LiveRunView: View {
             .controlSize(.large)
 
             // Held for a second, so a brush of the wrist doesn't end the run.
-            HoldToFinishButton {
-                workout.end()   // the screen closes when the run stops (onChange above)
+            HoldToFinishButton(demoHold: demoHold) {
+                workout.end()   // RunFlowView moves on to the finish when the run stops
             }
         }
     }
@@ -654,6 +667,8 @@ private struct StepCardView: View {
 /// run ends when it's full, with a tap on the wrist. Letting go early does nothing.
 /// VoiceOver gets a plain Finish action, as holding is hard there.
 struct HoldToFinishButton: View {
+    /// Demo screenshots only: hold the button as a finger would.
+    var demoHold = false
     let onFinish: () -> Void
     @State private var holding = false
     @State private var progress: CGFloat = 0
@@ -686,5 +701,17 @@ struct HoldToFinishButton: View {
             .accessibilityHint("Hold for one second to finish")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { onFinish() }
+            #if DEBUG
+            .onChange(of: demoHold) { _, hold in
+                guard hold, DemoMode.isOn else { return }
+                holding = true
+                withAnimation(.linear(duration: 1)) { progress = 1 }
+                Task {
+                    try? await Task.sleep(for: .seconds(1))
+                    WKInterfaceDevice.current().play(.success)
+                    onFinish()
+                }
+            }
+            #endif
     }
 }

@@ -233,12 +233,8 @@ private struct DemoRunFlow: View {
                                        weekCompletedMeters: run.weekDone, weekTargetMeters: run.weekTarget)
             }
         }
-        .task {
-            // The countdown, then about eight seconds of the run, then Finish.
-            try? await Task.sleep(for: .seconds(11))
-            WKInterfaceDevice.current().play(.success)
-            workout.demoFinish()
-        }
+        // The run screen turns to its controls and holds Finish by itself
+        // (`LiveRunView`, `HoldToFinishButton`), so the demo ends the way a run does.
     }
 
     init() {
