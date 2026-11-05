@@ -23,10 +23,13 @@ final class PlanCalendar {
     private let store = EKEventStore()
     private static let enabledKey = "calendarSync"
     private static let calendarKey = "calendarIdentifier"
-    private static let urlPrefix = "endurancr://run/"
+    nonisolated private static let urlPrefix = "endurancr://run/"
 
-    /// Whether the runs are being kept in Calendar.
-    private(set) var isOn = UserDefaults.standard.bool(forKey: enabledKey)
+    /// Whether the runs are being kept in Calendar: switched on here, and still
+    /// allowed in Settings. Access taken away there turns the switch off with it,
+    /// rather than leaving it on while nothing syncs.
+    var isOn: Bool { wanted && EKEventStore.authorizationStatus(for: .event) == .fullAccess }
+    private var wanted = UserDefaults.standard.bool(forKey: enabledKey)
     /// Why turning it on didn't work, for the alert.
     var problem: String?
     private var pending: Task<Void, Never>?
@@ -56,14 +59,14 @@ final class PlanCalendar {
             problem = "Calendar couldn't make a calendar for your runs. Check that an account in Settings > Apps > Calendar allows new calendars."
             return
         }
-        isOn = true
+        wanted = true
         UserDefaults.standard.set(true, forKey: Self.enabledKey)
         sync(plan, now: true)
     }
 
     /// Stops and removes the "endurancr" calendar with its events.
     func turnOff() {
-        isOn = false
+        wanted = false
         UserDefaults.standard.set(false, forKey: Self.enabledKey)
         pending?.cancel()
         if let calendar = calendar(create: false) {
@@ -77,17 +80,23 @@ final class PlanCalendar {
     /// one sync for all of them is enough. `nil` clears the coming runs.
     func sync(_ plan: TrainingPlan?, now: Bool = false) {
         guard isOn, !DemoMode.isOn || Self.demoAllowed,
-              EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return }
+              let id = calendar(create: true)?.calendarIdentifier else { return }
         pending?.cancel()
         pending = Task {
             if !now { try? await Task.sleep(for: .seconds(1.5)) }
             guard !Task.isCancelled else { return }
-            apply(plan)
+            // A hundred-odd event writes and a commit: off the main thread, so a
+            // sync right after launch can't make Today stutter. EventKit is used
+            // from the background with a store of its own, as Apple advises.
+            await Task.detached(priority: .utility) {
+                Self.apply(plan, calendarID: id)
+            }.value
         }
     }
 
-    private func apply(_ plan: TrainingPlan?) {
-        guard let calendar = calendar(create: true) else { return }
+    nonisolated private static func apply(_ plan: TrainingPlan?, calendarID: String) {
+        let store = EKEventStore()
+        guard let calendar = store.calendar(withIdentifier: calendarID) else { return }
         let cal = Calendar.current
         let today = cal.startOfDay(for: .now)
         let end = cal.date(byAdding: .day, value: 1,
@@ -98,7 +107,7 @@ final class PlanCalendar {
         let existing = store.events(matching: store.predicateForEvents(withStart: today, end: horizon, calendars: [calendar]))
         var byID: [String: EKEvent] = [:]
         for event in existing {
-            guard let key = event.url?.absoluteString, key.hasPrefix(Self.urlPrefix) else { continue }
+            guard let key = event.url?.absoluteString, key.hasPrefix(urlPrefix) else { continue }
             if byID[key] != nil { try? store.remove(event, span: .thisEvent, commit: false) } else { byID[key] = event }
         }
 
@@ -106,11 +115,11 @@ final class PlanCalendar {
         for workout in plan?.allWorkouts ?? [] where workout.type.isRunning {
             let day = cal.startOfDay(for: workout.date)
             guard day >= today else { continue }
-            let key = Self.urlPrefix + workout.id.uuidString
+            let key = urlPrefix + workout.id.uuidString
             wanted.insert(key)
             let event = byID[key] ?? EKEvent(eventStore: store)
-            let title = Self.title(workout)
-            let notes = Self.notes(workout, plan: plan!)
+            let title = title(workout)
+            let notes = notes(workout, plan: plan!)
             let changed = event.calendar != calendar || event.title != title || event.notes != notes
                 || !event.isAllDay || event.startDate.map { cal.startOfDay(for: $0) } != day
             guard changed else { continue }
@@ -156,7 +165,7 @@ final class PlanCalendar {
     }
 
     /// "Intervals · 6 × 1 km", "Long run · 15 km", "Race day · Hamburg Marathon".
-    static func title(_ workout: PlannedWorkout) -> String {
+    nonisolated static func title(_ workout: PlannedWorkout) -> String {
         let kind = Format.workoutTitle(workout.type)
         if workout.type == .raceDay { return "\(kind) · \(Format.distance(workout.distanceMeters))" }
         // Strides are part of an easy run: its distance first, the strides after.
@@ -170,7 +179,7 @@ final class PlanCalendar {
     }
 
     /// The run's distance, paces and steps, as on Today, and where it comes from.
-    static func notes(_ workout: PlannedWorkout, plan: TrainingPlan) -> String {
+    nonisolated static func notes(_ workout: PlannedWorkout, plan: TrainingPlan) -> String {
         var lines = ["\(Format.distance(workout.distanceMeters)), \(Format.paceRange(workout.targetPaceSecPerKm))"]
         if let structure = workout.structure {
             let steps = Format.workoutSteps(structure, zones: plan.paceZones)

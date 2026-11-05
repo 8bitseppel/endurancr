@@ -161,6 +161,10 @@ private struct TreadmillDistanceView: View {
     let onDone: (Double?) -> Void
     /// In tens of metres, so a turn of the Crown moves it by 0.01 km.
     @State private var tens: Double
+    /// The Crown only turns a view that has focus, so the number takes it at once.
+    @FocusState private var crownFocused: Bool
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .largeTitle) private var numberSize: CGFloat = 40
 
     init(estimate: Double, onDone: @escaping (Double?) -> Void) {
         self.estimate = estimate
@@ -172,13 +176,17 @@ private struct TreadmillDistanceView: View {
         VStack(spacing: 6) {
             Text("Treadmill distance")
                 .font(.headline)
+                .lineLimit(1).minimumScaleFactor(0.7)
             Text(Format.distance(tens * 10))
-                .font(.system(size: 40, weight: .bold, design: .rounded))
+                .font(.system(size: min(numberSize, 56), weight: .bold, design: .rounded))
                 .monospacedDigit()
+                .lineLimit(1).minimumScaleFactor(0.6)
                 .contentTransition(.numericText())
                 .focusable()
+                .focused($crownFocused)
                 .digitalCrownRotation($tens, from: 0, through: 10_000, by: 1,
                                       sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
+                .accessibilityLabel("Treadmill distance")
                 .accessibilityValue(Format.distance(tens * 10))
                 .accessibilityAdjustableAction { direction in
                     switch direction {
@@ -187,10 +195,14 @@ private struct TreadmillDistanceView: View {
                     default: break
                     }
                 }
-            Text("Turn the Crown to match it. The watch measured \(Format.distance(estimate)).")
-                .font(.caption2).foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+            // At the largest text sizes the hint goes, so Save stays on the screen;
+            // the number and the Crown explain themselves.
+            if !typeSize.isAccessibilitySize {
+                Text("Turn the Crown to what the treadmill shows. The watch measured \(Format.distance(estimate)).")
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3).minimumScaleFactor(0.8)
+            }
             Button {
                 onDone(tens * 10)
             } label: {
@@ -203,5 +215,6 @@ private struct TreadmillDistanceView: View {
         }
         .padding(.horizontal, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { crownFocused = true }
     }
 }

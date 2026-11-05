@@ -239,9 +239,19 @@ final class WorkoutManager: NSObject {
     private(set) var needsMachineDistance = false
     private var machineDistanceWaiter: CheckedContinuation<Double?, Never>?
 
+    /// Answered before the save asked (the save starts when HealthKit reports the
+    /// session stopped, which can come after the treadmill screen is answered).
+    private var earlyMachineDistance: Double??
+    /// Which run a two-minute timeout belongs to, so an old one can't answer a newer run.
+    private var machineDistanceRun = UUID()
+
     /// The treadmill's distance, or `nil` to keep the watch's. Saves the run.
     func confirmMachineDistance(_ meters: Double?) {
-        guard needsMachineDistance else { return }
+        guard needsMachineDistance else {
+            // The save hasn't asked yet: keep the answer for when it does.
+            if isIndoor, saveState != .saved, saveState != .failed { earlyMachineDistance = .some(meters) }
+            return
+        }
         needsMachineDistance = false
         machineDistanceMeters = meters
         machineDistanceWaiter?.resume(returning: meters)
@@ -251,10 +261,18 @@ final class WorkoutManager: NSObject {
     /// Waits for the treadmill's distance, for at most two minutes: a run left on the
     /// wrist unanswered is saved with the watch's own distance rather than lost.
     private func awaitMachineDistance() async -> Double? {
+        if let early = earlyMachineDistance {
+            earlyMachineDistance = nil
+            machineDistanceMeters = early
+            return early
+        }
         needsMachineDistance = true
+        let run = UUID()
+        machineDistanceRun = run
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(120))
-            self?.confirmMachineDistance(nil)
+            guard let self, self.machineDistanceRun == run else { return }
+            self.confirmMachineDistance(nil)
         }
         return await withCheckedContinuation { machineDistanceWaiter = $0 }
     }
@@ -363,6 +381,8 @@ final class WorkoutManager: NSObject {
         isPreparing = false
         hasBegun = false
         machineDistanceMeters = nil
+        earlyMachineDistance = nil
+        machineDistanceRun = UUID()
         saidPlanDone = false
     }
 
@@ -638,7 +658,11 @@ final class WorkoutManager: NSObject {
         didFinish = true
         closeReps(at: Date())
         locationManager.stopUpdatingLocation()
-        session?.end()
+        // Stopped, not ended: a stopped session still keeps the app running in the
+        // background, so the save (and, indoors, the wait for the treadmill's
+        // distance) can't be cut short when the wrist drops. The session ends once
+        // the run is saved (`saveWorkout`), as Apple's workout samples do it.
+        session?.stopActivity(with: .now)
         isRunning = false
     }
 
@@ -680,6 +704,9 @@ final class WorkoutManager: NSObject {
         saveState = .saving
         RunContext.clear()
         defer {
+            // Saved or not, the session can end now; it was kept stopped, not
+            // ended, only so the app stayed awake for the save.
+            if let session, session.state != .ended { session.end() }
             session = nil
             self.builder = nil
         }
@@ -805,8 +832,20 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
                 session = nil
                 builder = nil
                 routeBuilder = nil
+            case .stopped:
+                // Finished here: saved while the stopped session keeps the app awake.
+                didFinish = true
+                closeReps(at: date)
+                isRunning = false
+                isAutoPaused = false
+                locationManager.stopUpdatingLocation()
+                Task { await self.saveWorkout(endingAt: date) }
+            case .ended where saveState != .idle:
+                // The end that follows our own save: nothing more to do.
+                break
             case .ended:
-                // Finished here, or with Finish on the iPhone's Live Activity.
+                // Finished with Finish on the iPhone's Live Activity, which ends the
+                // mirrored session outright: save straight away.
                 didFinish = true
                 closeReps(at: date)
                 isRunning = false

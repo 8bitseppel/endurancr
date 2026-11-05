@@ -14,6 +14,8 @@ struct WatchTodayView: View {
 
     @Environment(HealthKitService.self) private var health
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
     /// Today, refreshed when the app comes back, so a watch app kept in memory
     /// overnight shows this morning's session, not yesterday's.
     @State private var today = Calendar.current.startOfDay(for: .now)
@@ -226,9 +228,11 @@ struct WatchTodayView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .phaseAnimator([0.55, 1]) { content, opacity in content.opacity(opacity) } animation: { _ in
-                .easeInOut(duration: 0.9)
-            }
+            // A gentle pulse says it's loading; still with Reduce Motion, and in
+            // Always On, where nothing should move.
+            .phaseAnimator(reduceMotion || isLuminanceReduced ? [0.7] : [0.55, 1]) { content, opacity in
+                content.opacity(opacity)
+            } animation: { _ in .easeInOut(duration: 0.9) }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Loading this week")
         } else if let weekProgress, weekProgress.currentWeekPlannedMeters > 0 {

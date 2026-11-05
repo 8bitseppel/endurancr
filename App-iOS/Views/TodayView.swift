@@ -11,6 +11,7 @@ struct TodayView: View {
     let coordinator: PlanCoordinator
     @State private var recorder = PhoneWorkoutManager.shared
     @State private var calendar = PlanCalendar.shared
+    @State private var confirmCalendarOff = false
     @State private var showLiveRun = false
     @State private var runSummary: RunSummaryData?
     @State private var showingGoalEditor = false
@@ -49,6 +50,12 @@ struct TodayView: View {
             }
             .background { BrandBackground() }
             .navigationBarTitleDisplayMode(.inline)
+            .confirmationDialog("Remove your runs from Calendar?", isPresented: $confirmCalendarOff, titleVisibility: .visible) {
+                Button("Remove the endurancr calendar", role: .destructive) { calendar.turnOff() }
+                Button("Keep it", role: .cancel) {}
+            } message: {
+                Text("The endurancr calendar and its runs are removed from Calendar on all your devices. Your plan stays as it is.")
+            }
             .alert("Couldn't add your runs to Calendar", isPresented: Binding(
                 get: { calendar.problem != nil }, set: { if !$0 { calendar.problem = nil } }
             )) {
@@ -77,7 +84,9 @@ struct TodayView: View {
                                     if on {
                                         Task { await calendar.turnOn(plan: coordinator.displayPlan) }
                                     } else {
-                                        calendar.turnOff()
+                                        // Removing a calendar reaches every device on the
+                                        // account, so it's asked first.
+                                        confirmCalendarOff = true
                                     }
                                 }
                             )) {

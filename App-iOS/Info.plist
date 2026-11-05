@@ -34,7 +34,7 @@
         <string>UIInterfaceOrientationPortrait</string>
     </array>
     <key>NSCalendarsFullAccessUsageDescription</key>
-    <string>endurancr puts your plan's runs in a calendar of its own, called endurancr, and moves or removes them when the plan changes. Your other calendars and events are never read or changed.</string>
+    <string>endurancr puts your plan's runs in a calendar of its own, called endurancr, and moves or removes them when the plan changes. Your other calendars and events aren't touched.</string>
     <key>NSHealthShareUsageDescription</key>
     <string>endurancr reads your runs, routes, heart rate, resting heart rate, VO2 max, steps, running speed and power from Apple Health to track your progress and adapt your training plan. This data stays on your device and is never sent anywhere.</string>
     <key>NSHealthUpdateUsageDescription</key>

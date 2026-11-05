@@ -800,7 +800,7 @@ endurancr is a training aid, not medical advice. Talk to a doctor before you sta
 
 ### Build
 
-1.8.0 (49). Build 48 was an earlier 1.8.0 archive with a 3, 2, 1 countdown before the run; use 49.
+1.8.0 (50). Builds 48 and 49 were earlier 1.8.0 archives (48 with a countdown before the run, 49 before the Apple reviews: a run kept alive until saved, the Crown on the treadmill screen, calendar removal confirmed); use 50.
 
 ### Screenshots
 
