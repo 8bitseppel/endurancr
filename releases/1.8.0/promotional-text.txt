@@ -1,1 +1,1 @@
-Run indoors: no GPS, targets as speeds for the treadmill. Put your runs in Calendar. And a watch that never makes you wait, from Start to Saved to Health.
+Plans that start from how much you already run, indoor runs in km/h, your runs in Calendar, and a watch that never makes you wait, from Start to Saved to Health.
