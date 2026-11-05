@@ -17,10 +17,20 @@ public struct VDOTPlanGenerator: PlanGenerator {
     public static let minimumDays = 14
     private let minimumDays = VDOTPlanGenerator.minimumDays
 
+    /// The plan without a training history: for a beginner, or from older inputs.
+    public func makePlan(goal: Goal, fitness: FitnessSnapshot, startDate: Date,
+                         calendar: Calendar = .current) throws -> TrainingPlan {
+        try makePlan(goal: goal, fitness: fitness, startDate: startDate, history: [], calendar: calendar)
+    }
+
+    /// `history` sizes the plan from how much the athlete already runs
+    /// (`TrainingHistory`); without it, or for someone running little, the plan is
+    /// exactly the plan for a beginner.
     public func makePlan(
         goal: Goal,
         fitness: FitnessSnapshot,
         startDate: Date,
+        history: [TrainingHistory],
         calendar: Calendar = .current
     ) throws -> TrainingPlan {
         guard fitness.distanceMeters > 0, fitness.timeSeconds > 0 else {
@@ -73,19 +83,58 @@ public struct VDOTPlanGenerator: PlanGenerator {
         let raceOffsetInWeek = calendar.dateComponents([.day], from: raceWeekStart, to: race0).day ?? 0  // 0...6 (Mon…Sun)
 
         let dpw = min(6, max(3, goal.daysPerWeek))
-        let peakVol = Self.peakWeeklyVolume(for: goal.race)
         let cap = Self.longRunCap(for: goal.race)
-        let progressionVolumes = Self.progressionVolumes(count: max(0, total - 3), peak: peakVol)
+        let buildWeeks = max(0, total - 3)
+        // How much the athlete already runs, each reading from its own week on: the
+        // one from when the plan was made at week 0, a step up later at its week.
+        let readings: [(week: Int, history: TrainingHistory)] = history
+            .filter { $0.weeklyMeters >= TrainingHistory.minimumWeeklyMeters }
+            .map { h in
+                let days = calendar.dateComponents([.day], from: firstWeekStart, to: calendar.startOfDay(for: h.asOf)).day ?? 0
+                return (max(0, days / 7), h)
+            }
+            .sorted { $0.week < $1.week }
+        // The peak rises to a little above what's already run, when that's more than
+        // the race asks for, within a ceiling for the race. Each reading's peak counts
+        // from its own week on: a step up raising it can't change the weeks before.
+        func raised(_ peak: Double, by r: TrainingHistory) -> Double {
+            max(peak, min(r.weeklyMeters * 1.10, Self.peakWeeklyCeiling(for: goal.race)))
+        }
+        let tablePeak = Self.peakWeeklyVolume(for: goal.race)
+        let basePeak = readings.filter { $0.week == 0 }.reduce(tablePeak) { raised($0, by: $1.history) }
+        let peakVol = readings.reduce(basePeak) { raised($0, by: $1.history) }
+        // The build starts at the table's start or at what's already run, whichever is
+        // more; each later reading lifts the weeks from its own on, never lowering one.
+        var progressionVolumes = Self.progressionVolumes(count: buildWeeks, peak: basePeak)
+        var peakSoFar = basePeak
+        for r in readings {
+            peakSoFar = raised(peakSoFar, by: r.history)
+            let lifted = Self.progressionVolumes(count: buildWeeks, peak: peakSoFar,
+                                                 start: min(peakSoFar, r.history.weeklyMeters), from: r.week)
+            for i in progressionVolumes.indices where i >= r.week {
+                progressionVolumes[i] = max(progressionVolumes[i], lifted[i])
+            }
+        }
         // The marathon and the half build their long run to a set peak, 3 weeks out,
-        // whatever share of the week that is (see `longRunTargets`).
+        // whatever share of the week that is (see `longRunTargets`). Someone already
+        // running long starts from their longest recent run, never past the peak.
         let longTargets: [Double] = Self.peakLongRun(for: goal.race).map { peakLong in
             let firstVolume = isMaintenance
                 ? Self.maintenanceVolume(weekPhase: .maintenance, race: goal.race)
                 : progressionVolumes.first ?? peakVol
             let firstFraction = Self.longRunFraction(for: isMaintenance ? .maintenance : .base)
-            return Self.longRunTargets(count: max(0, total - 3), peak: peakLong,
-                                       start: firstFraction * firstVolume)
+            var targets = Self.longRunTargets(count: buildWeeks, peak: peakLong,
+                                              start: firstFraction * firstVolume)
+            for r in readings where r.history.longestMeters > 0 {
+                let lifted = Self.longRunTargets(count: buildWeeks, peak: peakLong,
+                                                 start: min(peakLong, r.history.longestMeters), from: r.week,
+                                                 holdingStart: true)
+                for j in targets.indices where j >= r.week { targets[j] = max(targets[j], lifted[j]) }
+            }
+            return targets
         } ?? []
+        // A maintenance plan holds what's already run, if that's more than its own level.
+        let heldVolume = readings.last.map { min($0.history.weeklyMeters, Self.peakWeeklyCeiling(for: goal.race)) } ?? 0
 
         var weeks: [TrainingWeek] = []
         for i in 0..<total {
@@ -109,7 +158,9 @@ public struct VDOTPlanGenerator: PlanGenerator {
                     return Self.taperLongRun(weeksOut: weeksOut, race: goal.race, peak: peakLong)
                 }
                 var volume = isMaintenance
-                    ? Self.maintenanceVolume(weekPhase: phase, race: goal.race)
+                    ? (phase == .maintenance
+                        ? max(Self.maintenanceVolume(weekPhase: phase, race: goal.race), heldVolume)
+                        : Self.maintenanceVolume(weekPhase: phase, race: goal.race))
                     : Self.weeklyVolume(
                         weekIndex: i, total: total, phase: phase,
                         progression: progressionVolumes, peak: peakVol
@@ -201,15 +252,21 @@ public struct VDOTPlanGenerator: PlanGenerator {
     /// Cutbacks are counted back from the last progression week (3 weeks before race
     /// day): the week before it, then every 4th week further out. That keeps the peak
     /// long run 3 weeks out in a full week, with a lighter week before it.
-    static func progressionVolumes(count: Int, peak: Double) -> [Double] {
+    /// The build's weekly volumes: from `start` (55% of the peak unless the athlete
+    /// already runs more) up 8% a week to the peak, with a lighter week every fourth.
+    /// With `from`, the build only begins at that week, the weeks before it 0: a
+    /// step up accepted partway through lifts the weeks from its own on.
+    static func progressionVolumes(count: Int, peak: Double, start: Double? = nil, from: Int = 0) -> [Double] {
         guard count > 0 else { return [] }
-        let start = 0.55 * peak
+        let start = max(0.55 * peak, start ?? 0)
         var out: [Double] = []
         var trend = start
         for j in 0..<count {
             let isCutback = isCutbackWeek(j, count: count)
-            if j == 0 {
-                out.append(trend)
+            if j < from {
+                out.append(0)
+            } else if j == from {
+                out.append(isCutback ? trend * 0.70 : trend)
             } else if isCutback {
                 out.append(trend * 0.70)
             } else {
@@ -218,6 +275,19 @@ public struct VDOTPlanGenerator: PlanGenerator {
             }
         }
         return out
+    }
+
+    /// The most a week may grow to for someone who already runs a lot, so the plan
+    /// follows them without becoming a different sport: about Pfitzinger's highest
+    /// marathon plans.
+    static func peakWeeklyCeiling(for race: RaceDistance) -> Double {
+        switch race {
+        case .marathon: return 130_000
+        case .halfMarathon: return 100_000
+        case .tenK: return 90_000
+        case .fiveK: return 80_000
+        case .custom(let m): return min(130_000, max(80_000, m * 3))
+        }
     }
 
     static func weeklyVolume(
@@ -274,11 +344,18 @@ public struct VDOTPlanGenerator: PlanGenerator {
     /// back to 65% between them, then 2 km less for every week further out, with the
     /// same 65% step back in each cutback week. Growing at most 2 km a week from
     /// `start` caps it, so a short plan stops short of the peak.
-    static func longRunTargets(count: Int, peak: Double, start: Double) -> [Double] {
+    /// With `from`, the growth from `start` begins at that week; weeks before it are 0.
+    /// `holdingStart` is for someone who already runs long: their long run never
+    /// drops below `start` for the shape's early, shorter weeks. A beginner's build
+    /// (`holdingStart: false`) is the shape as it always was.
+    static func longRunTargets(count: Int, peak: Double, start: Double, from: Int = 0,
+                               holdingStart: Bool = false) -> [Double] {
         (0..<count).map { j in
+            guard j >= from else { return 0 }
             let weeksBeforeLast = count - 1 - j
-            let shape = weeksBeforeLast <= 2 ? peak : peak - longRunStep * Double(weeksBeforeLast - 2)
-            let target = min(shape, start + longRunStep * Double(j))
+            var shape = weeksBeforeLast <= 2 ? peak : peak - longRunStep * Double(weeksBeforeLast - 2)
+            if holdingStart { shape = max(shape, min(start, peak)) }
+            let target = min(shape, start + longRunStep * Double(j - from))
             return isCutbackWeek(j, count: count) ? 0.65 * target : target
         }
     }

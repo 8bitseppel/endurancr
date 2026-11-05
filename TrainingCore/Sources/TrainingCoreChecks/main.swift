@@ -1646,6 +1646,81 @@ h.suite("Workout steps") {
 
 // MARK: Another session
 
+// MARK: Training history
+
+h.suite("Training history") {
+    let gen = VDOTPlanGenerator()
+    let goal = Goal(race: .marathon, raceDate: date(2027, 4, 25), daysPerWeek: 5)
+    let fitness = FitnessSnapshot(distanceMeters: 10_000, timeSeconds: 45 * 60, date: date(2026, 1, 1))
+    let start = date(2026, 1, 1)
+    let base = try gen.makePlan(goal: goal, fitness: fitness, startDate: start, calendar: cal)
+    func plan(_ history: [TrainingHistory]) throws -> TrainingPlan {
+        try gen.makePlan(goal: goal, fitness: fitness, startDate: start, history: history, calendar: cal)
+    }
+    func volumes(_ p: TrainingPlan) -> [Double] { p.weeks.map(\.plannedVolumeMeters) }
+    func longest(_ w: TrainingWeek) -> Double { w.workouts.filter { $0.type == .longRun }.map(\.distanceMeters).max() ?? 0 }
+
+    // A beginner's plan doesn't move by a metre.
+    h.check(try plan([]) == base, "no history: the same plan as before")
+    let little = TrainingHistory(asOf: start, weeklyMeters: 8_000, longestMeters: 6_000, runsPerWeek: 2, weeks: 6)
+    h.check(try plan([little]) == base, "running a little: still the beginner's plan")
+
+    // Someone running 72 km a week with a 30 km long run starts where they are.
+    let lots = TrainingHistory(asOf: start, weeklyMeters: 72_000, longestMeters: 30_000, runsPerWeek: 5, weeks: 6)
+    let experienced = try plan([lots])
+    let first = experienced.weeks[1]   // week 0 may start mid-week
+    h.check(first.plannedVolumeMeters >= 72_000 && first.plannedVolumeMeters <= 72_000 * 1.08 + 500,
+            "an experienced runner starts at their own volume, one 8% step on (\(Int(first.plannedVolumeMeters / 1_000)) km, the beginner \(Int(base.weeks[1].plannedVolumeMeters / 1_000)) km)")
+    h.check((volumes(experienced).max() ?? 0) >= 79_000 && (volumes(experienced).max() ?? 0) <= 80_000,
+            "the peak rises to 10% over what they run (\(Int((volumes(experienced).max() ?? 0) / 1_000)) km)")
+    h.check(longest(first) >= 28_000, "the long run starts near their longest (\(Int(longest(first) / 1_000)) km)")
+    h.check(experienced.weeks.allSatisfy { longest($0) <= 32_000 + 0.5 }, "the long run never passes the marathon's peak of 32 km")
+    h.check(zip(volumes(experienced), volumes(base)).allSatisfy { $0 >= $1 - 0.5 },
+            "no week is lighter than the beginner's")
+    let huge = TrainingHistory(asOf: start, weeklyMeters: 200_000, longestMeters: 40_000, runsPerWeek: 10, weeks: 6)
+    h.check((volumes(try plan([huge])).max() ?? 0) <= 130_000 + 0.5, "and never past the race's ceiling of 130 km")
+
+    // A step up eight weeks in lifts those weeks on, and leaves the ones before.
+    let later = TrainingHistory(asOf: cal.date(byAdding: .day, value: 8 * 7, to: base.weeks[0].startDate)!,
+                                weeklyMeters: 70_000, longestMeters: 26_000, runsPerWeek: 5, weeks: 2)
+    let stepped = try plan([later])
+    h.check(Array(volumes(stepped).prefix(8)) == Array(volumes(base).prefix(8)), "a step up leaves the weeks before it as they were")
+    h.check(volumes(stepped)[8] > volumes(base)[8] + 5_000, "and lifts its own week on")
+
+    // The reading itself: averaged over the weeks run, not over one long week.
+    let today = date(2026, 3, 1)
+    let runs = (1...18).map { i in
+        CompletedRun(date: cal.date(byAdding: .day, value: -i * 2, to: today)!,
+                     distanceMeters: i == 3 ? 28_000 : 12_000, durationSeconds: 3_600)
+    }
+    let read = TrainingHistory.make(runs: runs, asOf: today, calendar: cal)
+    h.check(read != nil && abs((read?.weeklyMeters ?? 0) - (17 * 12_000 + 28_000) / 5.0) < 2_000,
+            "reads the weekly average over the weeks since the first run (\(Int((read?.weeklyMeters ?? 0) / 1_000)) km)")
+    h.check(read?.longestMeters == 28_000, "and the longest run of the last 30 days")
+    h.check(TrainingHistory.make(runs: [runs[0]], asOf: today, calendar: cal) == nil, "one run isn't a history")
+    h.check(PlanInputs(goal: goal, fitness: fitness, startDate: start).history.isEmpty,
+            "plans from before 1.9.0 have no history")
+
+    // The buddy offers a step up only for two weeks well over the plan.
+    let asOf = cal.date(byAdding: .day, value: 10 * 7 + 3, to: base.weeks[0].startDate)!
+    let week = base.weeks.first { $0.startDate <= asOf && asOf < cal.date(byAdding: .day, value: 7, to: $0.startDate)! }!
+    func runsAt(_ share: Double) -> [CompletedRun] {
+        (1...14).map { i in
+            CompletedRun(date: cal.date(byAdding: .day, value: -i, to: asOf)!,
+                         distanceMeters: week.plannedVolumeMeters * share / 7, durationSeconds: 3_000)
+        } + (15...42).map { i in
+            CompletedRun(date: cal.date(byAdding: .day, value: -i, to: asOf)!,
+                         distanceMeters: week.plannedVolumeMeters * share / 7, durationSeconds: 3_000)
+        }
+    }
+    let buddy = TrainingBuddy()
+    let over = buddy.status(plan: base, completedRuns: runsAt(1.5), asOf: asOf, calendar: cal)
+    h.check(over.stepUp != nil, "two weeks at 150% of the plan: a step up is offered")
+    h.check((over.stepUp?.weeklyMeters ?? 0) > week.plannedVolumeMeters * 1.1, "from what's run lately")
+    let onPlan = buddy.status(plan: base, completedRuns: runsAt(1.0), asOf: asOf, calendar: cal)
+    h.check(onPlan.stepUp == nil, "running the plan: nothing to offer")
+}
+
 h.suite("Another session") {
     let plan = try marathonPlan()
     let all = plan.allWorkouts

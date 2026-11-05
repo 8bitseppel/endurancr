@@ -20,6 +20,33 @@ struct TodayView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var showingOther = false
 
+
+    /// What the buddy says about the week, with the step up when one is offered.
+    @ViewBuilder private var buddyCard: some View {
+        if let buddy = coordinator.buddy, !buddy.message.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Label {
+                    Text(buddy.message).font(.subheadline)
+                } icon: {
+                    Image(systemName: buddy.phase.symbol).foregroundStyle(.tint)
+                }
+                // Offered, never done for you: the weeks ahead start from
+                // what you've been running if you say so.
+                if let step = buddy.stepUp {
+                    Button {
+                        coordinator.stepUp(step)
+                    } label: {
+                        Label("Plan from \(Int((step.weeklyMeters / 1_000).rounded())) km a week", systemImage: "arrow.up.right")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.glass)
+                }
+            }
+            .brandCard()
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -32,18 +59,14 @@ struct TodayView: View {
                             .brandCard()
                     }
                     startButton
+                    // An offer to act on (a step up) comes right under Start, where
+                    // it's seen; a plain note about the week stays at the bottom.
+                    if coordinator.buddy?.stepUp != nil { buddyCard }
                     if let plan = coordinator.displayPlan {
                         weekStrip(plan)
                         if let next = nextRun(plan) { nextRunCard(next) }
                     }
-                    if let buddy = coordinator.buddy, !buddy.message.isEmpty {
-                        Label {
-                            Text(buddy.message).font(.subheadline)
-                        } icon: {
-                            Image(systemName: buddy.phase.symbol).foregroundStyle(.tint)
-                        }
-                        .brandCard()
-                    }
+                    if coordinator.buddy?.stepUp == nil { buddyCard }
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)

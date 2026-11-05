@@ -28,6 +28,13 @@ struct GoalEditorView: View {
     @State private var recentSeconds: Int
     @State private var healthRun: CompletedRun?
 
+    // How much they already run, read from Health, so an experienced runner's plan
+    // starts where they are (`TrainingHistory`). Shown, and adjustable.
+    @State private var reading: TrainingHistory?
+    @State private var useReading = true
+    @State private var weeklyKm = 0
+    @State private var longestKm = 0
+
     @State private var draftPeriods: [UnavailablePeriod]
     /// The screen pushed on top of the form. One `navigationDestination(item:)`
     /// instead of one per screen: two `isPresented` destinations on the same stack
@@ -149,6 +156,7 @@ struct GoalEditorView: View {
                 restDaysSection
                 targetSection
                 recentEffortSection
+                if reading != nil { yourRunningSection }
                 vacationSection
                 if isEditing {
                     Section {
@@ -162,6 +170,22 @@ struct GoalEditorView: View {
             }
             .brandList()
             .navigationTitle(isEditing ? "Edit Goal" : "New Plan")
+            .task {
+                // How much they already run. When editing, the reading the plan was made
+                // with; otherwise a fresh one from the last six weeks.
+                if reading == nil {
+                    if let existing = coordinator.inputs?.history.first {
+                        reading = existing
+                    } else if let since = Calendar.current.date(byAdding: .day, value: -7 * TrainingHistory.lookbackWeeks, to: .now) {
+                        reading = TrainingHistory.make(runs: await coordinator.health.fetchRuns(since: since, heartRate: false), asOf: .now)
+                    }
+                    if let reading {
+                        weeklyKm = Int((reading.weeklyMeters / 5_000).rounded()) * 5
+                        longestKm = Int((reading.longestMeters / 1_000).rounded())
+                        useReading = coordinator.inputs.map { !$0.history.isEmpty } ?? true
+                    }
+                }
+            }
             .navigationBarTitleDisplayMode(.inline)
             .demoAutoScroll()
             .scrollDismissesKeyboard(.interactively)
@@ -369,6 +393,30 @@ struct GoalEditorView: View {
         }
     }
 
+    /// What Apple Health says they run, so the plan can start there instead of at a
+    /// beginner's first weeks. The numbers can be changed if a week was unusual.
+    private var yourRunningSection: some View {
+        Section {
+            if let reading {
+                Text("From Apple Health, the last \(reading.weeks) weeks: about \(Int((reading.weeklyMeters / 1_000).rounded())) km a week, longest run \(Int((reading.longestMeters / 1_000).rounded())) km.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            Toggle("Start the plan from my running", isOn: $useReading)
+            if useReading {
+                Stepper("\(weeklyKm) km a week", value: $weeklyKm, in: 10...200, step: 5)
+                    .monospacedDigit()
+                Stepper("Longest run \(longestKm) km", value: $longestKm, in: 3...45)
+                    .monospacedDigit()
+            }
+        } header: {
+            Text("Your running")
+        } footer: {
+            Text(useReading
+                 ? "The first weeks start at what you run now, and the long run near your longest, instead of building up from a beginner's level. Change the numbers if the last weeks weren't usual for you."
+                 : "The plan builds up from a beginner's level, about half of its peak week.")
+        }
+    }
+
     private var vacationSection: some View {
         Section {
             ForEach(draftPeriods.sorted { $0.start < $1.start }) { period in
@@ -453,11 +501,21 @@ struct GoalEditorView: View {
                 date: .now
             )
         }
+        // The reading as shown, with the numbers as set; step ups accepted later
+        // stay as they were.
+        let laterSteps = Array((coordinator.inputs?.history ?? []).dropFirst())
+        let history: [TrainingHistory] = {
+            guard let reading, useReading else { return isEditing ? laterSteps : [] }
+            var set = reading
+            set.weeklyMeters = Double(weeklyKm) * 1_000
+            set.longestMeters = Double(longestKm) * 1_000
+            return [set] + laterSteps
+        }()
         do {
             if isEditing {
-                try coordinator.update(goal: goal, fitness: fitness, startDate: startDate)
+                try coordinator.update(goal: goal, fitness: fitness, startDate: startDate, history: history)
             } else {
-                try coordinator.createPlan(goal: goal, fitness: fitness, startDate: startDate)
+                try coordinator.createPlan(goal: goal, fitness: fitness, startDate: startDate, history: history)
             }
             dismiss()
             Task { await coordinator.recalculate() }

@@ -138,10 +138,11 @@ final class PlanCoordinator {
     /// Generates a fresh plan and replaces any existing one. Running days per week
     /// and rest-weekday rules are read from `goal`. `startDate` is when training
     /// begins (defaults to today; the user can choose a later date).
-    func createPlan(goal: Goal, fitness: FitnessSnapshot, startDate: Date = .now) throws {
+    func createPlan(goal: Goal, fitness: FitnessSnapshot, startDate: Date = .now,
+                    history: [TrainingHistory] = []) throws {
         // Build once up front so invalid inputs throw before we touch the store.
-        let plan = try generator.makePlan(goal: goal, fitness: fitness, startDate: startDate, calendar: .current)
-        let newInputs = PlanInputs(goal: goal, fitness: fitness, startDate: startDate)
+        let newInputs = PlanInputs(goal: goal, fitness: fitness, startDate: startDate, history: history)
+        let plan = try newInputs.makePlan(calendar: .current)
 
         // Single active plan: clear old ones.
         try context.delete(model: StoredPlan.self)
@@ -155,14 +156,17 @@ final class PlanCoordinator {
     /// plan. `startDate` defaults to the existing plan's start so history isn't
     /// rewritten unless the user deliberately changes when training begins.
     /// Follow with `refreshAdaptation()` to re-apply adaptation from HealthKit.
-    func update(goal: Goal, fitness: FitnessSnapshot, startDate: Date? = nil) throws {
+    func update(goal: Goal, fitness: FitnessSnapshot, startDate: Date? = nil,
+                history: [TrainingHistory]? = nil) throws {
         guard let existing = inputs else {
-            try createPlan(goal: goal, fitness: fitness, startDate: startDate ?? .now)
+            try createPlan(goal: goal, fitness: fitness, startDate: startDate ?? .now, history: history ?? [])
             return
         }
         let start = startDate ?? existing.startDate
-        // Days the athlete moved stay moved when only the goal or rules change.
-        let newInputs = PlanInputs(goal: goal, fitness: fitness, startDate: start, daySwaps: existing.daySwaps)
+        // Days the athlete moved stay moved when only the goal or rules change, and
+        // so do the readings of how much they run, unless they were edited.
+        let newInputs = PlanInputs(goal: goal, fitness: fitness, startDate: start, daySwaps: existing.daySwaps,
+                                   history: history ?? existing.history)
         let plan = try newInputs.makePlan(calendar: .current)
         inputs = newInputs
         persistInputs()
@@ -328,6 +332,14 @@ final class PlanCoordinator {
         )
         fatigue = result.fatigue
         buddy = result.buddy
+        #if DEBUG
+        // `-demoStepUp YES`: the step up offered on Today, for its screenshot.
+        if DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoStepUp"), var shown = buddy {
+            shown.stepUp = TrainingHistory(asOf: .now, weeklyMeters: 64_000, longestMeters: 24_000, runsPerWeek: 5, weeks: 2)
+            shown.message = "You've run well over the plan for two weeks, about 64 km a week. The weeks ahead can start from what you run, if you like."
+            buddy = shown
+        }
+        #endif
         pacing = result.pacing
         currentPlan = result.plan
     }
@@ -356,6 +368,20 @@ final class PlanCoordinator {
     /// Starts `offer` today: a session from later in the week swaps its day with today.
     func adopt(_ offer: SessionOffers.Offer) {
         if let from = offer.movesFrom { swapDays(.now, from) }
+    }
+
+    /// Accepts the buddy's offer (`TrainingBuddy.Status.stepUp`): the weeks from
+    /// this one on start from what the athlete has been running. Earlier weeks keep
+    /// what they were, so past days still compare against what was planned.
+    func stepUp(_ reading: TrainingHistory) {
+        guard var updated = inputs, let plan = try? {
+            updated.history.append(reading)
+            return try updated.makePlan(calendar: .current)
+        }() else { return }
+        inputs = updated
+        persistInputs()
+        currentPlan = plan
+        Task { await refreshAdaptation() }
     }
 
     func swapDays(_ a: Date, _ b: Date) {

@@ -56,6 +56,10 @@ public struct TrainingBuddy: Sendable {
         public var vdotFactor: Double
         /// One friendly line about this week.
         public var message: String
+        /// Offered, not applied: the athlete has run well over the plan for two weeks,
+        /// and the weeks ahead could start from what they actually run. Accepting it
+        /// adds this reading to the plan's inputs (`PlanInputs.history`). `nil` otherwise.
+        public var stepUp: TrainingHistory?
 
         public var isEasingBack: Bool {
             if case .easingBack = phase { return true }
@@ -84,7 +88,7 @@ public struct TrainingBuddy: Sendable {
         var status = Status(
             phase: .starting, completion: completion, recentWeeklyMeters: recentWeekly,
             longestRecentMeters: longest, longestRecentBreakDays: breakDays,
-            vdotFactor: 1, message: ""
+            vdotFactor: 1, message: "", stepUp: nil
         )
 
         // No runs in the plan yet: nothing to judge (and no Health access looks the
@@ -112,6 +116,10 @@ public struct TrainingBuddy: Sendable {
         case 0.9...:
             status.phase = .onTrack
             status.message = "You're running the plan, so it keeps building step by step."
+            if let offer = stepUpOffer(plan: plan, runs: runs, completion: completion, today: today, calendar: calendar) {
+                status.stepUp = offer
+                status.message = "You've run well over the plan for two weeks, about \(Self.km(offer.weeklyMeters)) a week. The weeks ahead can start from what you run, if you like."
+            }
         case 0.75..<0.9:
             status.phase = .holding
             status.message = "The last two weeks were a little lighter, so this week stays at your last full week instead of growing."
@@ -120,6 +128,28 @@ public struct TrainingBuddy: Sendable {
             status.message = "The last two weeks were lighter, so the coming weeks build from what you ran, a little more each week."
         }
         return status
+    }
+
+    // MARK: Stepping up
+
+    /// Two weeks at 115% of the plan or more is a habit rather than one long run: the
+    /// plan may follow it. Only while the plan is still building (not in the taper or
+    /// race week, where more would undo the point), and only when what's run is
+    /// clearly more than this week asks, so a reading never lowers anything.
+    static let stepUpCompletion = 1.15
+
+    func stepUpOffer(plan: TrainingPlan, runs: [CompletedRun], completion: Double,
+                     today: Date, calendar: Calendar) -> TrainingHistory? {
+        guard completion >= Self.stepUpCompletion,
+              let week = plan.weeks.first(where: { contains($0, today, calendar) }),
+              [.base, .build, .peak, .maintenance].contains(week.phase),
+              let reading = TrainingHistory.make(runs: runs, asOf: today, calendar: calendar),
+              reading.weeklyMeters > week.plannedVolumeMeters * 1.10 else { return nil }
+        // Over the last two weeks only: that's what the 115% was measured on.
+        var recent = reading
+        recent.weeklyMeters = max(week.plannedVolumeMeters * 1.10,
+                                  Self.distance(of: runs, from: day(-14, today, calendar), to: today, calendar: calendar) / 2)
+        return recent
     }
 
     // MARK: Adjusting the plan

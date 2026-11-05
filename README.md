@@ -110,6 +110,12 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   the run and on that day in Plan: reps against their target, strides counted and timed,
   "All 6 strides done, 3:14 to 3:31/km". Strides are never judged against a pace and
   never count as a hard session.
+- Plans start from how much you run: the last six weeks in Apple Health (weekly
+  distance, longest run of the last month) set the first weeks, the long run and,
+  when you already run more than the race asks for, the peak (up to 130 km for the
+  marathon). Shown and editable on the goal screen; under 10 km a week the plan is
+  the beginner's. Two weeks at 115% of the plan or more, and Today offers to start
+  the weeks ahead from what you run; never by itself, never in the taper.
 - Indoor runs on Apple Watch, a turn of the Crown below today's run: no GPS, distance
   from the motion sensors, targets as speeds (a treadmill is set in km/h), and the
   treadmill's distance typed in on the Crown at the end, which the plan counts.
