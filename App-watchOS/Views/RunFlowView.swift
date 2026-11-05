@@ -3,8 +3,8 @@ import TrainingCore
 import WatchKit
 
 /// A run from the tap on Start to the summary, on one screen that changes in place:
-/// the countdown, the run, the finish, the treadmill's distance after an indoor run,
-/// and the summary. Nothing in between goes back to the home screen, and nothing
+/// the run, the finish, the treadmill's distance after an indoor run, and the
+/// summary. Nothing in between goes back to the home screen, and nothing
 /// waits for Health: the summary opens from what the watch already knows, and only
 /// its "Saving to Health" line waits for the save, changing in place when it's done.
 struct RunFlowView: View {
@@ -17,7 +17,7 @@ struct RunFlowView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var phase: Phase
 
-    enum Phase: Equatable { case countdown, running, finishing, treadmill, summary }
+    enum Phase: Equatable { case running, finishing, treadmill, summary }
     @State private var summary: WatchRunSummary?
     /// What the run came to, kept as it was the moment Finish was held, for the
     /// finish screen.
@@ -29,23 +29,12 @@ struct RunFlowView: View {
         self.plannedWorkout = plannedWorkout
         self.zones = zones
         self.makeSummary = makeSummary
-        _phase = State(initialValue: workout.isPreparing ? .countdown : .running)
+        _phase = State(initialValue: .running)
     }
 
     var body: some View {
         ZStack {
             switch phase {
-            case .countdown:
-                CountdownView(isIndoor: workout.isIndoor) {
-                    workout.begin()
-                    // The run starting is one of the few moments worth a tap.
-                    WKInterfaceDevice.current().play(.start)
-                    withAnimation(.smooth(duration: 0.35)) { phase = .running }
-                } onCancel: {
-                    workout.end()
-                    dismiss()
-                }
-                .transition(.opacity)
             case .running:
                 LiveRunView(workout: workout, plannedWorkout: plannedWorkout, zones: zones)
                     .transition(.asymmetric(insertion: .opacity, removal: .opacity.combined(with: .scale(scale: 0.92))))
@@ -101,65 +90,6 @@ struct RunFlowView: View {
         built.durationSeconds = final.seconds
         summary = built
         withAnimation(.smooth(duration: 0.5)) { phase = .summary }
-    }
-}
-
-/// 3, 2, 1 before the run, as in Apple's Workout app. It isn't only a ceremony:
-/// the session is prepared during it, so GPS and heart rate are settled by the
-/// time the clock starts and the first screen isn't a row of dashes. A tap skips it.
-private struct CountdownView: View {
-    let isIndoor: Bool
-    let onDone: () -> Void
-    let onCancel: () -> Void
-    @State private var count = 3
-    @State private var progress: CGFloat = 0
-    @State private var done = false
-
-    var body: some View {
-        VStack(spacing: 8) {
-            ZStack {
-                Circle().stroke(.tint.opacity(0.25), lineWidth: 8)
-                Circle()
-                    .trim(from: 0, to: progress)
-                    .stroke(.tint, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                Text("\(count)")
-                    .font(.system(size: 64, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .contentTransition(.numericText(countsDown: true))
-            }
-            .frame(width: 120, height: 120)
-            Text(isIndoor ? "Indoor run, no GPS" : "Getting GPS and heart rate")
-                .font(.footnote).foregroundStyle(.secondary)
-                .lineLimit(1).minimumScaleFactor(0.7)
-            Button("Cancel", role: .cancel, action: onCancel)
-                .font(.footnote)
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .contentShape(.rect)
-        .onTapGesture { finish() }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Starting in \(count)")
-        .accessibilityAction(named: "Start now") { finish() }
-        .accessibilityAction(named: "Cancel") { onCancel() }
-        .task {
-            withAnimation(.linear(duration: 3)) { progress = 1 }
-            for next in [2, 1] {
-                try? await Task.sleep(for: .seconds(1))
-                guard !done else { return }
-                withAnimation(.smooth) { count = next }
-            }
-            try? await Task.sleep(for: .seconds(1))
-            finish()
-        }
-    }
-
-    private func finish() {
-        guard !done else { return }
-        done = true
-        onDone()
     }
 }
 

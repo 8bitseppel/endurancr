@@ -313,11 +313,12 @@ struct WatchTodayView: View {
         beginRun()
     }
 
-    /// Prepares the run and opens the countdown; the run itself begins when the
-    /// countdown ends (`RunFlowView`).
+    /// Starts the run the moment Start is tapped. The first seconds show "--" while
+    /// heart rate and GPS lock on; a countdown before the clock wouldn't make GPS
+    /// any faster, it would only make you wait.
     private func beginRun(indoor: Bool = false) {
-        guard workout.prepare(plannedWorkout: runWorkout, zones: runZones,
-                              goalName: currentPlan?.goal.name ?? "", indoor: indoor) else {
+        guard workout.start(plannedWorkout: runWorkout, zones: runZones,
+                            goalName: currentPlan?.goal.name ?? "", indoor: indoor) else {
             startError = workout.lastError ?? "The run couldn't start."
             return
         }

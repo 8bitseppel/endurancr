@@ -116,9 +116,9 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   GymKit pairing is Apple's Workout app's only; runs recorded there count too.
 - Runs in Calendar: the plan's runs as all-day events in a calendar of their own,
   "endurancr", from today to race day, moved and changed when the plan changes.
-- On the watch, Start counts down 3, 2, 1 while GPS and heart rate settle, and after
-  Finish a check draws itself and the summary follows at once, without waiting for
-  Apple Health; its first line confirms the save when it's done.
+- On the watch, the run starts the moment you tap Start, and after Finish a check
+  draws itself and the summary follows at once, without waiting for Apple Health;
+  its first line confirms the save when it's done.
 - Start another session: this week's hard session moved to today (swapping the days),
   an interval session of the plan's size in a week with only one, or strides. Only when
   it fits: not in base weeks, not the day after a hard session or the long run, not the

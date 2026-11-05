@@ -10,7 +10,6 @@ Runs in Calendar
 - When the plan changes, the calendar changes with it. Turn it off and the calendar goes again.
 
 A smoother watch
-- Start counts down 3, 2, 1 while GPS and heart rate settle, so the run starts with real numbers.
 - Holding Finish no longer drops you on the home screen. A check draws itself with your distance and time, then the summary follows straight away.
 - The summary no longer waits for Apple Health. It says Saving to Health and turns into Saved to Health when it's done.
 - The home screen and every list of runs open faster: endurancr reads far less from Apple Health to show the same thing.

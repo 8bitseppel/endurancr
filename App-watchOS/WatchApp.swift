@@ -218,8 +218,7 @@ private struct IntervalRunSimulation: View {
 }
 
 /// `-demoScreen flow`: a run from Start to the summary, the way it plays on the
-/// wrist: the countdown, a few seconds of running, Hold to finish, the finish and
-/// the summary, with a save that confirms after a moment. `-demoIndoor YES` adds
+/// wrist: a few seconds of running, Hold to finish, the finish and the summary, with a save that confirms after a moment. `-demoIndoor YES` adds
 /// the treadmill's distance after the finish.
 private struct DemoRunFlow: View {
     @State private var workout = WorkoutManager.demo
@@ -239,8 +238,8 @@ private struct DemoRunFlow: View {
 
     init() {
         let manager = WorkoutManager.demo
-        manager.isRunning = false
         manager.demoPrepare(indoor: UserDefaults.standard.bool(forKey: "demoIndoor"))
+        manager.begin()
         _workout = State(initialValue: manager)
     }
 }

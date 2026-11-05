@@ -736,7 +736,7 @@ to finish and the old Progress wording. Everything is in `releases/1.7.0/`.
 
 ### Promotional text (170)
 
-Run indoors: no GPS, targets as speeds for the treadmill. Put your runs in Calendar. And a watch that never makes you wait, from the countdown to Saved to Health.
+Run indoors: no GPS, targets as speeds for the treadmill. Put your runs in Calendar. And a watch that never makes you wait, from Start to Saved to Health.
 
 ### What's New (4000)
 
@@ -752,7 +752,6 @@ Runs in Calendar
 - When the plan changes, the calendar changes with it. Turn it off and the calendar goes again.
 
 A smoother watch
-- Start counts down 3, 2, 1 while GPS and heart rate settle, so the run starts with real numbers.
 - Holding Finish no longer drops you on the home screen. A check draws itself with your distance and time, then the summary follows straight away.
 - The summary no longer waits for Apple Health. It says Saving to Health and turns into Saved to Health when it's done.
 - The home screen and every list of runs open faster: endurancr reads far less from Apple Health to show the same thing.
@@ -801,10 +800,10 @@ endurancr is a training aid, not medical advice. Talk to a doctor before you sta
 
 ### Build
 
-1.8.0 (48).
+1.8.0 (49). Build 48 was an earlier 1.8.0 archive with a 3, 2, 1 countdown before the run; use 49.
 
 ### Screenshots
 
-New: `watch-9-finish` (the countdown, the run, the finish and the summary, as a video)
+New: `watch-9-finish` (Hold to finish, the check, the summary saving and saved, as a video)
 and `watch-10-indoor` (an indoor run in km/h). The rest is unchanged from 1.7.0.
 Everything is in `releases/1.8.0/`.

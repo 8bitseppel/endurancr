@@ -150,7 +150,7 @@ final class WorkoutManager: NSObject {
     /// The demo's running speed, so its live pace reads as on target.
     func setDemoSpeed(_ metersPerSecond: Double) { currentSpeed = metersPerSecond }
 
-    /// A demo run waiting at its countdown, for `-demoScreen flow`.
+    /// A demo run about to begin, for `-demoScreen flow`.
     func demoPrepare(indoor: Bool) {
         isIndoor = indoor
         isPreparing = true
@@ -221,13 +221,13 @@ final class WorkoutManager: NSObject {
         return elapsedSeconds / (distanceMeters / 1_000)
     }
 
-    /// Whether the session is warming up for the countdown: created and prepared,
+    /// Whether the session is prepared but not yet begun: created and prepared,
     /// sensors on, nothing recorded yet. `begin()` starts the run itself.
     private(set) var isPreparing = false
     /// A run on a treadmill or indoor track: no GPS and no route, distance from the
     /// watch's motion sensors, and the distance the machine shows typed in at the end.
     private(set) var isIndoor = false
-    /// Whether the session ever began recording, so a countdown that never finished
+    /// Whether the session ever began recording, so a session ended before it began
     /// doesn't try to save an empty workout.
     private var hasBegun = false
 
@@ -259,7 +259,7 @@ final class WorkoutManager: NSObject {
         return await withCheckedContinuation { machineDistanceWaiter = $0 }
     }
 
-    /// Starts recording right away, without a countdown. Returns false (with
+    /// Starts recording right away: prepares the session and begins it. Returns false (with
     /// `lastError` set) when HealthKit refuses, e.g. without Health access, so no
     /// empty run screen opens.
     @discardableResult
@@ -271,8 +271,8 @@ final class WorkoutManager: NSObject {
     }
 
     /// Creates and prepares the workout session, as Apple's Workout app does at its
-    /// countdown: the sensors and GPS come on and settle, nothing is recorded yet.
-    /// Call `begin()` when the countdown ends. Returns false (with `lastError` set)
+    /// countdown: the sensors and GPS come on, nothing is recorded yet. `begin()`
+    /// starts the clock; `start` does both at once, as Start on the watch does. Returns false (with `lastError` set)
     /// when HealthKit refuses.
     @discardableResult
     func prepare(plannedWorkout: PlannedWorkout? = nil, zones: PaceZones? = nil, goalName: String = "",
@@ -312,7 +312,7 @@ final class WorkoutManager: NSObject {
     /// Starts the prepared run: the clock and the recording begin now.
     func begin() {
         #if DEBUG
-        // A demo flow has no session: the countdown still leads into the run.
+        // A demo flow has no session: it begins without one.
         if DemoMode.isOn, session == nil, isPreparing {
             isPreparing = false
             hasBegun = true
@@ -798,7 +798,7 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
                 isPaused = true
                 sendToPhone(force: true)
             case .ended where !hasBegun:
-                // Ended during the countdown: nothing was recorded, nothing to save.
+                // Ended before it began: nothing was recorded, nothing to save.
                 isPreparing = false
                 locationManager.stopUpdatingLocation()
                 RunContext.clear()
