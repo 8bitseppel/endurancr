@@ -1,0 +1,16 @@
+Indoor runs
+- On a treadmill or an indoor track, turn the Crown below today's run on the watch and choose Indoor run. Today's session with all its guidance, or a free run.
+- GPS stays off, and the distance comes from the watch's motion sensors.
+- A treadmill is set in km/h, so indoors the run screen shows your speed and the speed to set it to.
+- After the run, turn the Crown to the distance the treadmill shows. Your plan counts the treadmill's number.
+
+Runs in Calendar
+- Turn on Runs in Calendar in the menu on Today, and your plan's runs appear in a calendar of their own, called endurancr.
+- All-day events from today to race day, with the paces and steps in the notes. No alerts.
+- When the plan changes, the calendar changes with it. Turn it off and the calendar goes again.
+
+A smoother watch
+- Start counts down 3, 2, 1 while GPS and heart rate settle, so the run starts with real numbers.
+- Holding Finish no longer drops you on the home screen. A check draws itself with your distance and time, then the summary follows straight away.
+- The summary no longer waits for Apple Health. It says Saving to Health and turns into Saved to Health when it's done.
+- The home screen and every list of runs open faster: endurancr reads far less from Apple Health to show the same thing.

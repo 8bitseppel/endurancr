@@ -83,7 +83,12 @@ final class PlanCoordinator {
 
     /// The plan as the user should see it: canonical schedule with the goal's
     /// unavailable periods blanked out from today forward.
-    private(set) var displayPlan: TrainingPlan?
+    private(set) var displayPlan: TrainingPlan? {
+        didSet { onDisplayPlanChange?(displayPlan) }
+    }
+    /// Told every time the shown plan changes, deleted goal included. The iPhone
+    /// keeps its Calendar in step through it (`PlanCalendar`).
+    var onDisplayPlanChange: ((TrainingPlan?) -> Void)?
     /// What the Plan tab shows on each day and week: what was run, what changed
     /// from the plan built from the goal, and what each week is for.
     private(set) var review: PlanReview?

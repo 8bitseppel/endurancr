@@ -188,6 +188,19 @@ shot "$WATCH" app.endurancr.watchkitapp - watch-6-another -demoOffers offer -dem
 rec_sim "$WATCH" app.endurancr.watchkitapp intervals watch-7-strides 312 12 50 -demoStrides YES
 # The strides after the run, with their times and paces.
 rec "$WATCH" app.endurancr.watchkitapp summary watch-8-strides-done 312 25 -demoReps strides -demoRepsPage YES
+# A run from Start to the summary: the countdown, the run, Finish, the check, the
+# summary saving and saved. The still is the finish.
+rec_sim "$WATCH" app.endurancr.watchkitapp flow watch-9-finish 312 20 19
+xcrun simctl terminate "$WATCH" app.endurancr.watchkitapp 2>/dev/null || true
+xcrun simctl launch "$WATCH" app.endurancr.watchkitapp -demo -demoScreen flow >/dev/null
+sleep 12.6
+xcrun simctl io "$WATCH" screenshot --type=png "$OUT/watch-9-finish.png" >/dev/null 2>&1
+# An indoor run: speeds, not paces, and no GPS.
+xcrun simctl terminate "$WATCH" app.endurancr.watchkitapp 2>/dev/null || true
+xcrun simctl launch "$WATCH" app.endurancr.watchkitapp -demo -demoScreen flow -demoIndoor YES >/dev/null
+sleep 6
+xcrun simctl io "$WATCH" screenshot --type=png "$OUT/watch-10-indoor.png" >/dev/null 2>&1
+echo "    $OUT/watch-10-indoor.png"
 python3 scripts/watch-clock.py
 
 echo "==> Done"

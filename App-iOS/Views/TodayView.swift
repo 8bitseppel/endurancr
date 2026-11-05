@@ -10,6 +10,7 @@ struct TodayView: View {
 
     let coordinator: PlanCoordinator
     @State private var recorder = PhoneWorkoutManager.shared
+    @State private var calendar = PlanCalendar.shared
     @State private var showLiveRun = false
     @State private var runSummary: RunSummaryData?
     @State private var showingGoalEditor = false
@@ -48,6 +49,13 @@ struct TodayView: View {
             }
             .background { BrandBackground() }
             .navigationBarTitleDisplayMode(.inline)
+            .alert("Couldn't add your runs to Calendar", isPresented: Binding(
+                get: { calendar.problem != nil }, set: { if !$0 { calendar.problem = nil } }
+            )) {
+                Button("OK") { calendar.problem = nil }
+            } message: {
+                Text(calendar.problem ?? "")
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -60,6 +68,21 @@ struct TodayView: View {
                             showingDataManagement = true
                         } label: {
                             Label("Storage & backup", systemImage: "arrow.up.arrow.down.circle")
+                        }
+                        if coordinator.inputs != nil {
+                            // A toggle, so the menu shows a check while it's on.
+                            Toggle(isOn: Binding(
+                                get: { calendar.isOn },
+                                set: { on in
+                                    if on {
+                                        Task { await calendar.turnOn(plan: coordinator.displayPlan) }
+                                    } else {
+                                        calendar.turnOff()
+                                    }
+                                }
+                            )) {
+                                Label("Runs in Calendar", systemImage: "calendar")
+                            }
                         }
                         if coordinator.inputs != nil {
                             Divider()

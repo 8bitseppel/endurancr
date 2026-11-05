@@ -18,7 +18,8 @@ for f in iphone-1-welcome.png iphone-2-goal.gif iphone-2-goal.png iphone-3-today
          iphone-11-strides.png \
          watch-1-today.png watch-2-run.gif watch-2-run.png watch-3-summary.gif watch-3-summary.png \
          watch-4-intervals.png watch-5-reps.png watch-6-another.png \
-         watch-7-strides.gif watch-7-strides.png watch-8-strides-done.png; do
+         watch-7-strides.gif watch-7-strides.png watch-8-strides-done.png \
+         watch-9-finish.gif watch-9-finish.png watch-10-indoor.png; do
   cp "$S/$f" docs/screenshots/
 done
 
@@ -44,6 +45,8 @@ cp $S/watch-5-reps.png      $A/watch-5-reps.png
 cp $S/watch-6-another.png   $A/watch-6-another.png
 cp $S/watch-7-strides.png   $A/watch-7-strides.png
 cp $S/watch-8-strides-done.png $A/watch-8-strides-done.png
+cp $S/watch-9-finish.png    $A/watch-9-finish.png
+cp $S/watch-10-indoor.png   $A/watch-10-indoor.png
 
 python3 - <<'PY'
 from pathlib import Path
@@ -67,7 +70,7 @@ PY
 
 # Videos for the website. +igndts: the Simulator's recordings confuse ffmpeg's
 # timing otherwise (see screenshots.sh).
-for n in iphone-2-goal iphone-2-goal-dark iphone-6-progress iphone-6-progress-dark watch-1-today watch-2-run watch-3-summary watch-4-intervals watch-5-reps watch-7-strides watch-8-strides-done; do
+for n in iphone-2-goal iphone-2-goal-dark iphone-6-progress iphone-6-progress-dark watch-1-today watch-2-run watch-3-summary watch-4-intervals watch-5-reps watch-7-strides watch-8-strides-done watch-9-finish; do
   w=440; case $n in watch*) w=340;; esac
   ffmpeg -loglevel error -y -fflags +igndts -i "build/screenshots/$n.mov" \
     -vf "fps=30,scale=$w:-2:flags=lanczos" -c:v libx264 -crf 26 -pix_fmt yuv420p -movflags +faststart -an \

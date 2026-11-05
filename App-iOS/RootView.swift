@@ -45,7 +45,16 @@ struct RootView: View {
         }
         .task {
             if coordinator == nil {
-                coordinator = PlanCoordinator(context: context, health: health)
+                let made = PlanCoordinator(context: context, health: health)
+                // Calendar follows the plan from here on, and catches up now.
+                made.onDisplayPlanChange = { PlanCalendar.shared.sync($0) }
+                PlanCalendar.shared.sync(made.displayPlan)
+                coordinator = made
+                #if DEBUG
+                if PlanCalendar.demoAllowed, !PlanCalendar.shared.isOn {
+                    await PlanCalendar.shared.turnOn(plan: made.displayPlan)
+                }
+                #endif
             }
             #if DEBUG
             if DemoMode.screen == "run", let planned = DemoMode.todaysWorkout, let plan = DemoMode.plan {
