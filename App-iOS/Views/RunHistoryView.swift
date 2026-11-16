@@ -97,6 +97,14 @@ struct RunDetailView: View {
 
     @State private var avgHR: Double?
 
+    /// Time in each heart rate zone, for a run with heart rate on iOS 27.
+    private var zones: [ZoneTime] {
+        #if DEBUG
+        if DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoZones") { return HeartRateZones.demo }
+        #endif
+        return HeartRateZones.times(in: workout)
+    }
+
     private var distanceMeters: Double { coordinator.health.distanceMeters(for: workout) }
 
     var body: some View {
@@ -120,6 +128,16 @@ struct RunDetailView: View {
                 }
                 LabeledContent("Date", value: workout.startDate.formatted(date: .abbreviated, time: .shortened))
                 LabeledContent("Recorded by", value: workout.sourceRevision.source.name)
+            }
+            if !zones.isEmpty {
+                Section {
+                    ZoneBars(zones: zones)
+                        .padding(.vertical, 6)
+                } header: {
+                    Text("Heart rate zones")
+                } footer: {
+                    Text("Apple Health's zones: the ones set in Health, or Apple's own from your age and resting heart rate.")
+                }
             }
         }
         .brandList()

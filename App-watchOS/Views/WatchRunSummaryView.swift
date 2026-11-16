@@ -44,6 +44,9 @@ struct WatchRunSummaryView: View {
     /// "Saving to Health" turns into "Saved to Health" in place. `nil` uses
     /// `summary.saved`, for a summary built after the save.
     var saveState: WorkoutManager.SaveState? = nil
+    /// Time in each heart rate zone, once the save is done (watchOS 27); its page
+    /// appears then.
+    var zones: [ZoneTime] = []
     @Environment(\.dismiss) private var dismiss
     @State private var page: Page = {
         #if DEBUG
@@ -52,7 +55,19 @@ struct WatchRunSummaryView: View {
         #endif
         return .run
     }()
-    enum Page { case run, reps, week }
+    enum Page { case run, reps, zones, week }
+
+    private var shownZones: [ZoneTime] {
+        #if DEBUG
+        if DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoZones") { return HeartRateZones.demo }
+        #endif
+        return zones
+    }
+
+    /// The pages in order, the ones without anything to show left out.
+    private var pages: [Page] {
+        [.run] + (summary.reps.isEmpty ? [] : [.reps]) + (shownZones.isEmpty ? [] : [.zones]) + [.week]
+    }
 
     var body: some View {
         TabView(selection: $page) {
@@ -60,12 +75,15 @@ struct WatchRunSummaryView: View {
             if !summary.reps.isEmpty {
                 repsPage.tag(Page.reps)
             }
+            if !shownZones.isEmpty {
+                zonesPage.tag(Page.zones)
+            }
             weekPage.tag(Page.week)
         }
         .tabViewStyle(.verticalPage)
         // Every page in turn, from wherever it opens: run, reps, week, round again.
         .demoTurnPages($page, through: {
-            let all: [Page] = summary.reps.isEmpty ? [.run, .week] : [.run, .reps, .week]
+            let all = pages
             let start = all.firstIndex(of: page) ?? 0
             return Array(all[start...] + all[..<start])
         }())
@@ -76,10 +94,10 @@ struct WatchRunSummaryView: View {
             // `-demoScreen flow`: the save confirms, then a turn to the week and Done.
             guard DemoMode.isOn, DemoMode.screen == "flow" else { return }
             try? await Task.sleep(for: .seconds(4.5))
-            withAnimation { page = summary.reps.isEmpty ? .week : .reps }
-            guard !summary.reps.isEmpty else { return }
-            try? await Task.sleep(for: .seconds(3))
-            withAnimation { page = .week }
+            for (i, next) in pages.dropFirst().enumerated() {
+                if i > 0 { try? await Task.sleep(for: .seconds(3)) }
+                withAnimation { page = next }
+            }
         }
         #endif
         // No tap here: holding Finish already gave the run's last one.
@@ -118,6 +136,20 @@ struct WatchRunSummaryView: View {
         .minimumScaleFactor(0.6)
         .frame(maxWidth: .infinity, alignment: .top)
         .padding(.horizontal, 4)
+    }
+
+    /// Time in each heart rate zone, from Apple Health's own zones.
+    private var zonesPage: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Heart rate zones")
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                ZoneBars(zones: shownZones, showsRange: false)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 4)
+        }
     }
 
     /// Page 2 after a session with reps or strides. Strides are only counted and

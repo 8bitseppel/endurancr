@@ -50,7 +50,7 @@ struct RunFlowView: View {
                 .transition(.opacity)
             case .summary:
                 if let summary {
-                    WatchRunSummaryView(summary: summary, saveState: workout.saveState)
+                    WatchRunSummaryView(summary: summary, saveState: workout.saveState, zones: workout.heartRateZones)
                         .transition(.opacity)
                 }
             }

@@ -41,9 +41,13 @@
     <string>endurancr saves the runs it records (workout, distance, energy and GPS route) to Apple Health so they live alongside your other workouts. Nothing leaves your device.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>endurancr uses your location only while you record a run, including with the screen locked, to measure distance and pace and map your route. Your route stays on your device and in Apple Health.</string>
+    <key>NSMotionUsageDescription</key>
+    <string>endurancr counts your steps during an indoor run to measure its distance, since there is no GPS on a treadmill. The numbers stay on your device.</string>
     <key>UIBackgroundModes</key>
     <array>
         <string>location</string>
+        <string>audio</string>
+        <string>workout-processing</string>
     </array>
     <key>NSSupportsLiveActivities</key>
     <true/>

@@ -153,10 +153,12 @@ final class HealthKitService {
             .sumQuantity()?.doubleValue(for: .kilocalorie())
     }
 
-    /// Total distance (meters) of a running workout.
+    /// Total distance (meters) of a running workout: the treadmill's, for an
+    /// indoor run where it was given, as the plan counts it.
     func distanceMeters(for workout: HKWorkout) -> Double {
-        workout.statistics(for: HKQuantityType(.distanceWalkingRunning))?
-            .sumQuantity()?.doubleValue(for: .meter()) ?? 0
+        (workout.metadata?["EndurancrMachineDistance"] as? Double)
+            ?? workout.statistics(for: HKQuantityType(.distanceWalkingRunning))?
+                .sumQuantity()?.doubleValue(for: .meter()) ?? 0
     }
 
     /// Fetches daily resting-heart-rate samples since `date`, for fatigue detection.

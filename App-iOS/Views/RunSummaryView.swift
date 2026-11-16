@@ -34,17 +34,36 @@ struct RunSummaryData: Identifiable {
 
 struct RunSummaryView: View {
     let data: RunSummaryData
+    /// The save as it happens: the summary opens before Health has the run, and
+    /// "Saving to Health" turns into "Saved to Health" in place. `nil` uses `data.saved`.
+    var saveState: PhoneWorkoutManager.SaveState? = nil
     @Environment(\.dismiss) private var dismiss
+
+    private var saving: Bool { saveState == .saving || (saveState == .idle && !data.saved) }
+    private var saved: Bool { saveState.map { $0 == .saved } ?? data.saved }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 10) {
-                        Label(data.saved ? "Saved to Health" : "Could not save to Health",
-                              systemImage: data.saved ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(data.saved ? .green : .orange)
+                        Group {
+                            if saving {
+                                Label {
+                                    Text("Saving to Health")
+                                } icon: {
+                                    ProgressView().controlSize(.small)
+                                }
+                                .foregroundStyle(.secondary)
+                            } else {
+                                Label(saved ? "Saved to Health" : "Could not save to Health",
+                                      systemImage: saved ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                    .foregroundStyle(saved ? .green : .orange)
+                            }
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .contentTransition(.opacity)
+                        .animation(.smooth, value: saving)
                         Text(Format.distance(data.distanceMeters))
                             .font(.system(size: 64, weight: .bold, design: .rounded))
                             .monospacedDigit()

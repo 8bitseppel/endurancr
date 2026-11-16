@@ -2,6 +2,7 @@ import Foundation
 import HealthKit
 import CoreLocation
 import ActivityKit
+import CoreMotion
 import TrainingCore
 
 /// Records a running workout on iPhone — no Apple Watch required — using
@@ -10,9 +11,12 @@ import TrainingCore
 /// HealthKit. It also drives a Live Activity so time/distance/pace show on the
 /// Lock Screen and Dynamic Island while the phone is locked.
 ///
-/// Unlike watchOS there is no `HKWorkoutSession`/`HKLiveWorkoutBuilder` on iOS, so
-/// distance is derived from GPS fixes and elapsed time from a wall-clock timer
-/// (which keeps counting while the app is suspended). Heart rate isn't available
+/// Outdoors, distance is derived from GPS fixes and elapsed time from a wall-clock
+/// timer (which keeps counting while the app is suspended); GPS in the background
+/// keeps the app running. Indoors there's no GPS to do that, so the run is an
+/// `HKWorkoutSession` (iOS 26), which keeps the app running as the watch's does,
+/// and the distance comes from the step counter (`CMPedometer`), with the
+/// treadmill's own number typed in at the end. Heart rate isn't available
 /// without a watch, so it's omitted. The class lives on the main actor:
 /// `CLLocationManager` is created there and calls back there, and HealthKit's
 /// completion handlers hop back with `onMain`.
@@ -25,6 +29,15 @@ final class PhoneWorkoutManager: NSObject {
 
     private let store = HKHealthStore()
     private var builder: HKWorkoutBuilder?
+    /// Indoors only: the session that keeps the app running with GPS off.
+    private var session: HKWorkoutSession?
+    private let pedometer = CMPedometer()
+    /// Indoors: the step counter's distance, all of it, paused stretches included.
+    private var stepMeters: Double = 0
+    /// Indoors: the step counter's metres run while paused, which don't count.
+    private var pausedStepMeters: Double = 0
+    /// Indoors: the step counter's distance when the run was paused.
+    private var stepMetersAtPause: Double?
     private var routeBuilder: HKWorkoutRouteBuilder?
     private let locationManager = CLLocationManager()
     private var activity: Activity<RunActivityAttributes>?
@@ -75,6 +88,27 @@ final class PhoneWorkoutManager: NSObject {
     /// Number of GPS points captured so far (a simple "route is tracking" signal).
     var routePointCount = 0
     var lastError: String?
+    /// A run on a treadmill: no GPS and no route, speed in km/h, the treadmill's
+    /// distance typed in at the end.
+    private(set) var isIndoor = false
+    /// Paused by itself, because you stopped (`RunSettings.autoPause`).
+    private(set) var isAutoPaused = false
+    /// When the runner came to a stop, for auto-pause.
+    private var stillSince: Date?
+    /// Set the moment Finish is held, so the run screen can play the finish even
+    /// for a run too short to summarize.
+    private(set) var didFinish = false
+    /// Which run this is, so a summary is shown once per run.
+    private(set) var runID = UUID()
+    /// The full-screen line at a step change, as `RunCues` built it.
+    private(set) var cue: RunCue?
+    /// The rep already announced with "get ready", so it's announced once.
+    private var readiedStep: Int?
+    /// Indoors: the saved run is waiting for the treadmill's distance.
+    private(set) var needsMachineDistance = false
+    /// Indoors: the distance the treadmill showed, which the plan counts.
+    private(set) var machineDistanceMeters: Double?
+    private var machineDistanceWaiter: CheckedContinuation<Double?, Never>?
 
     /// Whether the finished run reached Apple Health. The summary waits for this
     /// instead of guessing from `lastError`, which also collects GPS hiccups.
@@ -106,6 +140,18 @@ final class PhoneWorkoutManager: NSObject {
     /// Seconds left of a step run by the clock (a stride, or the easy minute before
     /// one); `nil` for a step run by distance.
     var stepSecondsLeft: Double? { guided?.remainingSeconds(elapsed: elapsedSeconds) }
+    /// Metres left of a step run by distance; `nil` for a timed step or the last one.
+    var stepMetersLeft: Double? { guided?.remainingMeters(distance: distanceMeters) }
+    /// How far through the current step, 0 to 1.
+    var stepProgress: Double { guided?.progress(distance: distanceMeters, elapsed: elapsedSeconds) ?? 0 }
+    /// Every step of the session, in order; empty for a free run.
+    var steps: [WorkoutStep] { guided?.steps ?? [] }
+    /// The pace of the last stride that was run, once it's over; `nil` before the first.
+    var lastStridePace: Double? {
+        guided.flatMap { RepReport.strides($0.reps).last?.paceSecPerKm }
+    }
+    /// During a rep or a stride: its average pace so far, the fairest "am I on pace".
+    var thisRepPaceSecPerKm: Double? { guided?.currentPace(distance: distanceMeters, elapsed: elapsedSeconds) }
 
     #if DEBUG
     /// Fills in a run in progress for Simulator screenshots (see `DemoMode`),
@@ -121,14 +167,74 @@ final class PhoneWorkoutManager: NSObject {
         routePointCount = 412
         isRunning = true
     }
+
+    /// `-demoScreen phoneflow`: a guided session from a simulation, through the same
+    /// steps, cues and finish as a real run, without HealthKit, GPS or the step
+    /// counter. `-demoStrides YES` runs an easy run with strides, `-demoIndoor YES`
+    /// runs it on a treadmill. Fast between the parts worth watching.
+    func demoRun(plannedWorkout planned: PlannedWorkout, zones: PaceZones, indoor: Bool) async {
+        self.plannedWorkout = planned
+        targetPace = planned.targetPaceSecPerKm
+        self.zones = zones
+        guided = GuidedRun(workout: planned, zones: zones)
+        isIndoor = indoor
+        didFinish = false
+        runID = UUID()
+        cue = nil
+        readiedStep = nil
+        reps = []
+        saveState = .idle
+        machineDistanceMeters = nil
+        isPaused = false
+        isRunning = true
+        let steps = WorkoutSteps.steps(for: planned, zones: zones)
+        // From 200 m before the strides or the first rep.
+        let hard = steps.first { $0.kind == .stride || $0.kind == .work || $0.seconds != nil }
+        var distance = max(0, (hard?.startMeters ?? 0) - 200)
+        var elapsed = distance / 1_000 * zones.easySecPerKm
+        while distance < planned.distanceMeters + 300, elapsed < 36_000, isRunning {
+            let step = activeStep
+            let pace = (step?.targetPaceSecPerKm ?? zones.easySecPerKm) + (step?.kind == .stride && step?.repNumber == 4 ? 30 : 0)
+            let tick = step?.kind == .stride ? 0.4 : (hard?.kind == .stride ? 6 : 3)
+            distance += 1_000 / pace * tick
+            elapsed += tick
+            distanceMeters = distance
+            elapsedSeconds = elapsed
+            currentPaceSecPerKm = pace
+            advanceSteps()
+            try? await Task.sleep(for: .milliseconds(100))
+            if activeStep?.kind == .cooldown, hard?.kind == .stride {
+                try? await Task.sleep(for: .seconds(4))
+                break
+            }
+        }
+        guard isRunning else { return }
+        guided?.finish(distance: distanceMeters, elapsed: elapsedSeconds, date: .now)
+        reps = guided?.reps ?? []
+        guided = nil
+        didFinish = true
+        saveState = .saving
+        isRunning = false
+        if indoor {
+            let run = runID
+            Task {
+                // The treadmill's number, typed in a moment later, as a runner would.
+                try? await Task.sleep(for: .seconds(5))
+                if runID == run, needsMachineDistance { confirmMachineDistance((distanceMeters * 1.03 / 10).rounded() * 10) }
+            }
+        }
+        if let machine = await awaitMachineDistance() { distanceMeters = machine }
+        try? await Task.sleep(for: .seconds(2))
+        saveState = .saved
+    }
     #endif
 
     func start(
         goalName: String = "", workoutTitle: String = "Run",
         targetPace: ClosedRange<Double>? = nil,
-        plannedWorkout: PlannedWorkout? = nil, zones: PaceZones? = nil
+        plannedWorkout: PlannedWorkout? = nil, zones: PaceZones? = nil, indoor: Bool = false
     ) {
-        guard !isRunning else { return }
+        guard !isRunning, saveState != .saving else { return }
         self.goalName = goalName
         self.workoutTitle = workoutTitle
         self.targetPace = targetPace
@@ -136,16 +242,48 @@ final class PhoneWorkoutManager: NSObject {
         self.zones = zones
         guided = plannedWorkout.flatMap { w in zones.map { GuidedRun(workout: w, zones: $0) } }
         reps = []
+        isIndoor = indoor
+        isAutoPaused = false
+        stillSince = nil
+        didFinish = false
+        runID = UUID()
+        cue = nil
+        readiedStep = nil
+        needsMachineDistance = false
+        machineDistanceMeters = nil
+        stepMeters = 0
+        pausedStepMeters = 0
+        stepMetersAtPause = nil
 
         let config = HKWorkoutConfiguration()
         config.activityType = .running
-        config.locationType = .outdoor
-
-        let builder = HKWorkoutBuilder(healthStore: store, configuration: config, device: .local())
-        self.builder = builder
-        self.routeBuilder = HKWorkoutRouteBuilder(healthStore: store, device: nil)
-
+        config.locationType = indoor ? .indoor : .outdoor
         let start = Date()
+
+        if indoor {
+            // A workout session keeps the app running with the screen locked, which
+            // GPS does outdoors. Its live builder records what the iPhone measures;
+            // the distance is the step counter's, or the treadmill's, added at the end.
+            do {
+                let session = try HKWorkoutSession(healthStore: store, configuration: config)
+                let live = session.associatedWorkoutBuilder()
+                let source = HKLiveWorkoutDataSource(healthStore: store, workoutConfiguration: config)
+                source.disableCollection(for: HKQuantityType(.distanceWalkingRunning))
+                live.dataSource = source
+                self.session = session
+                self.builder = live
+                session.startActivity(with: start)
+            } catch {
+                lastError = error.localizedDescription
+                return
+            }
+            routeBuilder = nil
+        } else {
+            builder = HKWorkoutBuilder(healthStore: store, configuration: config, device: .local())
+            routeBuilder = HKWorkoutRouteBuilder(healthStore: store, device: nil)
+        }
+        guard let builder else { return }
+
         startDate = start
         segmentStart = start
         accumulatedSeconds = 0
@@ -167,7 +305,7 @@ final class PhoneWorkoutManager: NSObject {
             Self.onMain { if let message { self?.lastError = message } }
         }
 
-        beginLocationUpdates()
+        if indoor { beginStepCounting(from: start) } else { beginLocationUpdates() }
         startTimer()
         startLiveActivity()
         observeLiveActivityControls()
@@ -202,7 +340,9 @@ final class PhoneWorkoutManager: NSObject {
     /// Freezes the clock and stops accruing distance until `resume()`. The paused gap
     /// is excluded from both moving time and distance, and a `.pause` event is added
     /// to the workout so Health reflects the split.
-    func pause() {
+    func pause() { pause(auto: false) }
+
+    private func pause(auto: Bool) {
         guard isRunning, !isPaused, let seg = segmentStart else { return }
         accumulatedSeconds += Date().timeIntervalSince(seg)
         elapsedSeconds = accumulatedSeconds
@@ -213,20 +353,50 @@ final class PhoneWorkoutManager: NSObject {
         // iOS suspend the app in the background, and a Resume from the Lock Screen
         // couldn't start it again.
         lastLocation = nil          // so the distance across the paused gap isn't counted
+        stepMetersAtPause = stepMeters
         paceWindow = []
         currentPaceSecPerKm = 0
-        addWorkoutEvent(.pause)
+        isAutoPaused = auto
+        if let session { session.pause() } else { addWorkoutEvent(auto ? .motionPaused : .pause) }
+        if auto, RunSettings.spokenCues { SpokenCues.shared.say("Paused.") }
         updateLiveActivity()
     }
 
     /// Resumes timing, distance, and GPS after a `pause()`.
-    func resume() {
+    func resume() { resume(auto: false) }
+
+    private func resume(auto: Bool) {
         guard isRunning, isPaused else { return }
         segmentStart = Date()
         isPaused = false
-        addWorkoutEvent(.resume)
+        if let atPause = stepMetersAtPause { pausedStepMeters += stepMeters - atPause }
+        stepMetersAtPause = nil
+        stillSince = nil
+        let wasAuto = isAutoPaused
+        isAutoPaused = false
+        if let session { session.resume() } else { addWorkoutEvent(wasAuto ? .motionResumed : .resume) }
+        if auto, RunSettings.spokenCues { SpokenCues.shared.say("Running again.") }
         startTimer()
         updateLiveActivity()
+    }
+
+    /// Auto-pause (`RunSettings.autoPause`): after 8 s standing still the run
+    /// pauses, and it goes on the moment you run again. Called with every reading of
+    /// how fast you're going: the GPS speed outdoors, the step counter indoors.
+    private func checkAutoPause(moving: Bool) {
+        guard isRunning, RunSettings.autoPause else { return }
+        if isAutoPaused {
+            if moving { resume(auto: true) }
+            return
+        }
+        guard !isPaused else { return }
+        if moving {
+            stillSince = nil
+        } else if let since = stillSince {
+            if Date().timeIntervalSince(since) >= 8 { pause(auto: true) }
+        } else {
+            stillSince = Date()
+        }
     }
 
     private func addWorkoutEvent(_ type: HKWorkoutEventType) {
@@ -240,44 +410,85 @@ final class PhoneWorkoutManager: NSObject {
         }
     }
 
+    /// Ends the run. The screen moves on at once (`isRunning` goes false here); the
+    /// save to Health follows in the background, with `saveState` saying how it went,
+    /// so nothing has to wait for it. Indoors the save first waits for the
+    /// treadmill's distance (`confirmMachineDistance`).
     func end() {
         guard isRunning else { return }
+        let end = Date()
+        if !isPaused, let seg = segmentStart { elapsedSeconds = accumulatedSeconds + end.timeIntervalSince(seg) }
         timer?.invalidate()
         timer = nil
         isPaused = false
+        isAutoPaused = false
         segmentStart = nil
         locationManager.stopUpdatingLocation()
+        pedometer.stopUpdates()
         removeLiveActivityControls()
         endLiveActivity()
+        // The reps are settled now, so the summary can show them straight away.
+        guided?.finish(distance: distanceMeters, elapsed: elapsedSeconds, date: end)
+        reps = guided?.reps ?? []
+        guided = nil
+        didFinish = true
 
         guard let builder, let startDate else {
             isRunning = false
             return
         }
-        let end = Date()
+        saveState = .saving
+        isRunning = false
+        Task { await saveWorkout(builder: builder, start: startDate, end: end) }
+    }
 
-        // Attach the total running distance so the saved workout carries it (HealthKit
-        // otherwise derives distance only from samples we add).
-        var samples: [HKSample] = []
-        if distanceMeters > 0 {
-            samples.append(HKQuantitySample(
-                type: HKQuantityType(.distanceWalkingRunning),
-                quantity: HKQuantity(unit: .meter(), doubleValue: distanceMeters),
-                start: startDate, end: end
-            ))
+    /// The treadmill's distance, or `nil` to keep the step counter's. Saves the run.
+    func confirmMachineDistance(_ meters: Double?) {
+        if let meters, meters > 0 { machineDistanceMeters = meters }
+        needsMachineDistance = false
+        machineDistanceWaiter?.resume(returning: machineDistanceMeters)
+        machineDistanceWaiter = nil
+    }
+
+    /// Waits for the treadmill's distance, for at most two minutes: a run left
+    /// unanswered is saved with the step counter's distance rather than lost.
+    private func awaitMachineDistance() async -> Double? {
+        guard isIndoor, distanceMeters > 0, machineDistanceMeters == nil else { return machineDistanceMeters }
+        needsMachineDistance = true
+        let run = runID
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(120))
+            guard let self, self.runID == run, self.needsMachineDistance else { return }
+            self.confirmMachineDistance(nil)
         }
-
-        Task { await saveWorkout(builder: builder, samples: samples, end: end) }
+        return await withCheckedContinuation { machineDistanceWaiter = $0 }
     }
 
     /// Saves the finished run with its distance, then attaches the GPS route.
-    private func saveWorkout(builder: HKWorkoutBuilder, samples: [HKSample], end: Date) async {
+    private func saveWorkout(builder: HKWorkoutBuilder, start: Date, end: Date) async {
         let routeBuilder = self.routeBuilder
         self.routeBuilder = nil
-        saveState = .saving
+        defer {
+            if let session, session.state != .ended { session.end() }
+            session = nil
+            self.builder = nil
+        }
         do {
-            if !samples.isEmpty { try await builder.addSamples(samples) }
-            try await saveReps(to: builder, endingAt: end)
+            // Indoors the treadmill's number is the run's distance: it counts the belt.
+            let machine = await awaitMachineDistance()
+            if let machine { distanceMeters = machine }
+            // Attach the total running distance so the saved workout carries it
+            // (HealthKit otherwise derives distance only from samples we add).
+            if distanceMeters > 0 {
+                try await builder.addSamples([HKQuantitySample(
+                    type: HKQuantityType(.distanceWalkingRunning),
+                    quantity: HKQuantity(unit: .meter(), doubleValue: distanceMeters),
+                    start: start, end: end
+                )])
+            }
+            if let machine { try await builder.addMetadata(["EndurancrMachineDistance": machine]) }
+            try await saveReps(to: builder)
+            if let session { session.stopActivity(with: end) }
             try await builder.endCollection(at: end)
             if let workout = try await builder.finishWorkout() {
                 saveState = .saved
@@ -290,15 +501,11 @@ final class PhoneWorkoutManager: NSObject {
             lastError = error.localizedDescription
             saveState = .failed
         }
-        isRunning = false
     }
 
     /// The reps go into Health twice: as Apple's workout segments, which the Fitness
     /// app shows, and as one metadata entry endurancr reads back with their targets.
-    private func saveReps(to builder: HKWorkoutBuilder, endingAt date: Date) async throws {
-        guided?.finish(distance: distanceMeters, elapsed: elapsedSeconds, date: date)
-        reps = guided?.reps ?? []
-        guided = nil
+    private func saveReps(to builder: HKWorkoutBuilder) async throws {
         guard let json = RepReport.encode(reps) else { return }
         try await builder.addMetadata([RepReport.metadataKey: json])
         try await builder.addWorkoutEvents(reps.map { rep in
@@ -321,17 +528,69 @@ final class PhoneWorkoutManager: NSObject {
             MainActor.assumeIsolated {
                 guard let self, !self.isPaused, let seg = self.segmentStart else { return }
                 self.elapsedSeconds = self.accumulatedSeconds + Date().timeIntervalSince(seg)
-                self.guided?.update(distance: self.distanceMeters, elapsed: self.elapsedSeconds,
-                                    date: Date(), heartRate: 0)
+                self.advanceSteps()
                 // No usable fix for 10 s (standing, or under cover): no pace, rather
                 // than the last running pace still showing as on target.
-                if let fix = self.lastFixDate, Date().timeIntervalSince(fix) > 10 {
+                if !self.isIndoor, let fix = self.lastFixDate, Date().timeIntervalSince(fix) > 10 {
                     self.currentPaceSecPerKm = 0
+                    self.checkAutoPause(moving: false)
                 }
                 // The Lock Screen clock counts by itself; new numbers every 5 s are enough.
                 if Date().timeIntervalSince(self.lastActivityUpdate) >= 5 { self.updateLiveActivity() }
             }
         }
+    }
+
+    // MARK: Steps
+
+    /// Ends the step that's over and says what's next, on every tick and every new
+    /// distance, so a stride ends on its 20th second and a rep on its last metre.
+    private func advanceSteps() {
+        guard var run = guided, !isPaused else { return }
+        let entered = run.update(distance: distanceMeters, elapsed: elapsedSeconds, date: Date(), heartRate: 0)
+        guided = run
+        if entered.isEmpty {
+            if let next = RunCues.ready(run, distance: distanceMeters, readied: readiedStep) {
+                readiedStep = run.nextStep?.index
+                announce(next)
+            }
+        } else {
+            for step in entered {
+                if let next = RunCues.cue(for: step, in: run.steps) { announce(next) }
+            }
+        }
+    }
+
+    /// Hands the screen the cue and, with spoken cues on, says it.
+    private func announce(_ next: RunCue) {
+        cue = next
+        if RunSettings.spokenCues, let words = next.spoken { SpokenCues.shared.say(words) }
+        #if DEBUG
+        if DemoMode.isOn { print("[step] at \(Int(distanceMeters)) m, \(Int(elapsedSeconds)) s: \(next.spoken ?? "(silent)") | \(next.title)") }
+        #endif
+    }
+
+    // MARK: Step counter (indoors)
+
+    /// Indoors the distance is the step counter's, which needs the iPhone on you:
+    /// in a pocket, on an armband or in a hand. On the treadmill's console it counts
+    /// nothing, which is why the treadmill's own number is asked for at the end.
+    private func beginStepCounting(from start: Date) {
+        guard CMPedometer.isDistanceAvailable() else { return }
+        pedometer.startUpdates(from: start) { [weak self] data, _ in
+            let meters = data?.distance?.doubleValue
+            Self.onMain { if let meters { self?.stepped(to: meters) } }
+        }
+    }
+
+    private func stepped(to meters: Double) {
+        let moved = meters - stepMeters
+        stepMeters = meters
+        checkAutoPause(moving: moved > 1)
+        guard !isPaused else { return }
+        distanceMeters = max(0, stepMeters - pausedStepMeters)
+        recomputeCurrentPace(now: Date().timeIntervalSince1970)
+        advanceSteps()
     }
 
     private func beginLocationUpdates() {
@@ -448,6 +707,10 @@ final class PhoneWorkoutManager: NSObject {
 // checks that at run time.
 extension PhoneWorkoutManager: @preconcurrency CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        // Standing still or running again, for auto-pause, paused or not.
+        if let last = locations.last, last.speed >= 0, last.horizontalAccuracy >= 0, last.horizontalAccuracy <= 20 {
+            checkAutoPause(moving: last.speed >= 1.0)
+        }
         // Ignore any fixes buffered around a pause so the gap isn't counted.
         guard !isPaused else { return }
         // Keep only accurate fixes so distance/route aren't polluted by noise. 20 m
@@ -491,6 +754,7 @@ extension PhoneWorkoutManager: @preconcurrency CLLocationManagerDelegate {
         }
 
         recomputeCurrentPace(now: Date().timeIntervalSince1970)
+        advanceSteps()
         routePointCount += filtered.count
 
         if let routeBuilder {

@@ -32,6 +32,9 @@ final class PlanSync: NSObject {
     /// The last inputs the phone asked to publish, retained so we can (re)send once
     /// the session finishes activating. Unused on watchOS.
     private var pendingContext: [String: Any]?
+    /// Whether the watch taps at a heart rate zone change (`RunSettings.zoneTapsKey`),
+    /// sent with the plan.
+    private var zoneTaps = UserDefaults.standard.bool(forKey: "zoneTaps")
 
     private var session: WCSession? {
         WCSession.isSupported() ? WCSession.default : nil
@@ -50,7 +53,7 @@ final class PlanSync: NSObject {
     /// when `inputs` is `nil`). Coalesces to the newest state, so it is safe to call
     /// on every plan change.
     func publish(inputs: PlanInputs?, adapted: AdaptedWeeks?) {
-        var context: [String: Any] = [:]
+        var context: [String: Any] = ["zoneTaps": zoneTaps]
         if let inputs, let data = try? JSONEncoder().encode(inputs) {
             context["inputs"] = data
             if let adapted, let data = try? JSONEncoder().encode(adapted) {
@@ -58,6 +61,15 @@ final class PlanSync: NSObject {
             }
         }
         pendingContext = context
+        flush()
+    }
+
+    /// Switches the watch's zone taps on or off, with the next plan sent, or now
+    /// when one has been sent already.
+    func setZoneTaps(_ on: Bool) {
+        zoneTaps = on
+        guard pendingContext != nil else { return }
+        pendingContext?["zoneTaps"] = on
         flush()
     }
 
@@ -108,7 +120,11 @@ extension PlanSync: WCSessionDelegate {
         // Catch up only on a real context: an empty one (a failed activation, or the
         // phone hasn't sent anything yet) would otherwise delete the watch's plan.
         let hasContext = error == nil && !context.isEmpty
+        let zoneTaps = context["zoneTaps"] as? Bool
         Task { @MainActor in
+            #if os(watchOS)
+            if let zoneTaps { UserDefaults.standard.set(zoneTaps, forKey: "zoneTaps") }
+            #endif
             self.flush()                    // phone: (re)send once activated
             if hasContext { self.apply(inputsData: inputsData, adaptedData: adaptedData) } // watch: catch up
         }
@@ -124,7 +140,11 @@ extension PlanSync: WCSessionDelegate {
                              didReceiveApplicationContext applicationContext: [String: Any]) {
         let inputsData = applicationContext["inputs"] as? Data
         let adaptedData = applicationContext["adapted"] as? Data
-        Task { @MainActor in self.apply(inputsData: inputsData, adaptedData: adaptedData) }
+        let zoneTaps = applicationContext["zoneTaps"] as? Bool
+        Task { @MainActor in
+            if let zoneTaps { UserDefaults.standard.set(zoneTaps, forKey: "zoneTaps") }
+            self.apply(inputsData: inputsData, adaptedData: adaptedData)
+        }
     }
 
     #if os(iOS)

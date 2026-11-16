@@ -19,6 +19,14 @@ struct TodayView: View {
     @State private var showDeleteConfirm = false
     @Environment(\.colorScheme) private var colorScheme
     @State private var showingOther = false
+    /// The run the summary was shown for, so it opens once per run.
+    @State private var summarizedRun: UUID?
+    #if DEBUG
+    private static var demoRan = false
+    #endif
+    @AppStorage(RunSettings.spokenCuesKey) private var spokenCues = false
+    @AppStorage(RunSettings.autoPauseKey) private var autoPause = false
+    @AppStorage(RunSettings.zoneTapsKey) private var zoneTaps = false
 
 
     /// What the buddy says about the week, with the step up when one is offered.
@@ -118,6 +126,17 @@ struct TodayView: View {
                                 Label("Runs in Calendar", systemImage: "calendar")
                             }
                         }
+                        Section("Runs") {
+                            Toggle(isOn: $spokenCues) {
+                                Label("Spoken cues", systemImage: "speaker.wave.2")
+                            }
+                            Toggle(isOn: $autoPause) {
+                                Label("Auto-pause on iPhone", systemImage: "pause.circle")
+                            }
+                            Toggle(isOn: $zoneTaps) {
+                                Label("Zone taps on Apple Watch", systemImage: "heart.circle")
+                            }
+                        }
                         if coordinator.inputs != nil {
                             Divider()
                             Button(role: .destructive) {
@@ -132,38 +151,54 @@ struct TodayView: View {
                 }
             }
             .navigationDestination(isPresented: $showLiveRun) {
-                PhoneLiveRunView(recorder: recorder)
+                PhoneLiveRunView(recorder: recorder, onFinished: presentSummary)
             }
+            .onChange(of: zoneTaps) { _, on in PlanSync.shared.setZoneTaps(on) }
             .onChange(of: recorder.saveState) { _, state in
-                // A run finished (here, on another tab or from the Live Activity) and
-                // Health has it, or refused it. Snapshot what was just run, re-adapt
-                // from Health, then show a summary with where the week now stands.
-                guard state == .saved || state == .failed,
-                      recorder.distanceMeters >= Self.minSummaryDistanceMeters else { return }
-                let distance = recorder.distanceMeters
-                let duration = recorder.elapsedSeconds
-                let saved = state == .saved
-                // Week completed before this run. HealthKit's save is async and may not
-                // be visible to the re-fetch yet, so never show less than this.
-                let priorWeek = coordinator.progress?.currentWeekCompletedMeters ?? 0
+                // The run is in Health now, or Health refused it. A run finished while
+                // its screen wasn't showing (from the Live Activity, on another tab)
+                // gets its summary now; then the plan re-adapts and the summary's week
+                // follows.
+                guard state == .saved || state == .failed else { return }
+                if summarizedRun != recorder.runID, !recorder.needsMachineDistance { presentSummary() }
+                guard runSummary != nil else { return }
+                let run = recorder.runID
                 Task {
                     await coordinator.refreshAdaptation()
+                    guard summarizedRun == run, var shown = runSummary else { return }
                     let p = coordinator.progress
-                    let weekCompleted = max(p?.currentWeekCompletedMeters ?? 0, priorWeek + distance)
-                    runSummary = RunSummaryData(
-                        distanceMeters: distance,
-                        durationSeconds: duration,
-                        saved: saved,
-                        weekNumber: p?.currentWeekNumber,
-                        weekCompletedMeters: weekCompleted,
-                        weekTargetMeters: p?.currentWeekPlannedMeters ?? 0,
-                        reps: recorder.reps
-                    )
+                    shown.weekNumber = p?.currentWeekNumber ?? shown.weekNumber
+                    // HealthKit's save may not be visible to the re-read yet, so never
+                    // less than what the summary already said.
+                    shown.weekCompletedMeters = max(p?.currentWeekCompletedMeters ?? 0, shown.weekCompletedMeters)
+                    shown.weekTargetMeters = p?.currentWeekPlannedMeters ?? shown.weekTargetMeters
+                    runSummary = shown
                 }
             }
-            .sheet(item: $runSummary) { RunSummaryView(data: $0) }
+            .sheet(item: $runSummary) { RunSummaryView(data: $0, saveState: recorder.saveState) }
+            #if DEBUG
+            .task {
+                // `-demoScreen phoneflow`: a guided run on iPhone, Start to summary.
+                // Once, and not tied to this screen, which goes when the run's opens.
+                guard DemoMode.isOn, DemoMode.screen == "phoneflow", !Self.demoRan,
+                      let zones = coordinator.currentPlan?.paceZones else { return }
+                Self.demoRan = true
+                let strides = UserDefaults.standard.bool(forKey: "demoStrides")
+                let planned = strides
+                    ? PlannedWorkout(date: .now, type: .easy, distanceMeters: 3_500, notes: VDOTPlanGenerator.stridesNote)
+                    : PlannedWorkout(date: .now, type: .interval, distanceMeters: 5_600,
+                                     structure: WorkoutStructure(warmupMeters: 1_000, reps: 6, workMeters: 400, recoveryMeters: 200,
+                                                                 cooldownMeters: 1_000, workType: .interval, recoveryType: .easy))
+                showLiveRun = true
+                let recorder = recorder
+                Task {
+                    await recorder.demoRun(plannedWorkout: planned, zones: zones,
+                                           indoor: UserDefaults.standard.bool(forKey: "demoIndoor"))
+                }
+            }
+            #endif
             .sheet(isPresented: $showingOther) {
-                if let offers { OtherSessionSheet(offers: offers, onStart: start) }
+                OtherSessionSheet(offers: offers, today: todaysRun, onStart: start, onIndoor: startIndoor)
             }
             #if DEBUG
             // `-demoOffersOpen YES`: "Another session" open, for screenshots.
@@ -337,12 +372,11 @@ struct TodayView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
-            if offers != nil {
-                Button("Start another session") { showingOther = true }
-                    .font(.subheadline.weight(.medium))
-                    .frame(maxWidth: .infinity, minHeight: 44)   // a full tap target for one line of text
-                    .contentShape(.rect)
-            }
+            // Always there: the indoor run is offered even when nothing else is.
+            Button("Start another session") { showingOther = true }
+                .font(.subheadline.weight(.medium))
+                .frame(maxWidth: .infinity, minHeight: 44)   // a full tap target for one line of text
+                .contentShape(.rect)
         }
     }
 
@@ -353,6 +387,46 @@ struct TodayView: View {
         #endif
         guard let offers = coordinator.sessionOffers, !offers.offers.isEmpty || offers.reason != nil else { return nil }
         return offers
+    }
+
+    /// Today's run, unless today is a rest day.
+    private var todaysRun: PlannedWorkout? {
+        coordinator.workout().flatMap { $0.type == .rest ? nil : $0 }
+    }
+
+    /// The summary of the run just finished, at once: from what the iPhone measured,
+    /// with the week as it stood plus this run. "Saving to Health" turns into "Saved"
+    /// in place, and the week is brought up to date once the plan has re-adapted.
+    private func presentSummary() {
+        guard summarizedRun != recorder.runID else { return }
+        summarizedRun = recorder.runID
+        let distance = recorder.machineDistanceMeters ?? recorder.distanceMeters
+        guard distance >= Self.minSummaryDistanceMeters else { return }
+        let p = coordinator.progress
+        runSummary = RunSummaryData(
+            distanceMeters: distance,
+            durationSeconds: recorder.elapsedSeconds,
+            saved: recorder.saveState == .saved,
+            weekNumber: p?.currentWeekNumber,
+            weekCompletedMeters: (p?.currentWeekCompletedMeters ?? 0) + distance,
+            weekTargetMeters: p?.currentWeekPlannedMeters ?? 0,
+            reps: recorder.reps
+        )
+    }
+
+    /// Today's run, or a free run, on a treadmill.
+    private func startIndoor() {
+        showingOther = false
+        let today = todaysRun
+        recorder.start(
+            goalName: coordinator.currentPlan?.goal.displayName ?? "",
+            workoutTitle: today.map { Format.workoutTitle($0.type) } ?? "Indoor run",
+            targetPace: today?.targetPaceSecPerKm,
+            plannedWorkout: today,
+            zones: coordinator.currentPlan?.paceZones,
+            indoor: true
+        )
+        showLiveRun = true
     }
 
     private func start(_ offer: SessionOffers.Offer) {

@@ -95,6 +95,11 @@ final class WorkoutManager: NSObject {
     /// instead of guessing from `lastError`, which also collects GPS hiccups.
     enum SaveState: Equatable { case idle, saving, saved, failed }
     private(set) var saveState = SaveState.idle
+    /// Time in each heart rate zone, from the saved workout (watchOS 27); empty
+    /// until the save is done, and before watchOS 27.
+    private(set) var heartRateZones: [ZoneTime] = []
+    /// The zone the heart rate is in now, for the zone taps (`RunSettings.zoneTapsKey`).
+    private var currentZone: Int?
     /// The saved workout's own time and distance, once HealthKit has it.
     private(set) var savedDuration: TimeInterval?
     private(set) var savedDistanceMeters: Double?
@@ -102,6 +107,26 @@ final class WorkoutManager: NSObject {
     private var currentSpeed: Double = 0
     /// The reps of the run just finished, for the summary.
     private(set) var reps: [RepSplit] = []
+
+    // MARK: Heart rate zones
+
+    private func zoneChanged(to zone: Int) {
+        defer { currentZone = zone }
+        guard let previous = currentZone, previous != zone, isRunning, !isPaused,
+              UserDefaults.standard.bool(forKey: "zoneTaps") else { return }
+        // Never inside an effort: a rep or a stride is run by its pace, and its own
+        // taps are the ones that matter there.
+        if let step = activeStep, step.kind == .work || step.kind == .stride { return }
+        WKInterfaceDevice.current().play(.click)
+        if zone > previous {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { WKInterfaceDevice.current().play(.click) }
+        }
+        // A glance at the run screen says which; nothing covers the strides' countdown.
+        if activeStep?.seconds == nil {
+            cue = RunCue(title: "Zone \(zone)", detail: zone > previous ? "Heart rate up" : "Heart rate down",
+                         note: "", tone: .note, screenSeconds: 3)
+        }
+    }
 
     // MARK: Step guidance
 
@@ -372,6 +397,8 @@ final class WorkoutManager: NSObject {
         routePointCount = 0
         lastError = nil
         saveState = .idle
+        heartRateZones = []
+        currentZone = nil
         savedDuration = nil
         savedDistanceMeters = nil
         reps = []
@@ -519,107 +546,20 @@ final class WorkoutManager: NSObject {
         }
     }
 
-    /// What the screen says when `step` begins, or `nil` for a step that starts
-    /// without a word (the cool-down right after an "all done" card).
+    /// What the screen says when `step` begins (`RunCues`).
     private func buildCue(for step: WorkoutStep) -> RunCue? {
-        let steps = guided?.steps ?? []
-        let done = step.repNumber.map { $0 - 1 } ?? 0
-        switch step.kind {
-        case .stride:
-            // The first one says what to do, briefly: the page behind has the
-            // countdown but no verb. After that no card at all, so nothing covers
-            // the seconds and the pace.
-            return RunCue(title: strideTitle(step), detail: "\(Int(step.seconds ?? 20)) s quick and light",
-                          note: "Go", tone: .go, screenSeconds: step.repNumber == 1 ? 1.5 : nil)
-        case .recovery where step.seconds != nil && step.repNumber == 1:
-            // The strides begin, but the first thing to do is keep running easy, so
-            // that's the big line: "Strides now" over "easy for a minute" read as a
-            // contradiction. The two taps say the strides have begun.
-            return RunCue(title: "Easy \(Int(step.seconds ?? 60)) s",
-                          detail: "Then \(step.repTotal ?? 6) × \(Int(WorkoutSteps.strideSeconds)) s quick and light",
-                          note: "Strides next", tone: .strides, screenSeconds: 3)
-        case .recovery where step.seconds != nil:
-            // The stride just ended: felt, not read. The page counts the easy
-            // minute down from here.
-            return RunCue(title: "Easy \(Int(step.seconds ?? 60)) s", detail: "Next: \(strideTitle(step))",
-                          note: "\(done) of \(step.repTotal ?? 6) strides done", tone: .easy, screenSeconds: nil)
-        case .cooldown where strideTotal != nil:
-            // The last stride is done; what's left of the run is easy.
-            return RunCue(title: "All \(strideTotal ?? 6) strides done", detail: "Easy to the end",
-                          note: "Well run", tone: .done)
-        case .work:
-            return RunCue(title: repTitle(step), detail: stepDetail(step), note: "Go", tone: .go)
-        case .recovery where isLastRecovery(step, in: steps):
-            // After the last rep: straight to the cool-down, counting its easy part in.
-            let cooldown = steps.last { $0.kind == .cooldown }?.distanceMeters ?? 0
-            return RunCue(title: cooldown > 0 ? "Cool-down" : "Easy to the end",
-                          detail: "\(Format.distanceCompact(step.distanceMeters + cooldown)) easy",
-                          note: "All \(step.repTotal ?? 1) done. Well run.", tone: .done)
-        case .recovery:
-            let count = step.repNumber.flatMap { n in step.repTotal.map { "\(n) of \($0) done" } } ?? "Done"
-            return RunCue(title: "Easy now", detail: stepDetail(step), note: count, tone: .easy)
-        case .cooldown:
-            // Already said after the last rep's easy part.
-            if step.index > 0, isLastRecovery(steps[step.index - 1], in: steps) { return nil }
-            let reps = steps.last { $0.kind == .work }?.repTotal ?? 1
-            return RunCue(title: "Cool-down", detail: stepDetail(step),
-                          note: reps > 1 ? "All \(reps) done. Well run." : "Done. Well run.", tone: .done)
-        case .warmup, .steady:
-            return RunCue(title: step.label.isEmpty ? "Run" : step.label, detail: stepDetail(step),
-                          note: "", tone: .info)
-        }
+        RunCues.cue(for: step, in: guided?.steps ?? [])
     }
 
     /// Just before a rep: "Rep 3 of 6 in 70 m", so it doesn't come as a surprise.
-    /// Strides need no warning: the easy minute before each counts itself down.
     private func readyNextRep() {
-        guard let guided, guided.step.kind != .work, guided.step.seconds == nil,
-              let rep = guided.nextStep, rep.kind == .work, readiedStep != rep.index,
-              let left = guided.remainingMeters(distance: distanceMeters) else { return }
-        guard left <= min(100, guided.step.distanceMeters / 2) else { return }
-        readiedStep = rep.index
-        // Rounded to 10 m: "in 70 m", not "in 74 m".
-        let meters = max(10, Int((left / 10).rounded()) * 10)
-        // Between reps the page is already counting the metres down, so the tap is
-        // enough: a card over it would hide the number it's announcing.
-        let covers = guided.step.kind != .recovery || (guided.step.repTotal ?? 1) <= 1
-        let next = RunCue(title: "\(repTitle(rep)) in \(meters) m", detail: stepDetail(rep),
-                          note: "Get ready", tone: .ready, screenSeconds: covers ? 5 : nil)
+        guard let guided, let next = RunCues.ready(guided, distance: distanceMeters, readied: readiedStep) else { return }
+        readiedStep = guided.nextStep?.index
         play(next.tone)
         cue = next
         #if DEBUG
         if DemoMode.isOn { print("[step] at \(Int(distanceMeters)) m, \(Int(elapsedSeconds)) s, no tap: Get ready | \(next.title) | \(next.detail)") }
         #endif
-    }
-
-    /// How many strides the session has, when it has any.
-    private var strideTotal: Int? {
-        guided?.steps.first { $0.kind == .stride }?.repTotal
-    }
-
-    /// The easy part after the last rep, when nothing but easy running follows.
-    private func isLastRecovery(_ step: WorkoutStep, in steps: [WorkoutStep]) -> Bool {
-        step.kind == .recovery && step.repNumber == step.repTotal
-            && !steps.dropFirst(step.index + 1).contains { $0.kind == .work }
-    }
-
-    /// "Rep 3 of 6", or the block's name ("Threshold").
-    private func repTitle(_ step: WorkoutStep) -> String {
-        guard let n = step.repNumber, let total = step.repTotal, total > 1 else { return step.label }
-        return "Rep \(n) of \(total)"
-    }
-
-    /// "Stride 3 of 6", for the stride itself or the easy minute before it.
-    private func strideTitle(_ step: WorkoutStep) -> String {
-        "Stride \(step.repNumber ?? 1) of \(step.repTotal ?? WorkoutSteps.strideCount)"
-    }
-
-    /// "1 km at 4:15/km", "400 m easy".
-    private func stepDetail(_ step: WorkoutStep) -> String {
-        if step.kind == .cooldown, step.distanceMeters < 1 { return "easy to the end" }
-        let distance = Format.distanceCompact(step.distanceMeters)
-        if step.kind == .recovery || step.kind == .cooldown || step.paceType == .easy { return "\(distance) easy" }
-        return "\(distance) at \(step.targetPaceSecPerKm.map(Format.pace) ?? "race effort")"
     }
 
     /// Sends the current numbers to the iPhone, at most about once a second.
@@ -728,6 +668,7 @@ final class WorkoutManager: NSObject {
             savedDistanceMeters = machineDistanceMeters
                 ?? workout.statistics(for: HKQuantityType(.distanceWalkingRunning))?
                     .sumQuantity()?.doubleValue(for: .meter())
+            heartRateZones = HeartRateZones.times(in: workout)
             saveState = .saved
             // The workout is in Health now; a missing route doesn't undo that.
             _ = try? await routeBuilder?.finishRoute(with: workout, metadata: nil)
@@ -961,4 +902,14 @@ extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
     }
 
     nonisolated func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {}
+
+    /// The heart rate moved into another zone (watchOS 27). With zone taps on, one
+    /// tap, a click up or down: off by default, since the wrist is otherwise only
+    /// tapped where an effort begins or ends.
+    @available(watchOS 27.0, *)
+    nonisolated func workoutBuilder(_ workoutBuilder: HKLiveWorkoutBuilder, didUpdateWorkoutZone zoneUpdate: HKLiveWorkoutZoneUpdate) {
+        guard zoneUpdate.zoneGroup?.configuration.quantityType == HKQuantityType(.heartRate),
+              let zone = zoneUpdate.currentZoneDuration?.zone.index else { return }
+        Self.onMain { [weak self] in self?.zoneChanged(to: zone + 1) }
+    }
 }
