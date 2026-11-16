@@ -45,6 +45,9 @@ struct CalendarView: View {
                         .padding(.horizontal)
                         .padding(.top, 8)
                         .padding(.bottom, 20)
+                    HealthAccessNote(coordinator: coordinator)
+                        .padding(.horizontal)
+                        .padding(.bottom, 20)
                     ForEach(plan.weeks, id: \.index) { week in
                         Section {
                             VStack(alignment: .leading, spacing: 8) {

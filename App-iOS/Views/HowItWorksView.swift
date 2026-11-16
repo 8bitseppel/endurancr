@@ -156,6 +156,12 @@ struct HowItWorksView: View {
                 )
 
                 topic(
+                    "Runs Health doesn't share",
+                    icon: "heart.text.square",
+                    detail: "endurancr only knows the runs Apple Health lets it read, and Health doesn't tell an app when it holds some back. Since iOS 27 you can allow only your recent history, from a date on; then endurancr reads from that date, and Today and Plan say so when your plan started earlier, since runs before it can't count. If no run at all comes back since your plan started while run days have passed, Today and Plan ask you to check that endurancr may read Workouts. Both point to Settings > Apps > Health > Data Access & Devices > endurancr."
+                )
+
+                topic(
                     "Starting from how much you run",
                     icon: "chart.bar.xaxis",
                     detail: "When you make a plan, endurancr reads the last six weeks of runs in Apple Health: how far you run a week on average, over the weeks since your first run in that time, and your longest run of the last month. Jack Tupper Daniels and Pete Pfitzinger both size a plan from what you already run, so if that's more than a beginner's start, the plan starts there: the first weeks at your weekly distance, the long run near your longest, and the peak week 10% above what you run when that's more than the race asks for, up to 130 km for the marathon, 100 km for the half, 90 km for the 10K and 80 km for the 5K. The long run still never passes the race's peak, 32 km for the marathon. The goal screen shows the numbers under Your running, and you can change them if the last weeks weren't usual, or switch it off and build up from a beginner's level. Running less than 10 km a week, or with no runs in Health, the plan is the beginner's plan. Later, if you run 15% or more over the plan for two weeks, Today offers to start the weeks ahead from what you run. It never does it by itself: one long run isn't a habit, and the plan is a buddy that isn't pushy. It isn't offered in the taper or race week, or while you ease back after a break. Accepting it changes the weeks from this one on; the weeks behind you keep what was planned."

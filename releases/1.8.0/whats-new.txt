@@ -23,3 +23,7 @@ Plans that start where you are
 
 When you outgrow the plan
 - If you run well over the plan for two weeks, Today offers to start the weeks ahead from what you run. It never does it by itself, and never in the taper or race week.
+
+When Health holds runs back
+- Since iOS 27, Apple Health can share only your recent history. If your plan started before that, Today and Plan now say so and show where to allow your whole history, instead of marking those days missed.
+- If no run at all comes back since your plan started, they ask you to check that endurancr may read Workouts.

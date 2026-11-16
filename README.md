@@ -116,6 +116,9 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   marathon). Shown and editable on the goal screen; under 10 km a week the plan is
   the beginner's. Two weeks at 115% of the plan or more, and Today offers to start
   the weeks ahead from what you run; never by itself, never in the taper.
+- When Apple Health shares only your recent history (iOS 27) and the plan started
+  earlier, or no run at all comes back while run days have passed, Today and Plan
+  say so and point to the Health setting, instead of marking days missed in silence.
 - Indoor runs on Apple Watch, a turn of the Crown below today's run: no GPS, distance
   from the motion sensors, targets as speeds (a treadmill is set in km/h), and the
   treadmill's distance typed in on the Crown at the end, which the plan counts.

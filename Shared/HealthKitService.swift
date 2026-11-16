@@ -12,6 +12,11 @@ final class HealthKitService {
     let store = HKHealthStore()
     var isAuthorized = false
     var lastError: String?
+    /// The first day Health lets endurancr read runs from, when the athlete allowed
+    /// only their recent history (iOS 27); `nil` with full access, and before iOS 27.
+    /// Health hands over nothing older and doesn't say so, so older runs would look
+    /// like runs that never happened; the screens say it instead.
+    private(set) var readableFrom: Date?
 
     static var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
 
@@ -49,7 +54,7 @@ final class HealthKitService {
     }
 
     func requestAuthorization() async {
-        if DemoMode.isOn { isAuthorized = true; return }
+        if DemoMode.isOn { isAuthorized = true; await refreshReadableFrom(); return }
         guard Self.isAvailable else {
             lastError = "Health data isn't available on this device."
             return
@@ -59,6 +64,25 @@ final class HealthKitService {
             isAuthorized = true
         } catch {
             lastError = error.localizedDescription
+        }
+        await refreshReadableFrom()
+    }
+
+    /// Asks Health from when runs may be read. Cheap, so it's asked before every
+    /// read of the runs: the athlete can change it in Settings at any time.
+    func refreshReadableFrom() async {
+        #if DEBUG
+        // `-demoLimitedHealth YES`: Health allows only the last two weeks.
+        if DemoMode.isOn {
+            readableFrom = UserDefaults.standard.bool(forKey: "demoLimitedHealth")
+                ? Calendar.current.date(byAdding: .day, value: -14, to: Calendar.current.startOfDay(for: .now)) : nil
+            return
+        }
+        #endif
+        guard Self.isAvailable else { return }
+        if #available(iOS 27.0, watchOS 27.0, *) {
+            let limits = try? await store.earliestAuthorizedSampleDate(for: [HKObjectType.workoutType()])
+            readableFrom = limits?[HKObjectType.workoutType()]
         }
     }
 
@@ -186,9 +210,12 @@ final class HealthKitService {
 
     private func fetchRunningWorkouts(since date: Date) async -> [HKWorkout] {
         if DemoMode.isOn { return [] }
+        // Only from where Health allows reading, as Apple asks.
+        await refreshReadableFrom()
+        let from = max(date, readableFrom ?? date)
         let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
             HKQuery.predicateForWorkouts(with: .running),
-            HKQuery.predicateForSamples(withStart: date, end: nil),
+            HKQuery.predicateForSamples(withStart: from, end: nil),
         ])
         let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
         return await withCheckedContinuation { continuation in

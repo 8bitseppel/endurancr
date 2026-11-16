@@ -766,6 +766,10 @@ Plans that start where you are
 When you outgrow the plan
 - If you run well over the plan for two weeks, Today offers to start the weeks ahead from what you run. It never does it by itself, and never in the taper or race week.
 
+When Health holds runs back
+- Since iOS 27, Apple Health can share only your recent history. If your plan started before that, Today and Plan now say so and show where to allow your whole history, instead of marking those days missed.
+- If no run at all comes back since your plan started, they ask you to check that endurancr may read Workouts.
+
 ### Description (4000)
 
 endurancr builds a running plan around one goal, records your runs on Apple Watch or iPhone, and adapts the plan to what you really ran, like a running buddy who isn't pushy. No account, no feed, no ads.
@@ -810,8 +814,9 @@ endurancr is a training aid, not medical advice. Talk to a doctor before you sta
 
 ### Build
 
-1.8.0 (52). Builds 48 to 51 were earlier archives of this work (51 was labelled 1.9.0
-before 1.8.0 had shipped, so its plan-sizing work moved into 1.8.0); use 52.
+1.8.0 (53). Builds 48 to 52 were earlier archives of this work (51 was labelled 1.9.0
+before 1.8.0 had shipped, so its plan-sizing work moved into 1.8.0; 53 adds the
+note when Apple Health shares only part of your history); use 53.
 
 ### Screenshots
 

@@ -38,6 +38,9 @@ final class PlanCoordinator {
         didSet { recomputeDerived() }
     }
     private(set) var restingHeartRates: [RestingHeartRateSample] = []
+    /// Whether Health has been read since launch, so "no runs" means none were
+    /// found rather than not looked for yet.
+    private(set) var hasReadRuns = false
     private(set) var fatigue: FatigueAssessment?
     /// How training is going and what the plan does about it (`TrainingBuddy`).
     private(set) var buddy: TrainingBuddy.Status?
@@ -323,6 +326,7 @@ final class PlanCoordinator {
         guard inputs == inputsAtStart else { return }
         recentRuns = runs
         restingHeartRates = resting
+        hasReadRuns = true
 
         // The canonical plan stays free of vacation blanking (applied at display
         // time from the goal), so unavailability is left out here.

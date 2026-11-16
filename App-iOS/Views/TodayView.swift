@@ -52,6 +52,8 @@ struct TodayView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     header
+                    // First: when Health hides runs, everything below is off.
+                    HealthAccessNote(coordinator: coordinator)
                     if let workout = coordinator.workout() {
                         todayCard(workout)
                     } else {
