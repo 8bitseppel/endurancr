@@ -896,7 +896,8 @@ endurancr is a training aid, not medical advice. Talk to a doctor before you sta
 
 ### Build
 
-1.9.0 (54).
+1.9.0 (55). Build 54 was refused at upload: `workout-processing` is a watch-only
+background mode; the iPhone's indoor runs keep running through their workout session.
 
 ### Screenshots
 

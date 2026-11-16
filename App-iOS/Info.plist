@@ -47,7 +47,6 @@
     <array>
         <string>location</string>
         <string>audio</string>
-        <string>workout-processing</string>
     </array>
     <key>NSSupportsLiveActivities</key>
     <true/>
