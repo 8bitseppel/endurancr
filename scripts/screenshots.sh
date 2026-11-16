@@ -145,6 +145,21 @@ shot "$PHONE" app.endurancr paces iphone-9-paces -clipResults
 shot "$PHONE" app.endurancr - iphone-10-another -demoOffers offer -demoOffersOpen YES
 # Today after an easy run that ended with strides: every one with its pace.
 shot "$PHONE" app.endurancr - iphone-11-strides -demoDoneToday YES -demoReps strides
+# Strides on iPhone without a watch: the countdown with the stride's pace, each one
+# said out loud with spoken cues, then the finish and the summary.
+rec_sim "$PHONE" app.endurancr phoneflow iphone-12-strides-run 360 12 74 -demoStrides YES
+# Its still: the first stride, counted down in green with its pace and target.
+xcrun simctl terminate "$PHONE" app.endurancr 2>/dev/null || true
+sleep 2   # a relaunch straight away shows a back link to the app in the status bar
+xcrun simctl launch "$PHONE" app.endurancr -demo -demoScreen phoneflow -demoStrides YES >/dev/null
+sleep 10.5
+xcrun simctl io "$PHONE" screenshot --type=png "$OUT/iphone-12-strides-run.png" >/dev/null 2>&1
+# After an indoor run on iPhone: the treadmill's distance, typed in.
+xcrun simctl terminate "$PHONE" app.endurancr 2>/dev/null || true
+xcrun simctl launch "$PHONE" app.endurancr -demo -demoScreen phoneflow -demoStrides YES -demoIndoor YES -demoTreadmillHold YES >/dev/null
+sleep 70
+xcrun simctl io "$PHONE" screenshot --type=png "$OUT/iphone-13-indoor.png" >/dev/null 2>&1
+echo "    $OUT/iphone-13-indoor.png"
 
 # The same in dark, for the light and dark slider on the website.
 echo "==> iPhone, dark"
@@ -201,6 +216,8 @@ xcrun simctl launch "$WATCH" app.endurancr.watchkitapp -demo -demoScreen flow -d
 sleep 6
 xcrun simctl io "$WATCH" screenshot --type=png "$OUT/watch-10-indoor.png" >/dev/null 2>&1
 echo "    $OUT/watch-10-indoor.png"
+# The heart rate zones page of the summary (watchOS 27).
+shot "$WATCH" app.endurancr.watchkitapp summary watch-11-zones -demoZones YES -demoZonesPage YES
 python3 scripts/watch-clock.py
 
 echo "==> Done"

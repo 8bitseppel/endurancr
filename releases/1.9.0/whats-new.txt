@@ -1,0 +1,19 @@
+Your iPhone, guided like your watch
+- Intervals and strides on iPhone get the watch's screens: a card at each step, and inside the strides and the jogs between reps a big countdown, with the stride's pace next to its target.
+- Spoken cues: turn them on in the menu on Today, and the iPhone says out loud where an effort begins or ends. "Strides. One easy minute first." "Go." "Easy." "Rep 3 of 6 in 70 metres." "All done. Easy to the end." Nothing else, never while you run easy, and your music only dips while it speaks.
+
+Indoor runs on iPhone
+- No watch on the treadmill? Choose Indoor run under Start another session. GPS stays off, the distance comes from your steps, and your targets show in km/h.
+- It keeps recording with the screen locked. Keep the iPhone on you, in a pocket or on an armband.
+- After the run, type in the distance the treadmill shows. Your plan counts that number.
+
+A finish that doesn't wait, on iPhone too
+- Holding Finish on the iPhone now draws a check with your distance and time, and the summary opens straight away. It says Saving to Health and turns into Saved to Health when it's done.
+
+Auto-pause on iPhone
+- Turn it on in the menu on Today, and a run on the iPhone pauses after 8 seconds standing still and goes on when you run again.
+
+Heart rate zones (iOS 27 and watchOS 27)
+- After a run on the watch, a page of the summary shows the time you spent in each heart rate zone, from Apple Health's own zones.
+- On iPhone, every run with heart rate shows its zones under Recent runs in Progress.
+- Zone taps on Apple Watch, if you turn them on: a tap when your heart rate moves into another zone, never during a rep or a stride.

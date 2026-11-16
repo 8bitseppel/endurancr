@@ -15,38 +15,38 @@ mkdir -p docs/screenshots "$A/6.5-inch" "$A/6.3-inch" website/screens
 
 for f in iphone-1-welcome.png iphone-2-goal.gif iphone-2-goal.png iphone-3-today.png iphone-4-run.png \
          iphone-5-summary.png iphone-6-progress.gif iphone-6-progress.png iphone-7-plan.png iphone-8-week.png iphone-9-paces.png iphone-10-another.png \
-         iphone-11-strides.png \
+         iphone-11-strides.png iphone-12-strides-run.gif iphone-12-strides-run.png iphone-13-indoor.png \
          watch-1-today.png watch-2-run.gif watch-2-run.png watch-3-summary.gif watch-3-summary.png \
          watch-4-intervals.png watch-5-reps.png watch-6-another.png \
          watch-7-strides.gif watch-7-strides.png watch-8-strides-done.png \
-         watch-9-finish.gif watch-9-finish.png watch-10-indoor.png; do
+         watch-9-finish.gif watch-9-finish.png watch-10-indoor.png watch-11-zones.png; do
   cp "$S/$f" docs/screenshots/
 done
 
-# App Store order: Today, Progress, Plan, Last week, Paces, Run, Run complete, Goal,
-# Welcome, Another session, Strides done.
-rm -f $A/iphone-*.png $A/6.5-inch/iphone-*.png $A/6.3-inch/iphone-*.png
-cp $S/iphone-3-today.png    $A/iphone-1-today.png
-cp $S/iphone-6-progress.png $A/iphone-2-progress.png
-cp $S/iphone-7-plan.png     $A/iphone-3-plan.png
-cp $S/iphone-8-week.png     $A/iphone-4-week.png
-cp $S/iphone-9-paces.png    $A/iphone-5-paces.png
-cp $S/iphone-4-run.png      $A/iphone-6-run.png
-cp $S/iphone-5-summary.png  $A/iphone-7-summary.png
-cp $S/iphone-2-goal.png     $A/iphone-8-goal.png
-cp $S/iphone-1-welcome.png  $A/iphone-9-welcome.png
-cp $S/iphone-10-another.png $A/iphone-10-another.png
-cp $S/iphone-11-strides.png $A/iphone-11-strides.png
-cp $S/watch-1-today.png     $A/watch-1-today.png
-cp $S/watch-2-run.png       $A/watch-2-run.png
-cp $S/watch-3-summary.png   $A/watch-3-summary.png
-cp $S/watch-4-intervals.png $A/watch-4-intervals.png
-cp $S/watch-5-reps.png      $A/watch-5-reps.png
-cp $S/watch-6-another.png   $A/watch-6-another.png
-cp $S/watch-7-strides.png   $A/watch-7-strides.png
-cp $S/watch-8-strides-done.png $A/watch-8-strides-done.png
-cp $S/watch-9-finish.png    $A/watch-9-finish.png
+# App Store order, ten at most (Apple's limit per device): Today, Progress, Plan,
+# Strides on iPhone, Indoor, Last week, Paces, Run, Run complete, Goal. Welcome,
+# Another session and Strides done are on the website only.
+rm -f $A/iphone-*.png $A/6.5-inch/iphone-*.png $A/6.3-inch/iphone-*.png $A/watch-*.png
+cp $S/iphone-3-today.png    $A/iphone-01-today.png
+cp $S/iphone-6-progress.png $A/iphone-02-progress.png
+cp $S/iphone-7-plan.png     $A/iphone-03-plan.png
+cp $S/iphone-12-strides-run.png $A/iphone-04-strides-run.png
+cp $S/iphone-13-indoor.png  $A/iphone-05-indoor.png
+cp $S/iphone-8-week.png     $A/iphone-06-week.png
+cp $S/iphone-9-paces.png    $A/iphone-07-paces.png
+cp $S/iphone-4-run.png      $A/iphone-08-run.png
+cp $S/iphone-5-summary.png  $A/iphone-09-summary.png
+cp $S/iphone-2-goal.png     $A/iphone-10-goal.png
+cp $S/watch-1-today.png     $A/watch-01-today.png
+cp $S/watch-2-run.png       $A/watch-02-run.png
+cp $S/watch-3-summary.png   $A/watch-03-summary.png
+cp $S/watch-4-intervals.png $A/watch-04-intervals.png
+cp $S/watch-5-reps.png      $A/watch-05-reps.png
+cp $S/watch-7-strides.png   $A/watch-07-strides.png
+cp $S/watch-8-strides-done.png $A/watch-08-strides-done.png
+cp $S/watch-9-finish.png    $A/watch-09-finish.png
 cp $S/watch-10-indoor.png   $A/watch-10-indoor.png
+cp $S/watch-11-zones.png    $A/watch-11-zones.png
 
 python3 - <<'PY'
 from pathlib import Path
@@ -70,7 +70,7 @@ PY
 
 # Videos for the website. +igndts: the Simulator's recordings confuse ffmpeg's
 # timing otherwise (see screenshots.sh).
-for n in iphone-2-goal iphone-2-goal-dark iphone-6-progress iphone-6-progress-dark watch-1-today watch-2-run watch-3-summary watch-4-intervals watch-5-reps watch-7-strides watch-8-strides-done watch-9-finish; do
+for n in iphone-2-goal iphone-2-goal-dark iphone-6-progress iphone-6-progress-dark watch-1-today watch-2-run watch-3-summary watch-4-intervals watch-5-reps watch-7-strides watch-8-strides-done watch-9-finish iphone-12-strides-run; do
   w=440; case $n in watch*) w=340;; esac
   ffmpeg -loglevel error -y -fflags +igndts -i "build/screenshots/$n.mov" \
     -vf "fps=30,scale=$w:-2:flags=lanczos" -c:v libx264 -crf 26 -pix_fmt yuv420p -movflags +faststart -an \

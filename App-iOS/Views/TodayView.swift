@@ -21,6 +21,8 @@ struct TodayView: View {
     @State private var showingOther = false
     /// The run the summary was shown for, so it opens once per run.
     @State private var summarizedRun: UUID?
+    /// Why an indoor run didn't start, for the alert.
+    @State private var startProblem: String?
     #if DEBUG
     private static var demoRan = false
     #endif
@@ -88,6 +90,13 @@ struct TodayView: View {
                 Button("Keep it", role: .cancel) {}
             } message: {
                 Text("The endurancr calendar and its runs are removed from Calendar on all your devices. Your plan stays as it is.")
+            }
+            .alert("Couldn't start the indoor run", isPresented: Binding(
+                get: { startProblem != nil }, set: { if !$0 { startProblem = nil } }
+            )) {
+                Button("OK") { startProblem = nil }
+            } message: {
+                Text((startProblem ?? "") + " Check that endurancr may save Workouts in Apple Health: Settings > Apps > Health > Data Access & Devices > endurancr.")
             }
             .alert("Couldn't add your runs to Calendar", isPresented: Binding(
                 get: { calendar.problem != nil }, set: { if !$0 { calendar.problem = nil } }
@@ -426,7 +435,8 @@ struct TodayView: View {
             zones: coordinator.currentPlan?.paceZones,
             indoor: true
         )
-        showLiveRun = true
+        // Health can refuse the session (no access): then no empty run screen, but why.
+        if recorder.isRunning { showLiveRun = true } else { startProblem = recorder.lastError ?? "Apple Health didn't start the run." }
     }
 
     private func start(_ offer: SessionOffers.Offer) {

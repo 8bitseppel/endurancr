@@ -38,6 +38,9 @@ final class PhoneWorkoutManager: NSObject {
     private var pausedStepMeters: Double = 0
     /// Indoors: the step counter's distance when the run was paused.
     private var stepMetersAtPause: Double?
+    /// Indoors: when the step counter last counted a step. It goes quiet when you
+    /// stop, rather than saying so, which is how auto-pause notices.
+    private var lastStepDate: Date?
     private var routeBuilder: HKWorkoutRouteBuilder?
     private let locationManager = CLLocationManager()
     private var activity: Activity<RunActivityAttributes>?
@@ -215,7 +218,8 @@ final class PhoneWorkoutManager: NSObject {
         didFinish = true
         saveState = .saving
         isRunning = false
-        if indoor {
+        // `-demoTreadmillHold YES` keeps the treadmill screen up, for its screenshot.
+        if indoor, !UserDefaults.standard.bool(forKey: "demoTreadmillHold") {
             let run = runID
             Task {
                 // The treadmill's number, typed in a moment later, as a runner would.
@@ -254,6 +258,7 @@ final class PhoneWorkoutManager: NSObject {
         stepMeters = 0
         pausedStepMeters = 0
         stepMetersAtPause = nil
+        lastStepDate = indoor ? Date() : nil
 
         let config = HKWorkoutConfiguration()
         config.activityType = .running
@@ -535,6 +540,10 @@ final class PhoneWorkoutManager: NSObject {
                     self.currentPaceSecPerKm = 0
                     self.checkAutoPause(moving: false)
                 }
+                if self.isIndoor, let step = self.lastStepDate, Date().timeIntervalSince(step) > 3 {
+                    self.currentPaceSecPerKm = 0
+                    self.checkAutoPause(moving: false)
+                }
                 // The Lock Screen clock counts by itself; new numbers every 5 s are enough.
                 if Date().timeIntervalSince(self.lastActivityUpdate) >= 5 { self.updateLiveActivity() }
             }
@@ -586,6 +595,7 @@ final class PhoneWorkoutManager: NSObject {
     private func stepped(to meters: Double) {
         let moved = meters - stepMeters
         stepMeters = meters
+        if moved > 0 { lastStepDate = Date() }
         checkAutoPause(moving: moved > 1)
         guard !isPaused else { return }
         distanceMeters = max(0, stepMeters - pausedStepMeters)

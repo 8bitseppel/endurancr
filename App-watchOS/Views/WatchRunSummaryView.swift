@@ -52,6 +52,8 @@ struct WatchRunSummaryView: View {
         #if DEBUG
         // `-demoRepsPage YES`: open on the reps, for screenshots.
         if DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoRepsPage") { return .reps }
+        // `-demoZonesPage YES`: open on the heart rate zones.
+        if DemoMode.isOn, UserDefaults.standard.bool(forKey: "demoZonesPage") { return .zones }
         #endif
         return .run
     }()

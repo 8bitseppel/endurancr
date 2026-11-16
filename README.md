@@ -40,9 +40,14 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   <img src="docs/screenshots/iphone-8-week.png" width="180" alt="Last week in the plan: runs done, one missed, an extra run">
 </p>
 <p align="center">
+  <img src="docs/screenshots/iphone-12-strides-run.gif" width="180" alt="Strides on iPhone: each 20 s stride counted down with its pace against the target, then the finish and the summary">
+  <img src="docs/screenshots/iphone-13-indoor.png" width="180" alt="After an indoor run on iPhone: the treadmill's distance typed in">
+</p>
+<p align="center">
   <img src="docs/screenshots/watch-1-today.png" width="156" alt="Watch home">
   <img src="docs/screenshots/watch-2-run.gif" width="156" alt="Watch during a run">
   <img src="docs/screenshots/watch-3-summary.gif" width="156" alt="Watch after a run">
+  <img src="docs/screenshots/watch-11-zones.png" width="156" alt="Watch after a run: time in each heart rate zone">
 </p>
 
 ## Features
@@ -123,11 +128,25 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   from the motion sensors, targets as speeds (a treadmill is set in km/h), and the
   treadmill's distance typed in on the Crown at the end, which the plan counts.
   GymKit pairing is Apple's Workout app's only; runs recorded there count too.
+- Indoor runs on iPhone too, under Start another session: distance from the step
+  counter (Motion & Fitness), speeds in km/h, the run keeps recording with the screen
+  locked (an iOS 26 workout session), and the treadmill's distance typed in at the end.
+- Guided sessions on iPhone as on the watch: a card at each step, and inside the
+  strides and the jogs between reps a countdown with the stride's pace against its
+  target. Spoken cues (off until switched on in the menu on Today) say where an effort
+  begins or ends, "Go.", "Easy.", "Rep 3 of 6 in 70 metres.", the moments the watch
+  taps, and nothing else; music only dips while it speaks.
+- Auto-pause on iPhone (off until switched on): pauses after 8 s standing still and
+  goes on when you run again.
+- Heart rate zones (iOS 27, watchOS 27): Apple Health's own zones, the time in each on
+  a page of the watch's summary and on every run with heart rate in Recent runs.
+  Zone taps on the watch, off until switched on, tap once going down and twice going
+  up, never during a rep or a stride.
 - Runs in Calendar: the plan's runs as all-day events in a calendar of their own,
   "endurancr", from today to race day, moved and changed when the plan changes.
 - On the watch, the run starts the moment you tap Start, and after Finish a check
   draws itself and the summary follows at once, without waiting for Apple Health;
-  its first line confirms the save when it's done.
+  its first line confirms the save when it's done. The iPhone finishes the same way.
 - Start another session: this week's hard session moved to today (swapping the days),
   an interval session of the plan's size in a week with only one, or strides. Only when
   it fits: not in base weeks, not the day after a hard session or the long run, not the

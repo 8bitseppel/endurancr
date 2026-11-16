@@ -823,3 +823,83 @@ note when Apple Health shares only part of your history); use 53.
 New: `watch-9-finish` (Hold to finish, the check, the summary saving and saved, as a
 video) and `watch-10-indoor` (an indoor run in km/h); the goal figure shows Your
 running, and the App Preview was re-recorded. Everything is in `releases/1.8.0/`.
+
+## Version 1.9.0
+
+### Promotional text (170)
+
+The iPhone now guides your sessions like the watch, with spoken cues if you like, runs indoors on a treadmill, finishes without waiting, and shows your heart rate zones.
+
+### What's New (4000)
+
+Your iPhone, guided like your watch
+- Intervals and strides on iPhone get the watch's screens: a card at each step, and inside the strides and the jogs between reps a big countdown, with the stride's pace next to its target.
+- Spoken cues: turn them on in the menu on Today, and the iPhone says out loud where an effort begins or ends. "Strides. One easy minute first." "Go." "Easy." "Rep 3 of 6 in 70 metres." "All done. Easy to the end." Nothing else, never while you run easy, and your music only dips while it speaks.
+
+Indoor runs on iPhone
+- No watch on the treadmill? Choose Indoor run under Start another session. GPS stays off, the distance comes from your steps, and your targets show in km/h.
+- It keeps recording with the screen locked. Keep the iPhone on you, in a pocket or on an armband.
+- After the run, type in the distance the treadmill shows. Your plan counts that number.
+
+A finish that doesn't wait, on iPhone too
+- Holding Finish on the iPhone now draws a check with your distance and time, and the summary opens straight away. It says Saving to Health and turns into Saved to Health when it's done.
+
+Auto-pause on iPhone
+- Turn it on in the menu on Today, and a run on the iPhone pauses after 8 seconds standing still and goes on when you run again.
+
+Heart rate zones (iOS 27 and watchOS 27)
+- After a run on the watch, a page of the summary shows the time you spent in each heart rate zone, from Apple Health's own zones.
+- On iPhone, every run with heart rate shows its zones under Recent runs in Progress.
+- Zone taps on Apple Watch, if you turn them on: a tap when your heart rate moves into another zone, never during a rep or a stride.
+
+### Description (4000)
+
+endurancr builds a running plan around one goal, records your runs on Apple Watch or iPhone, and adapts the plan to what you really ran, like a running buddy who isn't pushy. No account, no feed, no ads.
+
+SET ONE GOAL
+Pick a race, from 5K to the marathon, and its date. endurancr builds a full plan with the VDOT method from Jack Tupper Daniels, paced to your fitness and sized to how much you run. It uses a recent run from Apple Health, or a race result you type in. A short race shows your speed, not your endurance, so marathon pace starts a little easier until your long runs prove it.
+
+TRAINING FROM THE BOOKS
+Easy runs, threshold runs, intervals and marathon-pace runs, at most two hard sessions a week. Strides keep your legs quick. Long runs build to 32 km for the marathon. A tune-up race six weeks out sets your paces. Race day tells you how to pace it and what to eat and drink, and afterwards the plan brings you back with rest and easy runs. Based on Jack Tupper Daniels, Pete Pfitzinger, the Hansons and Hal Higdon.
+
+A PLAN THAT FOLLOWS YOU
+Every run counts, even on a rest day. Missed kilometres are never piled onto the days after. Ran less than planned? The coming weeks build from what you actually ran, at most 10% more each week. Back from a break? Your paces ease a little and you start with easy runs. Strong runs nudge your paces up. Drag days to swap them, and put your runs in Calendar.
+
+THE WHOLE PLAN
+See what you ran on each day, what you missed, what changed and why, your new paces next to the old ones, and what each week is for, all the way to race day.
+
+AN HONEST OUTLOOK
+Progress shows a finish-time range for today and for race day, and tells you whether your target is on track, within reach, a stretch or unlikely, and why. If it's out of reach, it suggests a realistic time. It only changes your target if you tap it.
+
+A CALM LOOK, LIGHT AND DARK
+Every kind of run has its own colour, on Today, in the plan and in your paces.
+
+INTERVALS AND STRIDES, GUIDED
+On interval days your Apple Watch guides you through every rep: "get ready" before it, a tap and "Go" with its pace, and a tap when it is done. Only the start and end of an effort tap your wrist. Strides run on the clock: two taps when they start, then every 20 s burst counted down big. No watch? The iPhone guides the same sessions, with the countdown on screen, and can say "Go" and "Easy" out loud. Afterwards you see every rep against its target and every stride with its pace. Feel like intervals on another day? Start another session offers them when they fit your week.
+
+RUN ON YOUR WRIST OR YOUR PHONE
+Start today's run on Apple Watch with heart rate, or on iPhone with GPS. On a treadmill, an indoor run turns GPS off, shows your targets as speeds and asks for the treadmill's distance at the end, on the watch or the iPhone. Finish is held for a second, so a run never ends by accident, and the summary opens straight away. Auto-pause holds your run at a traffic light. With watchOS 27 you see the time in each heart rate zone. Every run is saved to Apple Health.
+
+YOUR PACES IN A MINUTE
+The pace calculator turns one recent race into your VDOT, your five training paces, a race-day range and the plan endurancr would build, ready to start with one tap. It's in the app, and as an App Clip it opens without installing, right in Safari or from a link.
+
+NOTHING HIDDEN
+How it works explains every rule the plan follows, in plain words, with the books behind it. endurancr is open source, so you can read every line that touches your data.
+
+PRIVATE BY DESIGN
+No account, no server, no analytics, no ads, no tracking. Your plan stays on your device, and your runs live in Apple Health.
+
+FREE
+No subscription and no in-app purchases.
+
+endurancr is a training aid, not medical advice. Talk to a doctor before you start a new training plan.
+
+### Build
+
+1.9.0 (54).
+
+### Screenshots
+
+New: `iphone-12-strides-run` (the strides countdown on iPhone, as a video),
+`iphone-13-indoor` (the treadmill's distance after an indoor run) and `watch-11-zones`
+(the heart rate zones page). Everything is in `releases/1.9.0/`.
