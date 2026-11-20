@@ -226,17 +226,27 @@ struct ShoeEditor: View {
                 }
                 Section {
                     DatePicker("In use since", selection: $since, in: ...Date.now, displayedComponents: .date)
-                    Stepper(value: $startingKm, in: 0...5_000, step: 10) {
-                        LabeledContent("Run before that", value: "\(startingKm) km")
+                    // Typed, not stepped: a used pair can have hundreds of kilometres.
+                    HStack(spacing: 4) {
+                        Text("Run before that")
+                        Spacer(minLength: 8)
+                        TextField("0", value: $startingKm, format: .number)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                            .accessibilityLabel("Kilometres run before that")
+                        Text("km").foregroundStyle(.secondary)
                     }
                 } header: {
                     Text("Already run in them?")
                 } footer: {
-                    Text("Your runs in Apple Health from that day on count for this pair. Add what they had run before, if you know it.")
+                    Text(makeDefault || shoe != nil
+                         ? "Your runs in Apple Health from that day on count for this pair. Add what they had run before, if you know it."
+                         : "Runs count for the default pair. Make this pair the default to count its runs from that day, or change single runs to it afterwards. Add what they had run before, if you know it.")
                 }
                 Section {
                     Stepper(value: $replaceAtKm, in: 100...2_000, step: 50) {
-                        LabeledContent("Replace at", value: "\(replaceAtKm) km")
+                        Text("Replace at \(replaceAtKm) km")
                     }
                 } footer: {
                     Text("Shoe makers give 500 to 800 km for everyday shoes; racing shoes with a carbon plate lose their edge by about 400 km. Today says so when they get there. Worn-through soles, creased foam or new aches count more than the number.")
@@ -324,21 +334,27 @@ struct ShoeDueNote: View {
                 } icon: {
                     Image(systemName: "shoe").foregroundStyle(.tint)
                 }
-                HStack(spacing: 10) {
-                    Button("Archive them") { store.change { $0.archive(pair.id) } }
-                        .buttonStyle(.glass)
-                        .frame(maxWidth: .infinity)
-                    Button("Another 100 km") {
-                        var later = pair
-                        later.replaceAtMeters = (meters / 1_000).rounded(.up) * 1_000 + 100_000
-                        store.change { $0.update(later) }
-                    }
-                    .buttonStyle(.glass)
-                    .frame(maxWidth: .infinity)
+                // Side by side when they fit, one under the other at large text sizes.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) { dueButtons(pair, meters: meters) }
+                    VStack(spacing: 10) { dueButtons(pair, meters: meters) }
                 }
                 .font(.subheadline.weight(.semibold))
             }
             .brandCard()
         }
+    }
+
+    @ViewBuilder private func dueButtons(_ pair: Shoe, meters: Double) -> some View {
+        Button("Archive them") { store.change { $0.archive(pair.id) } }
+            .buttonStyle(.glass)
+            .frame(maxWidth: .infinity)
+        Button("Another 100 km") {
+            var later = pair
+            later.replaceAtMeters = (meters / 1_000).rounded(.up) * 1_000 + 100_000
+            store.change { $0.update(later) }
+        }
+        .buttonStyle(.glass)
+        .frame(maxWidth: .infinity)
     }
 }

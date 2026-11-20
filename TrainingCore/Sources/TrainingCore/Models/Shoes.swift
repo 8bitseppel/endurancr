@@ -106,13 +106,13 @@ public struct ShoeLog: Sendable, Equatable, Codable {
     // MARK: Changes
 
     /// Adds a pair. The first one, or one asked to be, becomes the default from the
-    /// day it was in use, so its runs in Health since then count for it; unless
-    /// another pair was the default after that day, which keeps its runs.
+    /// day it was in use, so its runs in Health since then count for it: that's what
+    /// "in use since" says. Changes of the default after that day give way to it.
     public mutating func add(_ pair: Shoe, makeDefault: Bool) {
         shoes.append(pair)
         guard makeDefault || active.count == 1 else { return }
-        let lastChange = defaults.last?.from ?? .distantPast
-        setDefault(pair.id, from: lastChange < pair.addedAt ? pair.addedAt : max(lastChange, .now))
+        defaults.removeAll { $0.from >= pair.addedAt }
+        defaults.append(DefaultChange(from: pair.addedAt, shoeID: pair.id))
     }
 
     /// The pair runs count for from `date` on.

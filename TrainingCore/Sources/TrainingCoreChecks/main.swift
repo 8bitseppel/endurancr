@@ -1864,6 +1864,17 @@ h.suite("Running shoes") {
     h.check(log.defaultShoe == nil && log.shoeID(for: run(date(2026, 11, 15), 5)) == nil,
             "with every pair archived, new runs are in none")
 
+    // A pair you already own, added today as the default from the day you started
+    // in it: its runs since then count for it, not for the pair that was default.
+    var owned = ShoeLog()
+    let daily = Shoe(name: "Daily", addedAt: date(2026, 9, 1))
+    owned.add(daily, makeDefault: true)
+    let older = run(date(2026, 10, 5), 10), newer = run(date(2026, 11, 3), 12)
+    let bought = Shoe(name: "Bought in October", startingMeters: 30_000, addedAt: date(2026, 10, 20))
+    owned.add(bought, makeDefault: true)
+    h.check(owned.meters(of: bought.id, in: [older, newer]) == 42_000 && owned.meters(of: daily.id, in: [older, newer]) == 10_000,
+            "a pair added as the default from a past day counts its runs since that day")
+
     // Into the backup and back, and backups from before shoes still read.
     let inputs = PlanInputs(goal: Goal(race: .marathon, raceDate: date(2027, 4, 25)),
                             fitness: FitnessSnapshot(distanceMeters: 10_000, timeSeconds: 3_000, date: date(2026, 10, 1)),

@@ -972,7 +972,8 @@ endurancr is a training aid, not medical advice. Talk to a doctor before you sta
 
 ### Build
 
-1.21.11 (56). The version number is the birthday the release is for, 21 November;
+1.21.11 (57). Build 56 crashed when archiving a pair, and its add-shoe form had two
+accessibility audit issues; 57 fixes both. The version number is the birthday the release is for, 21 November;
 every version after it has to be higher (1.22.0 and up).
 
 ### Screenshots

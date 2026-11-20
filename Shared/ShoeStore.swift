@@ -60,8 +60,13 @@ final class ShoeStore {
 
     // MARK: Changes
 
+    /// Changes the shoes. The edit works on a copy, so it may read the store while it
+    /// runs (a page asking which pair it shows): editing `log` in place while it's
+    /// read is an overlapping access, which stops the app.
     func change(_ edit: (inout ShoeLog) -> Void) {
-        edit(&log)
+        var changed = log
+        edit(&changed)
+        log = changed
         save()
     }
 
