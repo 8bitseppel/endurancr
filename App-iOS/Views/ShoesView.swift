@@ -84,6 +84,9 @@ struct ShoeRow: View {
 
     private var fraction: Double { min(1, meters / max(1, shoe.replaceAtMeters)) }
     private var isDue: Bool { meters >= shoe.replaceAtMeters }
+    /// From 80% on: runners don't feel cushioning go (Cornwall and McPoil, 2017),
+    /// so a look at the shoes is worth it before the number is reached.
+    private var isNear: Bool { !isDue && meters >= 0.8 * shoe.replaceAtMeters }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -102,7 +105,9 @@ struct ShoeRow: View {
                 .accessibilityHidden(true)
             Text(isDue
                  ? "\(Format.distance(meters)), past the \(Format.distanceCompact(shoe.replaceAtMeters)) set for replacing"
-                 : "\(Format.distance(meters)) of \(Format.distanceCompact(shoe.replaceAtMeters))")
+                 : isNear
+                    ? "\(Format.distance(meters)) of \(Format.distanceCompact(shoe.replaceAtMeters)), time to check them"
+                    : "\(Format.distance(meters)) of \(Format.distanceCompact(shoe.replaceAtMeters))")
                 .font(.caption).foregroundStyle(isDue ? .red : .secondary)
         }
         .padding(.vertical, 4)
@@ -234,7 +239,7 @@ struct ShoeEditor: View {
                         LabeledContent("Replace at", value: "\(replaceAtKm) km")
                     }
                 } footer: {
-                    Text("Most shoes last 500 to 800 km, racing shoes less. The note on Today comes when they get there; how they feel matters more than the number.")
+                    Text("Shoe makers give 500 to 800 km for everyday shoes; racing shoes with a carbon plate lose their edge by about 400 km. Today says so when they get there. Worn-through soles, creased foam or new aches count more than the number.")
                 }
                 if shoe == nil, !store.log.active.isEmpty {
                     Section {

@@ -1,0 +1,11 @@
+Happy Birthday Jan!
+
+Your shoes
+- Under Progress, add the shoes you run in. Every run counts for them, nothing to pick before or after a run.
+- Already own them? Add the day you started running in them, and your runs in Apple Health since then count, plus the kilometres they had run before.
+- More than one pair? One is the default: change it under Start run on Today. After a run, change its pair in the summary or under Recent runs.
+- Each pair shows how far it has gone against when to replace it, 700 km unless you set another. At 80% it says it's time to check them, and at the distance Today says so once, with Archive them or Another 100 km.
+- Archived pairs stay under Your earlier shoes, with what they ran.
+- Your shoes stay on your iPhone and go into the backup file with your plan. Apple Health has no shoes, so nothing else knows them.
+
+How it works explains where the 700 km come from, and why worn soles and new aches count more than any number.

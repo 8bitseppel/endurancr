@@ -204,6 +204,12 @@ struct HowItWorksView: View {
                 )
 
                 topic(
+                    "Your shoes",
+                    icon: "shoe",
+                    detail: "Under Progress, Shoes keeps track of how far each pair has gone, so you know when they're due for replacing. You don't have to add any; without shoes nothing changes. Add the pair you run in and every run counts for it, nothing to pick before or after a run. With more than one pair, one is the default: change it under Start run on Today before a run, and change a run's pair afterwards in its summary or under Recent runs, or set it to none. Changing the default counts from then on; the runs before stay with the pair they were run in. A pair you already own can be added with the day you started running in them, so your runs in Apple Health since then count, and the kilometres they had run before that. Indoor runs count with the treadmill's distance. Each pair has its own distance for replacing it, 700 km unless you set another. That's inside the 500 to 800 km the shoe makers give, which goes back to a 1985 study of how fast midsole foam loses its cushioning (Cook, Kester and Brunet), not to any study of injuries: none has found a distance at which shoes start to hurt. Racing shoes with a carbon plate lose their advantage sooner, by about 450 km in the one study that measured it (Rodrigo-Carranza, Hoogkamer and others, 2024), so 400 km suits them. Runners don't feel the cushioning go (Cornwall and McPoil, 2017), which is why the number is worth keeping: from 80% the pair says it's time to check them, and at 100% Today says so once, with Archive them or Another 100 km. Worn-through soles, creases in the foam or new aches count more than any number. Archived pairs stay under Your earlier shoes with what they ran, and can be used again; deleting one removes it for good. Shoes live only on your iPhone, as Apple Health has no shoes, and they go into the backup file with your plan."
+                )
+
+                topic(
                     "Another session",
                     icon: "arrow.left.arrow.right",
                     detail: "Want to run intervals today though the plan has an easy run? Start another session, under Start run on Today, or a turn of the Crown below today's run on the watch, lists what fits today. First this week's own hard session: starting it moves it to today and today's run to its day, so nothing is done twice. In a week with only one hard session, an interval session of the plan's own size: reps of about 3 to 4 minutes at your interval pace, 3 to 6 of them, at most 8% of the week or 10 km in all, as Jack Tupper Daniels limits them. And strides at the end of today's easy run. It's never offered when it would do more harm than good, and it says why: in base weeks (intervals start in the build phase), the day after a hard session or the long run, the day before the long run, when it would put two hard days side by side, in the last 10 days before the race, while you ease back in after a break, when your resting heart rate is up, or when the week already has its two hard sessions. The paces come from your current fitness, and the reps are timed and shown like any other interval session."
@@ -319,6 +325,11 @@ struct HowItWorksView: View {
                     title: "Excessive progression in weekly running distance (JOSPT, 2014)",
                     author: "Nielsen et al.",
                     detail: "More injuries among novice runners who added more than 30% in two weeks."
+                )
+                source(
+                    title: "How long running shoes last",
+                    author: "Cook, Kester & Brunet, Am J Sports Med 1985 · Cornwall & McPoil 2017 · Rodrigo-Carranza, Hoogkamer et al. 2024",
+                    detail: "Midsole foam keeps about 75% of its shock absorption after 80 km and under 60% by 400 to 800 km; runners don't notice the loss; a carbon-plated racing shoe's advantage is gone by 450 km. Where the 700 km for replacing shoes, and 400 km for racing shoes, come from."
                 )
                 source(
                     title: "Oxygen Power: Performance Tables for Distance Runners",

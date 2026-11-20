@@ -7,6 +7,7 @@ the details and reasons behind each text are in `docs/APP_STORE.md`.
 
 | Version | Build | Date | What changed |
 |---|---|---|---|
+| [1.21.11](1.21.11/UPLOAD.md) | 56 | 2026-11-20 | Happy Birthday Jan: your running shoes, every run counted for the pair you run in, archived pairs kept |
 | [1.9.0](1.9.0/UPLOAD.md) | 55 | 2026-11-16 | The iPhone guided like the watch, with spoken cues; indoor runs, auto-pause and an instant finish on iPhone; heart rate zones |
 | [1.8.0](1.8.0/UPLOAD.md) | 53 | 2026-11-05 | Plans sized to how much you run, indoor runs in km/h, runs in Calendar, a watch that never waits |
 | [1.7.0](1.7.0/UPLOAD.md) | 47 | 2026-10-30 | Strides on the clock: two taps, each 20 s burst counted down, every one saved and shown |

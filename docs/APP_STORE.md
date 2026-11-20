@@ -904,3 +904,79 @@ background mode; the iPhone's indoor runs keep running through their workout ses
 New: `iphone-12-strides-run` (the strides countdown on iPhone, as a video),
 `iphone-13-indoor` (the treadmill's distance after an indoor run) and `watch-11-zones`
 (the heart rate zones page). Everything is in `releases/1.9.0/`.
+
+## Version 1.21.11
+
+### Promotional text (170)
+
+Your running shoes, with every run counted for the pair you run in, so you know when they're due for replacing. All on your iPhone, in your backup.
+
+### What's New (4000)
+
+Happy Birthday Jan!
+
+Your shoes
+- Under Progress, add the shoes you run in. Every run counts for them, nothing to pick before or after a run.
+- Already own them? Add the day you started running in them, and your runs in Apple Health since then count, plus the kilometres they had run before.
+- More than one pair? One is the default: change it under Start run on Today. After a run, change its pair in the summary or under Recent runs.
+- Each pair shows how far it has gone against when to replace it, 700 km unless you set another. At 80% it says it's time to check them, and at the distance Today says so once, with Archive them or Another 100 km.
+- Archived pairs stay under Your earlier shoes, with what they ran.
+- Your shoes stay on your iPhone and go into the backup file with your plan. Apple Health has no shoes, so nothing else knows them.
+
+How it works explains where the 700 km come from, and why worn soles and new aches count more than any number.
+
+### Description (4000)
+
+endurancr builds a running plan around one goal, records your runs on Apple Watch or iPhone, and adapts the plan to what you really ran, like a running buddy who isn't pushy. No account, no feed, no ads.
+
+SET ONE GOAL
+Pick a race, from 5K to the marathon, and its date. endurancr builds a full plan with the VDOT method from Jack Tupper Daniels, paced to your fitness and sized to how much you run. It uses a recent run from Apple Health, or a race result you type in. A short race shows your speed, not your endurance, so marathon pace starts a little easier until your long runs prove it.
+
+TRAINING FROM THE BOOKS
+Easy runs, threshold runs, intervals and marathon-pace runs, at most two hard sessions a week. Strides keep your legs quick. Long runs build to 32 km for the marathon. A tune-up race six weeks out sets your paces. Race day tells you how to pace it and what to eat and drink, and afterwards the plan brings you back with rest and easy runs. Based on Jack Tupper Daniels, Pete Pfitzinger, the Hansons and Hal Higdon.
+
+A PLAN THAT FOLLOWS YOU
+Every run counts, even on a rest day. Missed kilometres are never piled onto the days after. Ran less than planned? The coming weeks build from what you actually ran, at most 10% more each week. Back from a break? Your paces ease a little and you start with easy runs. Strong runs nudge your paces up. Drag days to swap them, and put your runs in Calendar.
+
+THE WHOLE PLAN
+See what you ran on each day, what you missed, what changed and why, your new paces next to the old ones, and what each week is for, all the way to race day.
+
+AN HONEST OUTLOOK
+Progress shows a finish-time range for today and for race day, and tells you whether your target is on track, within reach, a stretch or unlikely, and why. If it's out of reach, it suggests a realistic time. It only changes your target if you tap it.
+
+A CALM LOOK, LIGHT AND DARK
+Every kind of run has its own colour, on Today, in the plan and in your paces.
+
+INTERVALS AND STRIDES, GUIDED
+On interval days your Apple Watch guides you through every rep: "get ready" before it, a tap and "Go" with its pace, and a tap when it is done. Only the start and end of an effort tap your wrist. Strides run on the clock: two taps when they start, then every 20 s burst counted down big. No watch? The iPhone guides the same sessions, with the countdown on screen, and can say "Go" and "Easy" out loud. Afterwards you see every rep against its target and every stride with its pace. Feel like intervals on another day? Start another session offers them when they fit your week.
+
+RUN ON YOUR WRIST OR YOUR PHONE
+Start today's run on Apple Watch with heart rate, or on iPhone with GPS. On a treadmill, an indoor run turns GPS off, shows your targets as speeds and asks for the treadmill's distance at the end, on the watch or the iPhone. Finish is held for a second, so a run never ends by accident, and the summary opens straight away. Auto-pause holds your run at a traffic light. With watchOS 27 you see the time in each heart rate zone. Every run is saved to Apple Health.
+
+YOUR SHOES
+Add your shoes and every run counts for the pair you run in. See how far each has gone and when it's due for replacing.
+
+YOUR PACES IN A MINUTE
+The pace calculator turns one recent race into your VDOT, your five training paces, a race-day range and the plan endurancr would build, ready to start with one tap. It's in the app, and as an App Clip it opens without installing, right in Safari or from a link.
+
+NOTHING HIDDEN
+How it works explains every rule the plan follows, in plain words, with the books behind it. endurancr is open source, so you can read every line that touches your data.
+
+PRIVATE BY DESIGN
+No account, no server, no analytics, no ads, no tracking. Your plan stays on your device, and your runs live in Apple Health.
+
+FREE
+No subscription and no in-app purchases.
+
+endurancr is a training aid, not medical advice. Talk to a doctor before you start a new training plan.
+
+### Build
+
+1.21.11 (56). The version number is the birthday the release is for, 21 November;
+every version after it has to be higher (1.22.0 and up).
+
+### Screenshots
+
+New: `iphone-14-shoes` (Shoes under Progress, in the App Store set) and
+`iphone-15-add-shoe` (adding a pair you already own, on the website). Everything is
+in `releases/1.21.11/`.

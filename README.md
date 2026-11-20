@@ -142,6 +142,12 @@ ran. Paces come from the VDOT method by Jack Tupper Daniels.
   a page of the watch's summary and on every run with heart rate in Recent runs.
   Zone taps on the watch, off until switched on, tap once going down and twice going
   up, never during a rep or a stride.
+- Shoes (under Progress, optional): every run counts for the default pair, changed on
+  Today before a run or afterwards in its summary or Recent runs. A pair you already
+  own is added with the day you started running in it and the kilometres before.
+  700 km for replacing by default (400 km suits carbon-plated racers), a hint at
+  80%, one note on Today at 100%. Archived pairs keep their history. Only on the
+  iPhone, and in the backup file.
 - Runs in Calendar: the plan's runs as all-day events in a calendar of their own,
   "endurancr", from today to race day, moved and changed when the plan changes.
 - On the watch, the run starts the moment you tap Start, and after Finish a check
