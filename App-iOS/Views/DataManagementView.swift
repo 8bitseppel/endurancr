@@ -28,7 +28,7 @@ struct DataManagementView: View {
             } header: {
                 Text("Storage")
             } footer: {
-                Text("endurancr stores only your goal and training rules. Your calendar is regenerated on the fly, so past weeks take up no space and there's nothing to prune. Recorded runs live in Apple Health and aren't counted here.")
+                Text("endurancr stores only your goal, training rules and running shoes. Your calendar is regenerated on the fly, so past weeks take up no space and there's nothing to prune. Recorded runs live in Apple Health and aren't counted here.")
             }
 
             Section {
@@ -41,7 +41,7 @@ struct DataManagementView: View {
             } header: {
                 Text("Back up")
             } footer: {
-                Text("Saves your goal, training rules, and vacations to a file you can keep or AirDrop to a new iPhone. No personal data or recorded runs; those stay in Apple Health.")
+                Text("Saves your goal, training rules, vacations and running shoes, with their kilometres, to a file you can keep or AirDrop to a new iPhone. No recorded runs; those stay in Apple Health.")
             }
 
             Section {
@@ -51,7 +51,7 @@ struct DataManagementView: View {
                     Label("Import plan…", systemImage: "square.and.arrow.down")
                 }
             } footer: {
-                Text("Restores a plan from a backup file. This replaces your current plan; recorded runs in Health are kept.")
+                Text("Restores a plan, and the shoes when the file has them, from a backup file. This replaces your current plan; recorded runs in Health are kept.")
             }
 
             Section {

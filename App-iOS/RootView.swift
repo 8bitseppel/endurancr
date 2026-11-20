@@ -30,6 +30,15 @@ struct RootView: View {
                     PaceCalculatorSheet(action: .createPlan { _ in })
                 } else if DemoMode.screen == "goal" {
                     GoalEditorView(coordinator: coordinator)
+                } else if DemoMode.screen == "shoes" {
+                    // `-demoScreen shoes`: the shoes under Progress, `shoe` one pair,
+                    // `addshoe` adding a pair you already own.
+                    NavigationStack { ShoesView(coordinator: coordinator) }
+                } else if DemoMode.screen == "shoe", let pair = ShoeStore.shared.log.defaultShoe {
+                    NavigationStack { ShoeDetailView(shoe: pair) }
+                } else if DemoMode.screen == "addshoe" {
+                    ShoeEditor(shoe: nil, prefill: Shoe(name: "Novablast 5", startingMeters: 140_000,
+                                                        addedAt: Calendar.current.date(byAdding: .month, value: -2, to: .now)!))
                 } else if DemoMode.screen == "summary" {
                     #if DEBUG
                     RunSummaryView(data: .demo)
@@ -65,6 +74,7 @@ struct RootView: View {
             #endif
             await health.requestAuthorization()
             await coordinator?.refreshAdaptation()
+            await ShoeStore.shared.refresh(health: health)
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
@@ -74,7 +84,10 @@ struct RootView: View {
                 // Reopened after a real background trip: pull in any runs recorded
                 // meanwhile and re-adapt the plan (paces, fatigue, missed sessions).
                 wasBackgrounded = false
-                Task { await coordinator?.refreshAdaptation() }
+                Task {
+                    await coordinator?.refreshAdaptation()
+                    await ShoeStore.shared.refresh(health: health)
+                }
             default:
                 break
             }

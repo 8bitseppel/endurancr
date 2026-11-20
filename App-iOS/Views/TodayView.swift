@@ -11,6 +11,7 @@ struct TodayView: View {
     let coordinator: PlanCoordinator
     @State private var recorder = PhoneWorkoutManager.shared
     @State private var calendar = PlanCalendar.shared
+    @State private var shoes = ShoeStore.shared
     @State private var confirmCalendarOff = false
     @State private var showLiveRun = false
     @State private var runSummary: RunSummaryData?
@@ -64,6 +65,7 @@ struct TodayView: View {
                     header
                     // First: when Health hides runs, everything below is off.
                     HealthAccessNote(coordinator: coordinator)
+                    ShoeDueNote()
                     if let workout = coordinator.workout() {
                         todayCard(workout)
                     } else {
@@ -174,6 +176,7 @@ struct TodayView: View {
                 let run = recorder.runID
                 Task {
                     await coordinator.refreshAdaptation()
+                    await shoes.refresh(health: coordinator.health)
                     guard summarizedRun == run, var shown = runSummary else { return }
                     let p = coordinator.progress
                     shown.weekNumber = p?.currentWeekNumber ?? shown.weekNumber
@@ -184,7 +187,9 @@ struct TodayView: View {
                     runSummary = shown
                 }
             }
-            .sheet(item: $runSummary) { RunSummaryView(data: $0, saveState: recorder.saveState) }
+            .sheet(item: $runSummary) {
+                RunSummaryView(data: $0, saveState: recorder.saveState, workoutID: recorder.savedWorkoutID)
+            }
             #if DEBUG
             .task {
                 // `-demoScreen phoneflow`: a guided run on iPhone, Start to summary.
@@ -226,7 +231,10 @@ struct TodayView: View {
             } message: {
                 Text("Removes your plan and training rules. Recorded runs stay in Apple Health.")
             }
-            .refreshable { await coordinator.refreshAdaptation() }
+            .refreshable {
+                await coordinator.refreshAdaptation()
+                await shoes.refresh(health: coordinator.health)
+            }
         }
     }
 
@@ -381,6 +389,14 @@ struct TodayView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
+            // Which shoes the run counts for, once there are any: changed here,
+            // it's the default from now on.
+            if !shoes.log.active.isEmpty {
+                ShoeMenu(title: "Shoes", selected: shoes.log.defaultShoe) { id in
+                    shoes.change { $0.setDefault(id) }
+                }
+                .frame(maxWidth: .infinity, minHeight: 44)
+            }
             // Always there: the indoor run is offered even when nothing else is.
             Button("Start another session") { showingOther = true }
                 .font(.subheadline.weight(.medium))
@@ -419,7 +435,8 @@ struct TodayView: View {
             weekNumber: p?.currentWeekNumber,
             weekCompletedMeters: (p?.currentWeekCompletedMeters ?? 0) + distance,
             weekTargetMeters: p?.currentWeekPlannedMeters ?? 0,
-            reps: recorder.reps
+            reps: recorder.reps,
+            date: Date(timeIntervalSinceNow: -recorder.elapsedSeconds)
         )
     }
 

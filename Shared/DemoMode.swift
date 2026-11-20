@@ -215,6 +215,26 @@ enum DemoMode {
     }
 
 
+    /// Three pairs for the shoe screens: an old pair put away, the daily pair (the
+    /// default) and a race pair. `-demoShoes none` starts with no shoes, and
+    /// `-demoShoeDue YES` has the daily pair past its distance, for the note on Today.
+    static var shoes: ShoeLog {
+        guard isOn, UserDefaults.standard.string(forKey: "demoShoes") != "none" else { return ShoeLog() }
+        let today = Calendar.current.startOfDay(for: .now)
+        let ago = { (days: Int) in Calendar.current.date(byAdding: .day, value: -days, to: today)! }
+        let due = UserDefaults.standard.bool(forKey: "demoShoeDue")
+        var log = ShoeLog()
+        let old = Shoe(name: "Ghost 15", startingMeters: 410_000, addedAt: ago(240), replaceAtMeters: 700_000)
+        log.add(old, makeDefault: true)
+        log.archive(old.id, at: ago(61))
+        // The old pair's own runs, before the plan's: what it had run when put away.
+        log.update(Shoe(id: old.id, name: old.name, startingMeters: 742_000, addedAt: old.addedAt,
+                        replaceAtMeters: 700_000, archivedAt: ago(61)))
+        log.add(Shoe(name: "Pegasus 41", startingMeters: due ? 520_000 : 190_000, addedAt: ago(60)), makeDefault: true)
+        log.add(Shoe(name: "Vaporfly 3", startingMeters: 64_000, addedAt: ago(20), replaceAtMeters: 400_000), makeDefault: false)
+        return log
+    }
+
     /// The single run set with `-demoRecentRun`, if any.
     static var recentRun: CompletedRun? {
         guard isOn, let parts = UserDefaults.standard.string(forKey: "demoRecentRun")?

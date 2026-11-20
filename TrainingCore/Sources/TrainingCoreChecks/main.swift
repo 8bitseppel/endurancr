@@ -1823,4 +1823,56 @@ h.suite("Another session") {
     }
 }
 
+// MARK: Running shoes
+
+h.suite("Running shoes") {
+    let run = { (d: Date, km: Double) in
+        CompletedRun(date: d, distanceMeters: km * 1_000, durationSeconds: km * 360, workoutID: UUID())
+    }
+    var log = ShoeLog()
+    let first = Shoe(name: "Pegasus", startingMeters: 120_000, addedAt: date(2026, 11, 1))
+    log.add(first, makeDefault: false)
+    h.check(log.defaultShoe?.id == first.id, "the only pair is the default without being asked")
+    let before = run(date(2026, 10, 30), 10)
+    let a = run(date(2026, 11, 2), 8), b = run(date(2026, 11, 4), 12)
+    h.check(log.meters(of: first.id, in: [before, a, b]) == 140_000,
+            "a pair counts what it had run plus every run since it was added, not the runs before")
+
+    // A second pair, made the default from the 5th: the runs before stay with the first.
+    let second = Shoe(name: "Vaporfly", addedAt: date(2026, 11, 5))
+    log.add(second, makeDefault: true)
+    let c = run(date(2026, 11, 6), 21)
+    let runs = [before, a, b, c]
+    h.check(log.meters(of: first.id, in: runs) == 140_000 && log.meters(of: second.id, in: runs) == 21_000,
+            "changing the default counts from then on")
+
+    // Changed after the run.
+    log.assign(b, to: second.id)
+    h.check(log.meters(of: first.id, in: runs) == 128_000 && log.meters(of: second.id, in: runs) == 33_000,
+            "a run changed afterwards counts for the pair it was changed to")
+    log.assign(a, to: nil)
+    h.check(log.shoeID(for: a) == nil, "a run can be in no pair")
+
+    // Archived: its kilometres stay, no new run counts for it, the other pair takes over.
+    log.archive(second.id, at: date(2026, 11, 10))
+    let d = run(date(2026, 11, 12), 10)
+    h.check(log.archived.map(\.id) == [second.id] && log.meters(of: second.id, in: runs + [d]) == 33_000,
+            "an archived pair keeps what it ran")
+    h.check(log.defaultShoe?.id == first.id && log.shoeID(for: d) == first.id,
+            "archiving the default hands it to the only other pair in use")
+    log.archive(first.id, at: date(2026, 11, 14))
+    h.check(log.defaultShoe == nil && log.shoeID(for: run(date(2026, 11, 15), 5)) == nil,
+            "with every pair archived, new runs are in none")
+
+    // Into the backup and back, and backups from before shoes still read.
+    let inputs = PlanInputs(goal: Goal(race: .marathon, raceDate: date(2027, 4, 25)),
+                            fitness: FitnessSnapshot(distanceMeters: 10_000, timeSeconds: 3_000, date: date(2026, 10, 1)),
+                            startDate: date(2026, 11, 2))
+    let backup = PlanBackup(inputs: inputs, shoes: log, appVersion: "test")
+    let restored = try? PlanBackupCodec.decode(PlanBackupCodec.encode(backup))
+    h.check(restored?.shoes == log, "shoes and their runs go into the backup file and come back")
+    let old = try? PlanBackupCodec.decode(PlanBackupCodec.encode(PlanBackup(inputs: inputs, appVersion: "1.9.0")))
+    h.check(old != nil && old?.shoes == nil, "a backup without shoes still reads")
+}
+
 h.finish()

@@ -18,6 +18,8 @@ struct RunSummaryData: Identifiable {
     var weekTargetMeters: Double
     /// The reps of an interval session, as they were run.
     var reps: [RepSplit] = []
+    /// When the run started, for the shoes it counts for.
+    var date: Date = .now
 
     var averagePaceSecPerKm: Double {
         guard distanceMeters > 0 else { return 0 }
@@ -37,7 +39,27 @@ struct RunSummaryView: View {
     /// The save as it happens: the summary opens before Health has the run, and
     /// "Saving to Health" turns into "Saved to Health" in place. `nil` uses `data.saved`.
     var saveState: PhoneWorkoutManager.SaveState? = nil
+    /// The run's ID in Apple Health, once saved, so its shoes can be changed.
+    var workoutID: UUID? = nil
     @Environment(\.dismiss) private var dismiss
+    @State private var shoes = ShoeStore.shared
+    /// A pair chosen before the save was done, put on the run once it is.
+    @State private var pendingShoe: UUID??
+
+    /// The pair this run counts for: the one chosen here, or the default.
+    private var runShoe: Shoe? {
+        if let pendingShoe { return shoes.log.shoe(pendingShoe) }
+        if let workoutID { return shoes.shoe(forWorkout: workoutID, date: data.date) }
+        return shoes.log.shoe(shoes.log.defaultID(at: data.date))
+    }
+
+    private func pick(_ id: UUID?) {
+        guard let workoutID else { pendingShoe = .some(id); return }
+        let run = CompletedRun(date: data.date, distanceMeters: data.distanceMeters,
+                               durationSeconds: data.durationSeconds, workoutID: workoutID)
+        shoes.change { $0.assign(run, to: id) }
+        pendingShoe = nil
+    }
 
     private var saving: Bool { saveState == .saving || (saveState == .idle && !data.saved) }
     private var saved: Bool { saveState.map { $0 == .saved } ?? data.saved }
@@ -77,6 +99,23 @@ struct RunSummaryView: View {
                     .brandCard(tint: .green, cornerRadius: 30, padding: 22)
                     .accessibilityElement(children: .combine)
 
+                    // Only with shoes added: then the run counts for the default pair,
+                    // and here it can go to another.
+                    if !shoes.log.active.isEmpty {
+                        HStack {
+                            ShoeMenu(title: "Shoes", selected: runShoe, onPick: pick)
+                            Spacer()
+                            if let pair = runShoe {
+                                // This run included, also before Health has been read again.
+                                let counted = workoutID.map { id in shoes.runs.contains { $0.workoutID == id } } ?? false
+                                Text(Format.distance(shoes.meters(of: pair) + (counted ? 0 : data.distanceMeters)))
+                                    .font(.subheadline.weight(.semibold)).monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .brandCard(cornerRadius: 22, padding: 16)
+                    }
+
                     if !data.reps.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
                             Text(RepsView.title(for: data.reps)).brandEyebrow()
@@ -111,6 +150,10 @@ struct RunSummaryView: View {
             .background { BrandBackground() }
             .navigationTitle("Run complete")
             .navigationBarTitleDisplayMode(.inline)
+            .onChange(of: workoutID) { _, saved in
+                // Chosen while the save was still going: put it on the run now.
+                if saved != nil, let pendingShoe { pick(pendingShoe) }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }

@@ -20,9 +20,13 @@ public struct PlanBackup: Sendable, Equatable, Codable {
     public var appVersion: String
     public var exportedAt: Date
     public var inputs: PlanInputs
+    /// The running shoes, their kilometres and which runs were in which pair.
+    /// Optional, so backups from before shoes still read, and older apps ignore it.
+    public var shoes: ShoeLog?
 
     public init(
         inputs: PlanInputs,
+        shoes: ShoeLog? = nil,
         appVersion: String,
         exportedAt: Date = .now,
         schemaVersion: Int = PlanBackup.currentSchemaVersion
@@ -31,6 +35,7 @@ public struct PlanBackup: Sendable, Equatable, Codable {
         self.appVersion = appVersion
         self.exportedAt = exportedAt
         self.inputs = inputs
+        self.shoes = shoes
     }
 }
 

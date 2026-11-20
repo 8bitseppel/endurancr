@@ -15,7 +15,7 @@ mkdir -p docs/screenshots "$A/6.5-inch" "$A/6.3-inch" website/screens
 
 for f in iphone-1-welcome.png iphone-2-goal.gif iphone-2-goal.png iphone-3-today.png iphone-4-run.png \
          iphone-5-summary.png iphone-6-progress.gif iphone-6-progress.png iphone-7-plan.png iphone-8-week.png iphone-9-paces.png iphone-10-another.png \
-         iphone-11-strides.png iphone-12-strides-run.gif iphone-12-strides-run.png iphone-13-indoor.png \
+         iphone-11-strides.png iphone-12-strides-run.gif iphone-12-strides-run.png iphone-13-indoor.png iphone-14-shoes.png iphone-15-add-shoe.png \
          watch-1-today.png watch-2-run.gif watch-2-run.png watch-3-summary.gif watch-3-summary.png \
          watch-4-intervals.png watch-5-reps.png watch-6-another.png \
          watch-7-strides.gif watch-7-strides.png watch-8-strides-done.png \
@@ -24,19 +24,19 @@ for f in iphone-1-welcome.png iphone-2-goal.gif iphone-2-goal.png iphone-3-today
 done
 
 # App Store order, ten at most (Apple's limit per device): Today, Progress, Plan,
-# Strides on iPhone, Indoor, Last week, Paces, Run, Run complete, Goal. Welcome,
-# Another session and Strides done are on the website only.
+# Strides on iPhone, Shoes, Indoor, Last week, Paces, Run, Run complete. Welcome,
+# Goal, Another session, Strides done and Adding shoes are on the website only.
 rm -f $A/iphone-*.png $A/6.5-inch/iphone-*.png $A/6.3-inch/iphone-*.png $A/watch-*.png
 cp $S/iphone-3-today.png    $A/iphone-01-today.png
 cp $S/iphone-6-progress.png $A/iphone-02-progress.png
 cp $S/iphone-7-plan.png     $A/iphone-03-plan.png
 cp $S/iphone-12-strides-run.png $A/iphone-04-strides-run.png
-cp $S/iphone-13-indoor.png  $A/iphone-05-indoor.png
-cp $S/iphone-8-week.png     $A/iphone-06-week.png
-cp $S/iphone-9-paces.png    $A/iphone-07-paces.png
-cp $S/iphone-4-run.png      $A/iphone-08-run.png
-cp $S/iphone-5-summary.png  $A/iphone-09-summary.png
-cp $S/iphone-2-goal.png     $A/iphone-10-goal.png
+cp $S/iphone-14-shoes.png   $A/iphone-05-shoes.png
+cp $S/iphone-13-indoor.png  $A/iphone-06-indoor.png
+cp $S/iphone-8-week.png     $A/iphone-07-week.png
+cp $S/iphone-9-paces.png    $A/iphone-08-paces.png
+cp $S/iphone-4-run.png      $A/iphone-09-run.png
+cp $S/iphone-5-summary.png  $A/iphone-10-summary.png
 cp $S/watch-1-today.png     $A/watch-01-today.png
 cp $S/watch-2-run.png       $A/watch-02-run.png
 cp $S/watch-3-summary.png   $A/watch-03-summary.png

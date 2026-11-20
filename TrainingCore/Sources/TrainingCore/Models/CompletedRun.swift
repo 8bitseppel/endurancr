@@ -13,6 +13,9 @@ public struct CompletedRun: Sendable, Equatable, Codable, Identifiable {
     /// Each rep of an interval session as it was run, when endurancr recorded it
     /// (`RepTracker`); `nil` for other runs and runs from other apps.
     public var reps: [RepSplit]?
+    /// The workout's ID in Apple Health, so a run can be told which shoes it was in
+    /// (`ShoeLog`). `nil` for runs made up in checks and demos.
+    public var workoutID: UUID?
 
     public init(
         id: UUID = UUID(),
@@ -21,7 +24,8 @@ public struct CompletedRun: Sendable, Equatable, Codable, Identifiable {
         durationSeconds: Double,
         averageHeartRate: Double? = nil,
         plannedWorkoutID: UUID? = nil,
-        reps: [RepSplit]? = nil
+        reps: [RepSplit]? = nil,
+        workoutID: UUID? = nil
     ) {
         self.id = id
         self.date = date
@@ -30,6 +34,7 @@ public struct CompletedRun: Sendable, Equatable, Codable, Identifiable {
         self.averageHeartRate = averageHeartRate
         self.plannedWorkoutID = plannedWorkoutID
         self.reps = reps
+        self.workoutID = workoutID
     }
 
     /// Average pace in seconds per kilometer. Returns `.infinity` for a zero-distance run.

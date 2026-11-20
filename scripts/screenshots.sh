@@ -154,6 +154,10 @@ sleep 2   # a relaunch straight away shows a back link to the app in the status 
 xcrun simctl launch "$PHONE" app.endurancr -demo -demoScreen phoneflow -demoStrides YES >/dev/null
 sleep 10.5
 xcrun simctl io "$PHONE" screenshot --type=png "$OUT/iphone-12-strides-run.png" >/dev/null 2>&1
+# Your shoes under Progress: two pairs in use, one put away; and adding a pair you
+# already own, with the kilometres it has.
+shot "$PHONE" app.endurancr shoes iphone-14-shoes
+shot "$PHONE" app.endurancr addshoe iphone-15-add-shoe
 # After an indoor run on iPhone: the treadmill's distance, typed in.
 xcrun simctl terminate "$PHONE" app.endurancr 2>/dev/null || true
 xcrun simctl launch "$PHONE" app.endurancr -demo -demoScreen phoneflow -demoStrides YES -demoIndoor YES -demoTreadmillHold YES >/dev/null

@@ -96,6 +96,10 @@ struct RunDetailView: View {
     let coordinator: PlanCoordinator
 
     @State private var avgHR: Double?
+    @State private var shoes = ShoeStore.shared
+
+    /// The pair this run counts for.
+    private var shoe: Shoe? { shoes.shoe(forWorkout: workout.uuid, date: workout.startDate) }
 
     /// Time in each heart rate zone, for a run with heart rate on iOS 27.
     private var zones: [ZoneTime] {
@@ -128,6 +132,17 @@ struct RunDetailView: View {
                 }
                 LabeledContent("Date", value: workout.startDate.formatted(date: .abbreviated, time: .shortened))
                 LabeledContent("Recorded by", value: workout.sourceRevision.source.name)
+            }
+            if !shoes.log.active.isEmpty || shoe != nil {
+                Section {
+                    ShoeMenu(title: "Shoes", selected: shoe) { id in
+                        let run = CompletedRun(date: workout.startDate, distanceMeters: distanceMeters,
+                                               durationSeconds: workout.duration, workoutID: workout.uuid)
+                        shoes.change { $0.assign(run, to: id) }
+                    }
+                } footer: {
+                    Text("The pair this run counts for. Every run counts for the default pair unless you change it here.")
+                }
             }
             if !zones.isEmpty {
                 Section {

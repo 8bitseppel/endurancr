@@ -129,7 +129,8 @@ final class HealthKitService {
                 durationSeconds: workout.duration,
                 averageHeartRate: rates[i],
                 // The reps endurancr saved with an interval session (`RepReport`).
-                reps: RepReport.decode(workout.metadata?[RepReport.metadataKey] as? String)
+                reps: RepReport.decode(workout.metadata?[RepReport.metadataKey] as? String),
+                workoutID: workout.uuid
             )
         }
         return CompletedRun.cleaned(runs)

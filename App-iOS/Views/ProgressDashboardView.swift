@@ -605,6 +605,11 @@ struct ProgressDashboardView: View {
                 Label("Recent runs", systemImage: "figure.run")
             }
             NavigationLink {
+                ShoesView(coordinator: coordinator)
+            } label: {
+                Label("Shoes", systemImage: "shoe")
+            }
+            NavigationLink {
                 AchievedGoalsView(coordinator: coordinator)
             } label: {
                 Label("Achieved goals", systemImage: "trophy")

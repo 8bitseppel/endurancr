@@ -117,6 +117,8 @@ final class PhoneWorkoutManager: NSObject {
     /// instead of guessing from `lastError`, which also collects GPS hiccups.
     enum SaveState: Equatable { case idle, saving, saved, failed }
     private(set) var saveState = SaveState.idle
+    /// The run's ID in Apple Health once it's saved, to change its shoes afterwards.
+    private(set) var savedWorkoutID: UUID?
 
     /// The target pace window for today's workout, if any.
     var targetPaceRange: ClosedRange<Double>? { targetPace }
@@ -251,6 +253,7 @@ final class PhoneWorkoutManager: NSObject {
         stillSince = nil
         didFinish = false
         runID = UUID()
+        savedWorkoutID = nil
         cue = nil
         readiedStep = nil
         needsMachineDistance = false
@@ -496,6 +499,7 @@ final class PhoneWorkoutManager: NSObject {
             if let session { session.stopActivity(with: end) }
             try await builder.endCollection(at: end)
             if let workout = try await builder.finishWorkout() {
+                savedWorkoutID = workout.uuid
                 saveState = .saved
                 // The workout is in Health now; a missing route doesn't undo that.
                 _ = try? await routeBuilder?.finishRoute(with: workout, metadata: nil)

@@ -187,11 +187,14 @@ final class PlanCoordinator {
 
     /// Serializes the current plan's inputs to a portable, cloud-free backup
     /// (`PlanBackup`). Throws `PlanBackupError.nothingToExport` when there is no
-    /// plan yet. The file holds only training inputs — no personal data, no runs.
+    /// plan yet. The file holds the training inputs and the running shoes with which
+    /// runs were in which pair; no runs themselves, which stay in Apple Health.
     func exportData() throws -> Data {
         guard let inputs else { throw PlanBackupError.nothingToExport }
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
-        return try PlanBackupCodec.encode(PlanBackup(inputs: inputs, appVersion: version))
+        let shoes = ShoeStore.shared.log
+        return try PlanBackupCodec.encode(PlanBackup(inputs: inputs, shoes: shoes.shoes.isEmpty ? nil : shoes,
+                                                     appVersion: version))
     }
 
     /// Restores a plan from a backup file, replacing the current one. The inputs
@@ -199,7 +202,8 @@ final class PlanCoordinator {
     /// file never leaves the app without a plan. Recorded runs in HealthKit are
     /// untouched; follow with `refreshAdaptation()` to re-layer adaptation.
     func importData(_ data: Data) throws {
-        let restored = try PlanBackupCodec.decode(data).inputs
+        let backup = try PlanBackupCodec.decode(data)
+        let restored = backup.inputs
         // Build once up front so invalid inputs throw before we replace anything.
         let plan = try restored.makePlan(calendar: .current)
         try context.delete(model: StoredPlan.self)
@@ -207,6 +211,9 @@ final class PlanCoordinator {
         try context.save()
         inputs = restored
         currentPlan = plan
+        // Shoes come back too, when the file has them; a file from before shoes
+        // leaves the ones on this iPhone as they are.
+        if let shoes = backup.shoes { ShoeStore.shared.restore(shoes) }
     }
 
     // MARK: Storage
